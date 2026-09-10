@@ -3,85 +3,126 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>dLive Show Editor — Experimental</title>
+  <title>dLive Show Editor v2.1 — Experimental</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="v2.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <div class="brand">dLive Show Editor <span class="badge">experimental</span></div>
-      <div class="sub">Local, browser-only editor for Allen &amp; Heath dLive show archives</div>
-    </div>
-    <div class="top-actions">
-      <button id="openBtn" class="primary">Open show</button>
-      <button id="importCsvBtn" disabled>Import CSV</button>
-      <button id="exportBtn" disabled>Export copy</button>
-      <input id="fileInput" type="file" accept=".gz,.tar.gz,application/gzip" hidden />
-      <input id="csvInput" type="file" accept=".csv,text/csv" hidden />
-    </div>
-  </header>
+<header class="topbar">
+  <div>
+    <div class="brand">dLive Show Editor <span class="badge">v2.1 experimental</span></div>
+    <div class="sub">Local dLive show editing + binary structure inspector</div>
+  </div>
+  <div class="top-actions">
+    <button id="openBtn" class="primary">Open show</button>
+    <button id="importCsvBtn" disabled>Import CSV</button>
+    <button id="reportBtn" disabled>Export research JSON</button>
+    <button id="exportBtn" disabled>Export copy</button>
+    <input id="fileInput" type="file" accept=".gz,.tar.gz,application/gzip" hidden />
+    <input id="csvInput" type="file" accept=".csv,text/csv" hidden />
+  </div>
+</header>
 
-  <main class="app-shell">
-    <aside class="sidebar">
-      <section class="show-card" id="showCard">
-        <div class="eyebrow">SHOW</div>
-        <div class="show-name" id="showName">No show loaded</div>
-        <div class="show-meta" id="showMeta">Open a dLive .tar.gz file to begin.</div>
-      </section>
-      <div class="nav-title">Scenes</div>
-      <div id="sceneList" class="scene-list"></div>
-    </aside>
-
-    <section class="workspace">
-      <div id="emptyState" class="empty-state">
-        <div class="empty-icon">DL</div>
-        <h1>Edit dLive show files without uploading them anywhere</h1>
-        <p>This MVP safely edits the fixed-width channel, bus, matrix, DCA and FX name/colour tables found in dLive StageBox scene data. Unknown DSP fields remain read-only.</p>
-        <button id="openBtn2" class="primary large">Choose show file</button>
-      </div>
-
-      <div id="editor" class="editor hidden">
-        <div class="editor-head">
-          <div>
-            <div class="eyebrow">ACTIVE SCENE</div>
-            <h1 id="sceneTitle">Scene</h1>
-            <div id="sceneStatus" class="muted"></div>
-          </div>
-          <div class="head-actions">
-            <label class="toggle"><input id="showUnused" type="checkbox" /> <span>Show unused slots</span></label>
-            <button id="applyAllBtn">Apply names/colours to all scenes</button>
-          </div>
-        </div>
-
-        <div class="tabs">
-          <button class="tab active" data-tab="names">Names &amp; colours</button>
-          <button class="tab" data-tab="fx">FX inspector</button>
-          <button class="tab" data-tab="archive">Archive</button>
-        </div>
-
-        <div id="tabNames" class="tab-panel active">
-          <div class="notice safe"><strong>Safe-write mode:</strong> only recognised 9-byte name slots and their 1-byte colour values are modified. Names are limited to 8 ASCII characters to preserve the binary layout.</div>
-          <div id="managerGrid" class="manager-grid"></div>
-        </div>
-
-        <div id="tabFx" class="tab-panel">
-          <div class="notice warn"><strong>Read-only DSP inspector:</strong> RackUltra/RackExtra DSP parameter encoding is not publicly documented. This build will inspect strings and slot names, but will not write DSP bytes.</div>
-          <div class="fx-grid">
-            <section class="panel"><h2>RackUltra send names</h2><div id="ufxSlots"></div></section>
-            <section class="panel"><h2>Detected FX-related strings</h2><div id="fxStrings" class="string-list"></div></section>
-          </div>
-        </div>
-
-        <div id="tabArchive" class="tab-panel">
-          <div class="notice">The app preserves every unrecognised archive entry byte-for-byte. Scene archives are rebuilt only when their StageBox scene has been edited.</div>
-          <section class="panel"><h2>Show archive entries</h2><div id="archiveList" class="archive-list"></div></section>
-        </div>
-      </div>
+<main class="app-shell">
+  <aside class="sidebar">
+    <section class="show-card">
+      <div class="eyebrow">SHOW</div>
+      <div class="show-name" id="showName">No show loaded</div>
+      <div class="show-meta" id="showMeta">Open a dLive .tar.gz file to begin.</div>
     </section>
-  </main>
+    <div class="nav-title">Scenes</div>
+    <div id="sceneList" class="scene-list"></div>
+  </aside>
 
-  <div id="toast" class="toast"></div>
-  <script src="app-core.js"></script>
-  <script src="app-ui.js"></script>
+  <section class="workspace">
+    <div id="emptyState" class="empty-state">
+      <div class="empty-icon">DL2</div>
+      <h1>Edit proven dLive structures, inspect the rest</h1>
+      <p>V2.1 adds a controlled-diff verified input PEQ editor on top of paired MixRack/Surface scenes, C-class layer editing, RackUltra inspection and mixer-config research tools.</p>
+      <button id="openBtn2" class="primary large">Choose show file</button>
+    </div>
+
+    <div id="editor" class="editor hidden">
+      <div class="editor-head">
+        <div>
+          <div class="eyebrow">ACTIVE SCENE</div>
+          <h1 id="sceneTitle">Scene</h1>
+          <div id="sceneName" class="scene-name"></div>
+          <div id="sceneStatus" class="muted"></div>
+        </div>
+        <div class="head-actions">
+          <label class="toggle"><input id="showUnused" type="checkbox" /> <span>Show unused name slots</span></label>
+          <button id="applyAllBtn">Apply names/colours to all scenes</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="names">Names &amp; colours</button>
+        <button class="tab" data-tab="peq">Input PEQ</button>
+        <button class="tab" data-tab="surface">Surface layout</button>
+        <button class="tab" data-tab="fx">RackUltra</button>
+        <button class="tab" data-tab="system">Mixer config</button>
+        <button class="tab" data-tab="research">Structure</button>
+        <button class="tab" data-tab="archive">Archive</button>
+      </div>
+
+      <div id="tabNames" class="tab-panel active">
+        <div class="notice safe"><strong>Verified write:</strong> fixed 9-byte name slots plus one-byte colour tables. Names remain limited to 8 ASCII characters.</div>
+        <div id="managerGrid" class="manager-grid"></div>
+      </div>
+
+      <div id="tabPeq" class="tab-panel">
+        <div class="notice safe"><strong>Controlled-diff write:</strong> dLive 2.12 input PEQ gain and frequency encodings are now directly verified from isolated Scene 10 clones. Bell width uses the official A&amp;H width index in the high byte; changing width writes the canonical zero-fraction form. Filter type/state bytes remain read-only.</div>
+        <div id="peqEditor"></div>
+      </div>
+
+      <div id="tabSurface" class="tab-panel">
+        <div class="notice safe"><strong>Verified write:</strong> bank/layer assignments use fixed two-byte <code>type,index</code> entries. V2 writes only type IDs independently confirmed in the supplied factory Strip Assign scenes. Unknown assignments remain untouched.</div>
+        <div id="surfaceBanks" class="surface-banks"></div>
+      </div>
+
+      <div id="tabFx" class="tab-panel">
+        <div class="notice warn"><strong>Decoded, read-only:</strong> RackUltra records are parsed as fixed 264-byte <code>AHFX Manager NN</code> records. Engine IDs, stored preset labels, offsets and byte differences are exposed, but DSP bytes are not writable yet.</div>
+        <div id="ahfxManagers" class="fx-cards"></div>
+        <section class="panel">
+          <h2>FX-related strings</h2>
+          <div id="fxStrings" class="string-list"></div>
+        </section>
+      </div>
+
+      <div id="tabSystem" class="tab-panel">
+        <div class="stats-row"><div class="stat"><span>Show format</span><strong id="showFormatVersion">—</strong></div><div class="stat"><span>MixConfig length</span><strong>13 bytes</strong></div></div>
+        <div class="notice warn"><strong>Read-only:</strong> the obvious mixer-count bytes are high-confidence, but four fields remain unidentified. V2 will not write <code>MixConfig.dat</code>.</div>
+        <section class="panel"><h2>MixConfig.dat</h2><div id="mixConfig"></div></section>
+        <section class="panel"><h2>Plain-text global configuration found in show</h2><div id="plainConfigs" class="details-stack"></div></section>
+      </div>
+
+      <div id="tabResearch" class="tab-panel">
+        <div class="notice"><strong>Reverse-engineering view:</strong> recognised record labels are listed with their scene offsets. This is intended to make controlled before/after show comparisons easier.</div>
+        <div id="structureList" class="research-grid"></div>
+        <section class="panel">
+          <h2>Live MIDI protocol cross-reference</h2>
+          <p class="muted">Derived from togrupe/dlive-midi-tools. It describes live console control semantics; it is used as an independent map while investigating the offline scene binary.</p>
+          <div id="protocolTable" class="protocol-table"></div>
+        </section>
+      </div>
+
+      <div id="tabArchive" class="tab-panel">
+        <div class="notice">Unrecognised outer archive entries are preserved. Modified StageBox and Surface scene archives are rebuilt independently, then the complete export is reopened and structurally validated before download.</div>
+        <section class="panel"><h2>Show archive entries</h2><div id="archiveList" class="archive-list"></div></section>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+<script src="app-format.js"></script>
+<script src="app-parsers.js"></script>
+<script src="app-peq.js"></script>
+<script src="app-model.js"></script>
+<script src="app-report.js"></script>
+<script src="app-render-main.js"></script>
+<script src="app-render-inspect.js"></script>
+<script src="app-ui.js"></script>
 </body>
 </html>
