@@ -73,3 +73,5 @@ The user explicitly mapped Scene 11 to +1 dB, Scene 12 to +3 dB and Scene 13 to 
 | 13 | −3.0 dB | fc fd | −771 | −3.01171875 |
 
 The +3 and −3 pair supports a signed big-endian two's-complement field. A Q8.8 interpretation is consistent with every observed display after rounding to one decimal place. Display rounding does not uniquely determine the scale: division by 255 also matches all six reported displays after rounding. Therefore the UI retains exact measured-byte lookup values rather than claiming a continuous encoding has been verified. The tests reproduce each target EQ record and verify that all bytes outside the two-byte field remain unchanged, preserving each scene's own metadata.
+
+The user confirmed these gains were typed directly into Director, rather than obtained by dragging a knob. This excludes manual positioning as the explanation for the measured raw values. A simple round(dB × 256) encoder does not reproduce the typed-value saves (for example +3 produces 771, not 768). Quantization or a different conversion remains unresolved.

@@ -61,5 +61,6 @@
       "sha256": "6b53c52411a3a0691082d6a0a1afa6b7eec8b019e962f0f804aa48919da37c24",
       "gainBytesOffset": 279626
     }
-  ]
+  ],
+  "entryMethod": "User confirms gain values were typed directly into Director."
 }
