@@ -1,75 +1,80 @@
 # Input high-pass filter (HPF)
 
-> Status: **high-confidence read-only**. These notes are unofficial reverse-engineering observations for the current dLive 2.12 reference set.
+> Status: **verified write for frequency and bypass**. These notes are unofficial reverse-engineering observations for dLive 2.12.
 
-Each current input HPF record is framed normally and contains five bytes of state after the NUL-terminated label:
+A second real event show (`Jaylen Aug 15`) plus an independent ConsoleFlip conversion preview resolves the current five-byte input-HPF state layout.
 
 ```text
 Highpass Filter Input Channel NN\0
-03 53 96 00 01
+03 FF FF MM BB
+│  └─┬─┘ │  └─ bypass: 00 active/on, 01 bypassed/off
+│    │   └──── unknown mode/state byte — preserve exactly
+│    └──────── frequency coordinate
+└───────────── observed HPF discriminator/type
 ```
 
-For channels 01–99 the observed payload length is 38 bytes; channels 100–128 are 39 bytes because the label itself is one character longer. The state length remains exactly five bytes.
+For channels 01–99 the payload is one byte shorter than channels 100–128 because the decimal channel label grows by one character. The state after the NUL-terminated label remains exactly five bytes.
 
-## Candidate field map
+## Field map
 
-| State offset | Bytes in reference | Candidate meaning | Confidence | Write |
+| State offset | Meaning | Type / transform | Confidence | Write |
 |---:|---|---|---|---|
-| `+0` | `03` | HPF discriminator/type | Decoded/parser guard | No |
-| `+1..+2` | `53 96` | HPF frequency | High-confidence decoded | No |
-| `+3` | `00` | HPF enable/bypass | Partial: `00 = Off` supported | No |
-| `+4` | `01` | trailing state/version byte | Unknown | No |
+| `+0` | HPF discriminator/type | `uint8`, observed `03` | Decoded/parser guard | No |
+| `+1..+2` | HPF frequency | `uint16_be`, logarithmic coordinate | **Verified write** | **Yes** |
+| `+3` | unknown mode/state | `uint8`; usually `00`, real `01` observed | Unknown | No |
+| `+4` | HPF bypass | `00` active/on, `01` bypassed/off | **Verified write** | **Yes** |
 
 ## Frequency
 
-`0x5396 = 21398`. Applying the same high-resolution logarithmic coordinate proved by the PEQ experiments gives exactly 100 Hz:
+HPF uses the same high-resolution coordinate already proven for input PEQ:
 
 ```text
 raw = floor(4608 × log2(f / 4))
 f   = 4 × 2^(raw / 4608)
 ```
 
-For the observed value:
+Examples from the real event show include:
 
 ```text
-f = 4 × 2^(21398 / 4608) ≈ 100 Hz
+46 96  -> about 61 Hz
+53 96  -> 100 Hz
+65 96  -> 200 Hz
+67 96  -> about 216 Hz
 ```
 
-This is independently consistent with Tobias Grupe's `dlive-midi-tools`, which documents HPF as an NRPN-controlled logarithmic 20–2000 Hz parameter. Its 7-bit MIDI conversion:
+The supported editor range is 20–2000 Hz, matching the dLive live-control range documented independently by `togrupe/dlive-midi-tools`.
+
+## Bypass / enable
+
+The final byte is now independently resolved:
 
 ```text
-int(27.58 × ln(f) - 82.622)
+00 = active / On
+01 = bypassed / Off
 ```
 
-is effectively the low-resolution normalisation of the same logarithmic range. For example, the high-resolution coordinate maps 20 Hz to approximately MIDI 0, 100 Hz to MIDI 44, and 2000 Hz to MIDI 127.
+The ConsoleFlip preview rendered 108 visible input-channel cards from the event show. All 108 agreed with both the native bypass byte and this project's decoded rounded HPF frequency.
 
-## Enable candidate
+## Unknown byte 3
 
-The byte at state offset `+3` is `00` on every input channel in the current reference file. The captured ConsoleFlip preview independently reports those same channels as **HPF Off**.
+Earlier work incorrectly treated state byte `+3` as the enable candidate because the first reference show contained only zeros there. The event archive disproves that assumption: at least one current-format scene contains `01` at byte `+3` while the actual HPF bypass state is still encoded by byte `+4`.
 
-That is strong evidence for:
+Its semantic purpose is not yet known. It may represent a mode, slope, or another processor state, but that is only speculation. The editor therefore preserves it exactly.
+
+## Writer boundary
+
+The HPF writer changes only:
 
 ```text
-00 = Off
+state +1..+2   frequency
+state +4       bypass
 ```
 
-The On representation has not yet been observed in a controlled scene, so the editor does not assume `01`, `7F`, or any other value.
-
-## Why writes are still disabled
-
-The frequency interpretation has two independent pieces of evidence, but we have not yet observed isolated show-file changes caused by moving HPF frequency. Likewise, we have only observed the Off state for the candidate enable byte.
-
-The required controlled dLive 2.12 scenes are:
+It never modifies:
 
 ```text
-HPF OFF 100
-HPF ON 100
-HPF ON 20
-HPF ON 50
-HPF ON 200
-HPF ON 500
-HPF ON 1000
-HPF ON 2000
+state +0       discriminator/type
+state +3       unknown mode/state
 ```
 
-Use one input channel, clone the same baseline scene each time, and change only HPF. If those diffs isolate to bytes `+1..+3` as expected, frequency and enable can be promoted to **Verified Write**.
+This narrow write boundary is intentional and is the reason HPF frequency and On/Off can be enabled without claiming the entire HPF record is understood.
