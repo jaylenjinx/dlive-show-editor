@@ -1,6 +1,6 @@
 # ConsoleFlip public analysis
 
-This note records only information observable from public pages, public forum posts, and public code/search surfaces. It does not include any attempt to bypass authentication or access private implementation details.
+This note records only information observable from public pages, public forum posts, public code/search surfaces, and a user-supplied static copy of the public website. It does not include any attempt to bypass authentication or access private implementation details.
 
 ## Publicly advertised dLive coverage
 
@@ -21,6 +21,45 @@ Its own transfer map currently lists aux masters, group sends, FX sends and scen
 
 This is valuable to this project because each supported class lines up with labelled records already visible in dLive StageBox scene data, including `Highpass Filter Input Channel NN`, `Parametric EQ, Input Channel NN`, `Compressor, Input Channel NN`, `Digital Attenuator Input Channel NN`, `Stereo Image Input Channel NN`, the send-source records and larger mixer records.
 
+## Static-site ZIP findings
+
+A static copy of the public ConsoleFlip site was inspected. It contains rendered HTML, CSS, the compiled browser JavaScript bundle, Flux/Livewire client code and public images. It does **not** contain the server-side application/parser source.
+
+The frontend stack is Laravel/Livewire/Flux with Alpine-style client components. The converter page submits the selected native console show to the server using a normal form POST. The relevant user-facing fields are `input_format`, `show_file` for dLive/Avantis, and `show_folder[]` for SQ.
+
+The browser-side converter code performs only lightweight upload validation:
+
+- selects permitted extensions/MIME types from the chosen console definition
+- validates that an SQ upload contains one complete `SHOW####` folder
+- requires SQ `SHOW.DAT` and `NVDATA.DAT`
+- reads only the first 16 bytes of SQ `SHOW.DAT` locally to display the show name
+- tracks the selected console and uploaded filename
+
+Crucially, the shipped browser bundle contains no dLive `.tar.gz` parser or serializer. There is no `DataView`-based dLive binary reader, and no browser TAR/GZIP implementation such as `DecompressionStream`, `CompressionStream`, pako, fflate, gunzip or inflate. Therefore the dLive archive is being interpreted on the server, not in the browser.
+
+The site configuration visible in the static HTML is explicitly version-pinned:
+
+- dLive: firmware **2.12**, `.tar.gz`, upload enabled
+- Avantis: firmware **1.35**, `.tar.gz`, upload currently disabled on the captured site because of a known issue
+- SQ: firmware **1.6.1**, complete `SHOW####` folder containing `SHOW.DAT` + `NVDATA.DAT`
+
+That version pin is significant. It is consistent with a direct, version-specific binary parser/serializer rather than merely replaying public MIDI control messages.
+
+The privacy page further states that uploaded show files are parsed into derived conversion data including channel names, fader levels, mutes, HPF, EQ, compressors and bus data, and that a preview is generated from the extracted data. This reinforces the server-side parser model.
+
+### What is *not* exposed by the ZIP
+
+The static copy does not reveal:
+
+- byte offsets or field schemas for dLive HPF/EQ/compressor/fader/pan/send data
+- PHP/backend parser classes
+- a public conversion REST API
+- dLive-to-SQ translation tables
+- RackUltra/RackExtra DSP parameter maps
+- source maps containing backend logic
+
+The public browser JavaScript is primarily framework/runtime code plus upload UX. The only console-file parsing logic found client-side is the small SQ show-name read described above.
+
 ## Historical Allen & Heath forum evidence
 
 In April 2023, Allen & Heath forum user `jemx` said they had custom software that could copy almost everything in a channel strip (minus inserts), plus aux sends, groups, DCAs, FX returns and FX sends. They also said effect parameters could be copied when both consoles supported the same effect, giving reverb decay and room size as examples.
@@ -29,7 +68,7 @@ That is not proof that `jemx` is the author of ConsoleFlip, but the capability, 
 
 ## Public implementation visibility
 
-No public ConsoleFlip source repository was found from searches of GitHub and the public web. The public site exposes the user workflow and transfer coverage but not its parser implementation or parameter maps. The web-search/crawler surfaces available during this analysis did not expose usable JavaScript source maps or backend parser code.
+No public ConsoleFlip source repository was found from searches of GitHub and the public web. The public site exposes the user workflow and transfer coverage but not its parser implementation or parameter maps. The static-site copy confirms that the missing logic is server-side rather than merely hidden in a minified browser bundle.
 
 Therefore, the useful information is not a byte-level parameter map copied from ConsoleFlip; it is an independent confirmation that the listed dLive parameter classes are practical to decode and render back into valid show files.
 
@@ -43,6 +82,8 @@ Prioritise these records in this order:
 4. Compressor parameters, again using one-parameter diffs.
 5. Aux sends and send-source selection.
 6. RackUltra/RackExtra DSP only after the normal channel-strip formats are stable.
+
+A further caution from the supplied show is that identically named labelled records are not always identical in serialized length across old/factory scenes. This may indicate version-dependent record layouts, optional fields or padding. V2 should therefore validate scene/show format assumptions before promoting a field to writable status rather than assuming one global fixed C-style struct.
 
 ## Useful independent MIDI reference
 
