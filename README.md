@@ -135,12 +135,15 @@ The exporter rebuilds only modified nested scene archives, preserves unrecognise
 
 ## Documentation
 
-The web app includes a built-in **Docs** view that is available without loading a show. The same reverse-engineering notes are versioned under [`docs/`](docs/README.md), with the consolidated field map in [`KNOWN_FORMAT.md`](KNOWN_FORMAT.md).
+The web app includes a built-in **Docs** view that is available without loading a show. Start with the **Parameter map**, which is the canonical index of every field currently located or decoded, including record pattern, payload size, byte offset, datatype, transform, evidence, confidence and write status.
+
+- [Canonical parameter map](docs/parameter-map.md)
+- [Documentation index](docs/README.md)
+- [Consolidated field notes](KNOWN_FORMAT.md)
+- [Machine-readable UI registry](app-parameter-map.js)
 
 ## GitHub Pages
 
-Pushes to `main` trigger [`.github/workflows/pages.yml`](.github/workflows/pages.yml), which publishes the static application with GitHub Pages. The expected project URL is:
+Pushes to `main` trigger [`.github/workflows/pages.yml`](.github/workflows/pages.yml), which publishes the static application with GitHub Pages. The project URL is:
 
 `https://jaylenjinx.github.io/dlive-show-editor/`
-
-If Pages has not previously been enabled for the repository, select **Settings → Pages → Source → GitHub Actions** once.
