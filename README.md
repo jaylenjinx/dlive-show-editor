@@ -64,7 +64,7 @@ This is an independent experimental tool, not an Allen & Heath product. Always e
 
 ## Version 2 research preview
 
-This branch prepares the editor for DSP reverse engineering. **It now supports a narrowly calibrated Input 16 / PEQ band 2 gain change among 0, −8.1 and +6.0 dB. Other DSP values remain unavailable.** See [REVERSE_ENGINEERING.md](REVERSE_ENGINEERING.md) for actual observations and the controlled-save experiment needed next.
+This branch prepares the editor for DSP reverse engineering. **It now supports a narrowly calibrated Input 16 / PEQ band 2 gain change among −8.1, −3, 0, +1, +3 and +6 dB. Other DSP values remain unavailable.** See [REVERSE_ENGINEERING.md](REVERSE_ENGINEERING.md) for actual observations and the controlled-save experiment needed next.
 
 Added: Binary research tab, scene/show comparisons, known-versus-unknown byte classification, offset-bearing string search, DSP comparisons by record label, JSON evidence export, and Undo/Redo for edits within the current scene session (history resets when switching scenes).
 

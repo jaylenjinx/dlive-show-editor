@@ -41,12 +41,12 @@ if(process.env.DLIVE_SAMPLE) test('real show: all scenes parse, preserve metadat
  let count=0;
  for(const e of entries){const match=e.name.match(/^Show\/Scenes\/StageBoxScene(\d+)\.tar\.gz$/);if(!match)continue;
   const nested=api.parseTar(await api.gunzip(e.content));const d=api.findSceneDat(nested,Number(match[1]));
-  const m=api.parseManagers(d.content);assert.equal(m.length,['001','010','65535'].includes(match[1])?14:12,`scene ${match[1]} manager count`);
+  const m=api.parseManagers(d.content);assert.equal(m.length,['001','010','011','012','013','65535'].includes(match[1])?14:12,`scene ${match[1]} manager count`);
   const edited=d.content.slice();edited[m[0].dataStart]=65;api.assertAllowedChanges(d.content,edited);
   d.content=edited;const reload=api.parseTar(await api.gunzip(await api.gzip(api.writeTar(nested))));
   assert.deepEqual(reload[0].content,edited);count++;
  }
- assert.equal(count,10);console.log(`Validated ${count} real scenes, ${entries.length} outer entries.`);
+ assert.ok(count>=10);console.log(`Validated ${count} real scenes, ${entries.length} outer entries.`);
 });
 const research=fs.readFileSync(require('node:path').join(__dirname,'../research.js'),'utf8');
 vm.runInContext(research.slice(0,research.indexOf('let comparisonShow'))+research.slice(research.indexOf('function parseDspBlocks'))+';globalThis.researchApi={diffSceneBytes,parseDspBlocks,compareDspBlocks};',ctx);
@@ -100,4 +100,24 @@ if(process.env.DLIVE_BASELINE_DAT&&process.env.DLIVE_POSITIVE_DAT) test('positiv
  const before=new Uint8Array(fs.readFileSync(process.env.DLIVE_BASELINE_DAT)),expected=new Uint8Array(fs.readFileSync(process.env.DLIVE_POSITIVE_DAT)),edited=before.slice();
  ctx.dspApi.writeObservedEqGain(edited,'6');assert.deepEqual(edited,expected);api.assertAllowedChanges(before,edited);
  const reload=api.parseTar(await api.gunzip(await api.gzip(api.writeTar([entry('StageBoxScene010.dat',edited)]))));assert.deepEqual(reload[0].content,expected);
+});
+
+test('new measured gains use signed big-endian lookup values',()=>{
+ for(const [value,raw] of [['1',0x0103],['3',0x0303],['-3',0xfcfd]]) {
+  const before=eqFixture(),after=before.slice();ctx.dspApi.writeObservedEqGain(after,value);
+  assert.equal(after[44]*256+after[45],raw);assert.equal(ctx.dspApi.observedEqField(after).value,value);api.assertAllowedChanges(before,after);
+ }
+});
+if(process.env.DLIVE_CALIBRATION_DIR) test('private scenes 11–13 reproduce target EQ records and preserve unrelated bytes',async()=>{
+ const dir=process.env.DLIVE_CALIBRATION_DIR,baseline=new Uint8Array(fs.readFileSync(require('node:path').join(dir,'StageBoxScene010.dat')));
+ for(const [scene,value] of [[11,'1'],[12,'3'],[13,'-3']]) {
+  const expected=new Uint8Array(fs.readFileSync(require('node:path').join(dir,`StageBoxScene${String(scene).padStart(3,'0')}-calibration.dat`)));
+  const offset=ctx.dspApi.observedEqField(expected).offset;
+  // Reproduce this scene from its own zero-gain form, retaining its scene header.
+  const before=expected.slice();ctx.dspApi.writeObservedEqGain(before,'0');const edited=before.slice();ctx.dspApi.writeObservedEqGain(edited,value);
+  assert.deepEqual(edited,expected);api.assertAllowedChanges(before,edited);
+  const baseField=ctx.dspApi.observedEqField(baseline),baseEdit=baseline.slice();ctx.dspApi.writeObservedEqGain(baseEdit,value);
+  assert.deepEqual(baseEdit.slice(baseField.offset-9,baseField.offset+28),expected.slice(offset-9,offset+28));
+  const reload=api.parseTar(await api.gunzip(await api.gzip(api.writeTar([entry(`StageBoxScene${scene}.dat`,edited)]))));assert.deepEqual(reload[0].content,expected);
+ }
 });

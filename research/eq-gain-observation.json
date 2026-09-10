@@ -21,7 +21,7 @@
   "gainOffsetFromPayload": 9,
   "beforeHex": "0000",
   "afterHex": "f7ea",
-  "encodingStatus": "Three calibrated values only; continuous conversion and other bands/channels remain unvalidated.",
+  "encodingStatus": "Six calibrated values; signed big-endian interpretation supported by +/-3 dB pair. Division by 256 is consistent with all rounded display values, but continuous conversion remains a hypothesis.",
   "additionalObservations": [
     {
       "displayDb": 6,
@@ -33,6 +33,33 @@
         279626,
         279627
       ]
+    },
+    {
+      "scene": 11,
+      "displayDb": 1,
+      "displayValueSource": "Explicit user-provided scene/value mapping",
+      "rawHex": "0103",
+      "signedBigEndian": 259,
+      "sha256": "e5bdea744ad1b631225b119c2214f65e24ca4f2cd1f8daa9c2803a884fff4d35",
+      "gainBytesOffset": 279626
+    },
+    {
+      "scene": 12,
+      "displayDb": 3,
+      "displayValueSource": "Explicit user-provided scene/value mapping",
+      "rawHex": "0303",
+      "signedBigEndian": 771,
+      "sha256": "cc4aea4de80969c9af3b8a5e181b106d2f121c73222710003adba6ee31a7e068",
+      "gainBytesOffset": 279626
+    },
+    {
+      "scene": 13,
+      "displayDb": -3,
+      "displayValueSource": "Explicit user-provided scene/value mapping",
+      "rawHex": "fcfd",
+      "signedBigEndian": -771,
+      "sha256": "6b53c52411a3a0691082d6a0a1afa6b7eec8b019e962f0f804aa48919da37c24",
+      "gainBytesOffset": 279626
     }
   ]
 }

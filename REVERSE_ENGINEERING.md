@@ -1,6 +1,6 @@
 # Version 2 DSP research — 11 September 2026
 
-Status: research preview; a narrowly calibrated Input 16 / PEQ band 2 gain control supports the measured values 0, −8.1 and +6.0 dB. Continuous DSP editing remains unvalidated.
+Status: research preview; a narrowly calibrated Input 16 / PEQ band 2 gain control supports six measured values: −8.1, −3, 0, +1, +3 and +6 dB. Continuous DSP editing remains unvalidated.
 
 ## Evidence from the supplied show
 
@@ -61,3 +61,15 @@ The next attachment, supplied in response to the request for +6.0 dB without an 
 A continuous formula is still unresolved: 1530 / 256 = 5.9765625, which rounds to 6.0; 1530 / 255 = 6.0 exactly. The negative sample also permits more than one interpretation when display rounding and control quantization are considered. Neither divisor has been established. No arbitrary gain encoding is enabled.
 
 For the next experiment, save several scenes in one show with the same input/band at known values (for example +1.0, +3.0, −3.0 dB) and supply the scene/value mapping. This is more efficient than one archive per measurement and helps distinguish scaling from quantization.
+
+## Scenes 11–13: signed gain evidence
+
+The user explicitly mapped Scene 11 to +1 dB, Scene 12 to +3 dB and Scene 13 to −3 dB, for Input 16 / band 2. Each EQ record matches the original calibration context apart from the gain field.
+
+| Scene | Reported display | Raw bytes | Signed big-endian | Raw / 256 |
+|---|---:|---|---:|---:|
+| 11 | +1.0 dB | 01 03 | 259 | 1.01171875 |
+| 12 | +3.0 dB | 03 03 | 771 | 3.01171875 |
+| 13 | −3.0 dB | fc fd | −771 | −3.01171875 |
+
+The +3 and −3 pair supports a signed big-endian two's-complement field. A Q8.8 interpretation is consistent with every observed display after rounding to one decimal place. Display rounding does not uniquely determine the scale: division by 255 also matches all six reported displays after rounding. Therefore the UI retains exact measured-byte lookup values rather than claiming a continuous encoding has been verified. The tests reproduce each target EQ record and verify that all bytes outside the two-byte field remain unchanged, preserving each scene's own metadata.
