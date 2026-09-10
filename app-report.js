@@ -21,6 +21,12 @@ function exportResearchReport(){
       layers:b.layers.map(row=>row.map(x=>({type:x.type,index:x.index})))
     }))||[],
     inputPeq:c.stage?.peqs.map(p=>({channel:p.channel,frameStart:p.frameStart,payloadLength:p.payloadLength,bands:p.bands.map(b=>({band:b.band,gainRaw:b.gainRaw,gainDb:b.gainDb,frequencyRaw:b.frequencyRaw,frequencyHz:b.frequencyHz,widthRaw:b.widthRaw,widthIndex:b.widthIndex,widthLabel:b.widthLabel,widthFraction:b.widthFraction,stateHex:hexRange(b.stateBytes)}))}))||[],
+    inputHpf:c.stage?parseInputHpfs(c.stage.datBytes).map(h=>({
+      channel:h.channel,frameStart:h.frameStart,payloadLength:h.payloadLength,stateLength:h.stateLength,
+      discriminator:h.discriminator,frequencyRaw:h.frequencyRaw,frequencyHz:h.frequencyHz,
+      enableRaw:h.enableRaw,tailRaw:h.tailRaw,shapeMatchesReference:h.shapeMatchesReference,
+      rawHex:hexRange(h.raw)
+    })):[],
     ahfx:c.stage?.ahfx.map(f=>({
       slot:f.slot,frameStart:f.frameStart,payloadLength:f.payloadLength,engineId:f.engineId,
       engineName:f.engineName,preset:f.preset,payloadHex:hexRange(f.payload)
