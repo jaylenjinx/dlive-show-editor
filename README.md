@@ -1,8 +1,8 @@
-# dLive Show Editor v2
+# dLive Show Editor v2.1
 
 Experimental, browser-only editor and reverse-engineering inspector for Allen & Heath dLive show archives (`.tar.gz`).
 
-V2 was developed against a real DM32/C1500 show and the factory-style strip-assignment scenes carried inside that show. The app never uploads a show to a server.
+V2/V2.1 were developed against a real DM32/C1500 show and the factory-style strip-assignment scenes carried inside that show. The app never uploads a show to a server.
 
 ## V2: verified writable
 
@@ -41,6 +41,15 @@ Verified strip types currently exposed:
 | 12 | RackExtra FX Return |
 | 13 | DCA |
 | 19 | RackUltra FX Return |
+
+### Input PEQ editor (V2.1)
+Controlled Scene 10 clones now validate the three numerical fields in each 9-byte input-PEQ band record:
+
+- **Gain** — signed 16-bit big-endian, effectively 8.8 fixed-point dB (`raw / 256`).
+- **Frequency** — high-resolution logarithmic coordinate (`raw = floor(4608 * log2(Hz / 4))`). Six controlled frequencies from 100 Hz to 10 kHz matched exactly.
+- **Bell Width** — the high byte maps directly to Allen & Heath's published width index (`1.5` through `1/9` octave); the low byte is extra internal precision and is preserved when untouched.
+
+V2.1 exposes these three values for all 128 input PEQs. The remaining three state/type bytes per band are still read-only. Width edits use a canonical index value and do not rewrite untouched fractional width state.
 
 ## V2: decoded, read-only
 
