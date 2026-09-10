@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.1.1
+
+- Added a canonical dLive 2.12 parameter map with record pattern, payload size, offsets, datatype, transform, evidence, confidence and write status.
+- Added an interactive, searchable/filterable Parameter Map page to the built-in Docs section.
+- Added `app-parameter-map.js` as the machine-readable reverse-engineering registry.
+- Added `docs/parameter-map.md` as the human-readable repository reference.
+- Added explicit located/unmapped backlog entries for HPF, compressor, gate, delay, stereo image, digital attenuator, routing/send-source, input mixer and preamp records.
+- Linked the parameter map prominently from the repository README and docs index.
+
 ## v2.1
 
 - Added controlled-diff verified input PEQ parsing for all 128 input channels.
