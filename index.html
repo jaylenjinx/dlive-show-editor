@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>dLive Show Editor — Experimental</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="brand">dLive Show Editor <span class="badge">experimental</span></div>
+      <div class="sub">Local, browser-only editor for Allen &amp; Heath dLive show archives</div>
+    </div>
+    <div class="top-actions">
+      <button id="openBtn" class="primary">Open show</button>
+      <button id="importCsvBtn" disabled>Import CSV</button>
+      <button id="exportBtn" disabled>Export copy</button>
+      <input id="fileInput" type="file" accept=".gz,.tar.gz,application/gzip" hidden />
+      <input id="csvInput" type="file" accept=".csv,text/csv" hidden />
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <aside class="sidebar">
+      <section class="show-card" id="showCard">
+        <div class="eyebrow">SHOW</div>
+        <div class="show-name" id="showName">No show loaded</div>
+        <div class="show-meta" id="showMeta">Open a dLive .tar.gz file to begin.</div>
+      </section>
+
+      <div class="nav-title">Scenes</div>
+      <div id="sceneList" class="scene-list"></div>
+    </aside>
+
+    <section class="workspace">
+      <div id="emptyState" class="empty-state">
+        <div class="empty-icon">DL</div>
+        <h1>Edit dLive show files without uploading them anywhere</h1>
+        <p>This MVP safely edits the fixed-width channel, bus, matrix, DCA and FX name/colour tables found in dLive StageBox scene data. Unknown DSP fields remain read-only.</p>
+        <button id="openBtn2" class="primary large">Choose show file</button>
+      </div>
+
+      <div id="editor" class="editor hidden">
+        <div class="editor-head">
+          <div>
+            <div class="eyebrow">ACTIVE SCENE</div>
+            <h1 id="sceneTitle">Scene</h1>
+            <div id="sceneStatus" class="muted"></div>
+          </div>
+          <div class="head-actions">
+            <label class="toggle"><input id="showUnused" type="checkbox" /> <span>Show unused slots</span></label>
+            <button id="applyAllBtn">Apply names/colours to all scenes</button>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="names">Names &amp; colours</button>
+          <button class="tab" data-tab="fx">FX inspector</button>
+          <button class="tab" data-tab="archive">Archive</button>
+        </div>
+
+        <div id="tabNames" class="tab-panel active">
+          <div class="notice safe">
+            <strong>Safe-write mode:</strong> only recognised 9-byte name slots and their 1-byte colour values are modified. Names are limited to 8 ASCII characters to preserve the binary layout.
+          </div>
+          <div id="managerGrid" class="manager-grid"></div>
+        </div>
+
+        <div id="tabFx" class="tab-panel">
+          <div class="notice warn">
+            <strong>Read-only DSP inspector:</strong> RackUltra/RackExtra DSP parameter encoding is not publicly documented. This build will inspect strings and slot names, but will not write DSP bytes.
+          </div>
+          <div class="fx-grid">
+            <section class="panel">
+              <h2>RackUltra send names</h2>
+              <div id="ufxSlots"></div>
+            </section>
+            <section class="panel">
+              <h2>Detected FX-related strings</h2>
+              <div id="fxStrings" class="string-list"></div>
+            </section>
+          </div>
+        </div>
+
+        <div id="tabArchive" class="tab-panel">
+          <div class="notice">
+            The app preserves every unrecognised archive entry byte-for-byte. Scene archives are rebuilt only when their StageBox scene has been edited.
+          </div>
+          <section class="panel">
+            <h2>Show archive entries</h2>
+            <div id="archiveList" class="archive-list"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
