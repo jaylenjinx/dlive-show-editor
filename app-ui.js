@@ -20,7 +20,7 @@ function renderScene() {
   $('#emptyState').classList.add('hidden'); $('#editor').classList.remove('hidden');
   $('#sceneTitle').textContent=state.current.scene.number===65535?'Current state':`Scene ${state.current.scene.number}`;
   $('#sceneStatus').textContent=`${state.current.managers.length} recognised name/colour tables`;
-  renderSceneList(); renderManagers(); renderFx(); renderArchive(); renderResearch();
+  renderSceneList(); renderManagers(); renderFx(); renderArchive(); renderResearch(); renderDsp();
 }
 
 function renderManagers() {

@@ -5,6 +5,7 @@ const vm=require('node:vm');
 const core=fs.readFileSync(require('node:path').join(__dirname,'../app-core.js'),'utf8');
 const ctx=vm.createContext({TextEncoder,TextDecoder,Uint8Array,Blob,Response,CompressionStream,DecompressionStream});
 vm.runInContext(core+';globalThis.api={parseTar,writeTar,parseManagers,assertAllowedChanges,findSceneDat,analyseShow,gunzip,gzip};',ctx);
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../dsp-core.js'),'utf8')+';globalThis.dspApi={observedEqField,writeObservedEqGain};',ctx);
 const api=ctx.api;
 function entry(name,content=new Uint8Array([1,2,3])){return {name,content,type:'0',mtime:123,mode:0o640};}
 function fixture(){let signature=new TextEncoder().encode('DCA Channel Name Colour Manager');let b=new Uint8Array(signature.length+2+240+20);b.set(signature);b[signature.length+1]=1;return b;}
@@ -59,4 +60,30 @@ test('DSP records compare by label across shifted absolute offsets',()=>{
  const block=new Uint8Array(size+2);block[1]=size;block.set(new TextEncoder().encode(label),2);block[2+label.length+1]=3;block[block.length-1]=4;
  const shifted=new Uint8Array(block.length+3);shifted.set(block,3);shifted[shifted.length-1]=5;
  const changes=ctx.researchApi.compareDspBlocks(block,shifted);assert.equal(changes.length,1);assert.equal(changes[0].changes[0].after,5);assert.equal(changes[0].offsetB-changes[0].offsetA,3);
+});
+
+function eqFixture() {
+ const label='Parametric EQ, Input Channel 16',payload=Buffer.from('000047970a80000000000065970a800000000000a72e0a800000000000cb2e0a8000000000','hex');
+ const b=new Uint8Array(72);b[1]=70;b.set(new TextEncoder().encode(label),2);b[34]=4;b.set(payload,35);return b;
+}
+test('calibrated EQ gain reproduces observed bytes and is reversible',()=>{
+ const before=eqFixture(),after=before.slice();ctx.dspApi.writeObservedEqGain(after,'-8.1');
+ assert.equal(ctx.dspApi.observedEqField(after).value,'-8.1');
+ assert.equal(after[44],0xf7);assert.equal(after[45],0xea);
+ api.assertAllowedChanges(before,after);
+ ctx.dspApi.writeObservedEqGain(after,'0');assert.deepEqual(after,before);
+});
+test('uncalibrated DSP values and altered or ambiguous records fail closed',()=>{
+ const b=eqFixture();assert.throws(()=>ctx.dspApi.writeObservedEqGain(b,'-8'),/not been calibrated/);
+ const other=b.slice();other[40]^=1;assert.equal(ctx.dspApi.observedEqField(other),null);assert.throws(()=>api.assertAllowedChanges(b,other),/Unexpected write/);
+ const raw=b.slice();raw[44]=0x80;assert.throws(()=>api.assertAllowedChanges(b,raw),/Unexpected write/);
+ const duplicate=new Uint8Array(144);duplicate.set(b);duplicate.set(b,72);assert.equal(ctx.dspApi.observedEqField(duplicate),null);
+ assert.equal(ctx.dspApi.observedEqField(b.slice(0,-1)),null);
+});
+if(process.env.DLIVE_BASELINE_DAT&&process.env.DLIVE_CHANGED_DAT) test('private controlled pair: exact DSP reproduction and gzip roundtrip',async()=>{
+ const before=new Uint8Array(fs.readFileSync(process.env.DLIVE_BASELINE_DAT)),expected=new Uint8Array(fs.readFileSync(process.env.DLIVE_CHANGED_DAT)),edited=before.slice();
+ ctx.dspApi.writeObservedEqGain(edited,'-8.1');assert.deepEqual(edited,expected);api.assertAllowedChanges(before,edited);
+ const nested=api.parseTar(await api.gunzip(await api.gzip(api.writeTar([entry('StageBoxScene010.dat',edited)]))));
+ assert.deepEqual(nested[0].content,expected);
+ ctx.dspApi.writeObservedEqGain(edited,'0');assert.deepEqual(edited,before);
 });

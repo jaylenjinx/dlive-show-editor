@@ -294,8 +294,9 @@ function setColour(managerKey,index,colour) { return changeItem(managerKey,index
 function historyStep(redo=false) {
   const c=state.current, from=redo?c.redo:c.undo, to=redo?c.undo:c.redo, edit=from.pop();
   if(!edit) return;
-  const item=c.managers.find(m=>m.key===edit.managerKey).items[edit.index-1];
-  writeItem(c,item,edit.field,redo?edit.after:edit.before); to.push(edit); markDirty(); renderManagers(); renderFx();
+  if(edit.dsp)writeObservedEqGain(c.datBytes,redo?edit.after:edit.before);
+  else {const item=c.managers.find(m=>m.key===edit.managerKey).items[edit.index-1];writeItem(c,item,edit.field,redo?edit.after:edit.before);}
+  to.push(edit); markDirty(); renderManagers(); renderFx(); renderDsp();
 }
 function findSceneDat(entries,number) {
   const matches=entries.filter(e=>e.type==='0' && /^StageBoxScene\d+\.dat$/.test(e.name.split('/').pop()) && Number(e.name.match(/StageBoxScene(\d+)\.dat$/)[1])===number);
@@ -308,6 +309,7 @@ function assertAllowedChanges(before,after) {
   for(const m of parseManagers(before)) for(const it of m.items) {
     allowed.fill(1,it.nameOffset,it.nameOffset+9); allowed[it.colourOffset]=1;
   }
+  allowObservedDspChanges(before,after,allowed);
   for(let i=0;i<before.length;i++) if(before[i]!==after[i]&&!allowed[i]) throw new Error(`Unexpected write at offset ${i}.`);
   const original=parseManagers(before), edited=parseManagers(after);
   if(original.length!==edited.length || original.some(m=>!edited.some(n=>n.key===m.key&&n.pos===m.pos))) throw new Error('Edited manager validation failed.');

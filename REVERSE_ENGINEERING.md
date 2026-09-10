@@ -1,6 +1,6 @@
 # Version 2 DSP research — 11 September 2026
 
-Status: research preview; scalar DSP editing is not implemented or validated.
+Status: research preview; a narrowly calibrated Input 16 / PEQ band 2 gain control supports the two measured values, 0 and −8.1 dB. Continuous DSP editing remains unvalidated.
 
 ## Evidence from the supplied show
 
@@ -41,3 +41,15 @@ Frequency, Q, filter slope, enable switches, compressor controls, and RackUltra 
 ## Current validation
 
 Eight Node tests pass, including optional private-sample checks across all ten StageBox scenes: parsing, metadata-preserving TAR rebuilding, allowed name changes, gzip round trips, rejection of malformed headers, duplicate paths, unknown writes, ambiguous managers, and label-based comparison across shifted offsets. This is software validation, not Director acceptance or hardware validation. The sample is deliberately absent from source and test fixtures.
+
+## Controlled Input 16 gain observation
+
+The second user-provided save changed Input 16 PEQ band 2 from 0 dB to −8.1 dB. Scene 10 retained its 413,883-byte length. Exactly two bytes changed, at offsets `0x4444a` and `0x4444b`: `00 00` → `f7 ea`. They lie at payload-relative offset 9 in the uniquely labelled `Parametric EQ, Input Channel 16` record (length-field offset `0x4441e`, stored length 70, version-like byte 4).
+
+Interpreted as a signed big-endian 16-bit integer, `f7ea` is −2070. Dividing by 256 yields −8.0859375, which rounds to the reported one-decimal display. That is compatible with a fixed-point hypothesis, but it is not enough to establish the actual gain conversion or its rounding rules. The editor uses an explicit lookup for the two observed values and does not encode arbitrary dB values.
+
+The DSP editing tab exposes only this specific channel/band. It checks the complete record framing and all other payload bytes against the calibration record; altered context, unknown gain bytes, duplicate signatures, and truncation disable the control. Only its two gain bytes join the write allowlist. Undo/Redo handles DSP edits, and the existing names-to-all-scenes operation does not copy DSP.
+
+The generated −8.1 dB scene equals the supplied changed scene byte-for-byte. Reverting to zero equals the original baseline byte-for-byte. Eleven tests pass, including these private-sample checks and gzip/TAR round trips. An exported archive has not yet been reopened in Director, so application acceptance is still outstanding. The raw show remains outside the repository; `research/eq-gain-observation.json` records hashes and the minimal differential evidence.
+
+Next useful measurement: set the same band to +6.0 dB, store Scene 10 and save the show. A positive sample and subsequent intermediate/negative samples will test sign, scaling and quantization before a continuous control is enabled.

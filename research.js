@@ -19,6 +19,8 @@ function diffSceneBytes(before,after) {
     for(let j=0;j<9;j++)fields.set(it.nameOffset+j,`${m.label} ${it.index} name`);
     fields.set(it.colourOffset,`${m.label} ${it.index} colour`);
   }
+  const calibrated=observedEqField(before);
+  if(calibrated){fields.set(calibrated.offset,calibrated.label);fields.set(calibrated.offset+1,calibrated.label);}
   const fieldAt=offset=>fields.get(offset)||null;
   let labelIndex=-1;
   const limit=Math.max(before.length,after.length);
@@ -57,7 +59,7 @@ async function sha256(bytes) {return hex(Array.from(new Uint8Array(await crypto.
 let comparisonShow=null, researchReport=null;
 function renderResearch() {
   const c=state.current;if(!c)return;
-  $('#researchSummary').textContent=`${formatBytes(c.datBytes.length)} scene data · ${c.managers.length} writable tables. All other offsets are read-only.`;
+  $('#researchSummary').textContent=`${formatBytes(c.datBytes.length)} scene data · ${c.managers.length} writable tables. The DSP tab provides the separately calibrated EQ gain control.`;
   $('#researchTables').innerHTML=c.managers.map(m=>`<tr><td>${m.label}</td><td>0x${m.pos.toString(16)}</td><td>0x${m.dataStart.toString(16)}</td><td>0x${m.colourStart.toString(16)}</td><td>${m.count}</td></tr>`).join('');
   const q=$('#stringSearch').value.toLowerCase();
   const records=stringRecords(c.datBytes).filter(r=>r.text.toLowerCase().includes(q));
@@ -78,7 +80,7 @@ async function runComparison() {
   researchReport={schemaVersion:1,source:{file:state.fileName,scene:state.current.scene.number,sha256:await sha256(before)},
     target:{file:comparisonShow?.fileName||state.fileName,scene:number,sha256:await sha256(after)},...diffSceneBytes(before,after),dspBlocks:compareDspBlocks(before,after)};
   const r=researchReport;
-  $('#diffResult').textContent=`${r.dspBlocks.length} DSP records differ (matched by label). See JSON for relative offsets.\n${r.changedBytes} changed bytes · ${r.knownBytes} in name/colour slots · ${r.unknownBytes} unknown\n`+
+  $('#diffResult').textContent=`${r.dspBlocks.length} DSP records differ (matched by label). See JSON for relative offsets.\n${r.changedBytes} changed bytes · ${r.knownBytes} in recognised fields · ${r.unknownBytes} unknown\n`+
     (r.beforeLength!==r.afterLength?'Lengths differ: positional offsets may be shifted.\n':'')+
     r.ranges.slice(0,300).map(d=>`\n0x${d.offset.toString(16)} · ${d.length} bytes · ${d.field||'UNKNOWN'}\nNear: ${d.nearestLabel?.text||'(no preceding string)'}\nA: ${hex(d.before)}\nB: ${hex(d.after)}\nCandidates only: ${JSON.stringify(d.interpretations)}`).join('')+
     (r.ranges.length>300?'\nFirst 300 ranges shown; download JSON for all ranges.':'');

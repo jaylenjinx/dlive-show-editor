@@ -36,7 +36,7 @@
       <div id="emptyState" class="empty-state">
         <div class="empty-icon">DL</div>
         <h1>Edit dLive show files without uploading them anywhere</h1>
-        <p>This research preview edits the fixed-width channel, bus, matrix, DCA and FX name/colour tables found in dLive StageBox scene data. Unknown DSP fields remain read-only.</p>
+        <p>This research preview edits the fixed-width channel, bus, matrix, DCA and FX name/colour tables found in dLive StageBox scene data. A calibrated Input 16 EQ gain control is available under DSP editing; other DSP fields remain read-only.</p>
         <button id="openBtn2" class="primary large">Choose show file</button>
       </div>
 
@@ -56,6 +56,7 @@
 
         <div class="tabs">
           <button class="tab active" data-tab="names">Names &amp; colours</button>
+          <button class="tab" data-tab="dsp">DSP editing</button>
           <button class="tab" data-tab="fx">FX inspector</button>
           <button class="tab" data-tab="research">Binary research</button>
           <button class="tab" data-tab="archive">Archive</button>
@@ -66,6 +67,14 @@
           <div id="managerGrid" class="manager-grid"></div>
         </div>
 
+        <div id="tabDsp" class="tab-panel">
+          <section class="panel"><h2>Input 16 · EQ band 2</h2>
+          <p>Experimental gain control calibrated from your two Director saves. Only the observed values are available.</p>
+          <label>Gain <select id="eqGain" disabled><option value="">Unavailable</option><option value="0">0.0 dB</option><option value="-8.1">−8.1 dB</option></select></label>
+          <p id="eqGainStatus" role="status"></p>
+          <p>Enabled only when this EQ record matches the sample apart from these gain bytes. Undo/Redo and Export copy include this edit. Reopen the exported copy in Director to verify it.</p>
+          </section>
+        </div>
         <div id="tabFx" class="tab-panel">
           <div class="notice warn"><strong>Read-only DSP inspector:</strong> RackUltra/RackExtra DSP parameter encoding is not publicly documented. This build will inspect strings and slot names, but will not write DSP bytes.</div>
           <div class="fx-grid">
@@ -75,7 +84,7 @@
         </div>
 
         <div id="tabResearch" class="tab-panel">
-          <div class="notice warn">DSP mappings are not validated yet. Compare shows saved after changing exactly one parameter in Director. Numeric interpretations and nearby strings are clues, not confirmed fields.</div>
+          <div class="notice warn">Most DSP mappings remain unvalidated. Compare shows saved after changing exactly one parameter in Director. Numeric interpretations and nearby strings are clues, not confirmed fields.</div>
           <section class="panel"><h2>Scene structure</h2><p id="researchSummary"></p>
           <div class="table-scroll"><table><thead><tr><th>Table</th><th>Signature</th><th>Names</th><th>Colours</th><th>Slots</th></tr></thead><tbody id="researchTables"></tbody></table></div></section>
           <section class="panel"><h2>Compare binary data</h2><p>Compare the active scene (A) to a scene in this show or a second show (B).</p>
@@ -94,7 +103,9 @@
 
   <div id="toast" class="toast"></div>
   <script src="app-core.js"></script>
+  <script src="dsp-core.js"></script>
   <script src="app-ui.js"></script>
   <script src="research.js"></script>
+  <script src="dsp-ui.js"></script>
 </body>
 </html>

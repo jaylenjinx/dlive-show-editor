@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "reportedChange": {
+    "scene": 10,
+    "channel": 16,
+    "processor": "PEQ",
+    "band": 2,
+    "beforeDb": 0,
+    "afterDb": -8.1
+  },
+  "beforeSha256": "a082d263262b15429b6a122cdd488bca0513cf93ce4e9afa38c6b8204f5b2893",
+  "afterSha256": "fb706eaf2674844e6558ed9980fc2e03e04fc91626363de6f9d11a6e3c13d8f2",
+  "sceneLength": 413883,
+  "changedOffsets": [
+    279626,
+    279627
+  ],
+  "label": "Parametric EQ, Input Channel 16",
+  "recordLengthOffset": 279582,
+  "gainBytesOffset": 279626,
+  "gainOffsetFromPayload": 9,
+  "beforeHex": "0000",
+  "afterHex": "f7ea",
+  "encodingStatus": "Two calibrated values only; continuous conversion and other bands/channels remain unvalidated."
+}
