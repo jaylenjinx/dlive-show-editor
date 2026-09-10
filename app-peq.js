@@ -57,7 +57,10 @@ function parseInputPeqs(dat){
   return out;
 }
 
-function getInputPeq(channel){ return state.current?.stage?.peqs?.find(p=>p.channel===Number(channel))||null; }
+function ensureInputPeqs(){
+  const stage=state.current?.stage;if(stage&&!stage.peqs)stage.peqs=parseInputPeqs(stage.datBytes);return stage?.peqs||[];
+}
+function getInputPeq(channel){ return ensureInputPeqs().find(p=>p.channel===Number(channel))||null; }
 function setPeqGain(channel,band,db){
   const p=getInputPeq(channel),b=p?.bands?.[Number(band)-1];if(!b)return false;
   const raw=peqGainToRaw(db);writeI16BE(state.current.stage.datBytes,b.offset,raw);
@@ -83,7 +86,7 @@ function formatHz(hz){
 function renderPeq(){
   const root=$('#peqEditor'); if(!root)return;
   root.innerHTML='';
-  const stage=state.current?.stage;
+  const stage=state.current?.stage;if(stage&&!stage.peqs)stage.peqs=parseInputPeqs(stage.datBytes);
   if(!stage?.peqs?.length){root.innerHTML='<div class="notice warn">No recognised input PEQ records were found.</div>';return;}
 
   const controls=document.createElement('section');controls.className='panel peq-toolbar';
