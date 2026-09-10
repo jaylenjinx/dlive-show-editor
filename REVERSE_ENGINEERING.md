@@ -1,6 +1,6 @@
 # Version 2 DSP research — 11 September 2026
 
-Status: research preview; a narrowly calibrated Input 16 / PEQ band 2 gain control supports the two measured values, 0 and −8.1 dB. Continuous DSP editing remains unvalidated.
+Status: research preview; a narrowly calibrated Input 16 / PEQ band 2 gain control supports the measured values 0, −8.1 and +6.0 dB. Continuous DSP editing remains unvalidated.
 
 ## Evidence from the supplied show
 
@@ -53,3 +53,11 @@ The DSP editing tab exposes only this specific channel/band. It checks the compl
 The generated −8.1 dB scene equals the supplied changed scene byte-for-byte. Reverting to zero equals the original baseline byte-for-byte. Eleven tests pass, including these private-sample checks and gzip/TAR round trips. An exported archive has not yet been reopened in Director, so application acceptance is still outstanding. The raw show remains outside the repository; `research/eq-gain-observation.json` records hashes and the minimal differential evidence.
 
 Next useful measurement: set the same band to +6.0 dB, store Scene 10 and save the show. A positive sample and subsequent intermediate/negative samples will test sign, scaling and quantization before a continuous control is enabled.
+
+## Positive gain sample
+
+The next attachment, supplied in response to the request for +6.0 dB without an additional caption, changes only the same two Scene 10 bytes to `05 fa` (signed big-endian integer 1530). The UI now includes +6.0 dB as a third calibrated lookup value. The entire resulting scene must reproduce this sample, not just its EQ record.
+
+A continuous formula is still unresolved: 1530 / 256 = 5.9765625, which rounds to 6.0; 1530 / 255 = 6.0 exactly. The negative sample also permits more than one interpretation when display rounding and control quantization are considered. Neither divisor has been established. No arbitrary gain encoding is enabled.
+
+For the next experiment, save several scenes in one show with the same input/band at known values (for example +1.0, +3.0, −3.0 dB) and supply the scene/value mapping. This is more efficient than one archive per measurement and helps distinguish scaling from quantization.

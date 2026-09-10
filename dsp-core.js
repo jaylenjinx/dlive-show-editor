@@ -6,7 +6,7 @@ const OBSERVED_EQ = Object.freeze({
   label:'Parametric EQ, Input Channel 16', length:70, version:4,
   gainRelativeOffset:9,
   baseline:'000047970a80000000000065970a800000000000a72e0a800000000000cb2e0a8000000000',
-  values:Object.freeze({'0':0x0000,'-8.1':0xf7ea}),
+  values:Object.freeze({'0':0x0000,'-8.1':0xf7ea,'6':0x05fa}),
 });
 function observedEqField(bytes) {
   const spec=OBSERVED_EQ,sig=asciiBytes(spec.label),pos=indexOfBytes(bytes,sig);

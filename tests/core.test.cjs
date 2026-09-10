@@ -87,3 +87,17 @@ if(process.env.DLIVE_BASELINE_DAT&&process.env.DLIVE_CHANGED_DAT) test('private 
  assert.deepEqual(nested[0].content,expected);
  ctx.dspApi.writeObservedEqGain(edited,'0');assert.deepEqual(edited,before);
 });
+
+test('positive gain lookup encodes 05fa and supports all measured transitions',()=>{
+ const b=eqFixture();
+ for(const value of ['6','-8.1','0','6']) {
+  const before=b.slice();ctx.dspApi.writeObservedEqGain(b,value);api.assertAllowedChanges(before,b);
+  assert.equal(ctx.dspApi.observedEqField(b).value,value);
+ }
+ assert.equal(b[44],5);assert.equal(b[45],250);
+});
+if(process.env.DLIVE_BASELINE_DAT&&process.env.DLIVE_POSITIVE_DAT) test('positive private sample is reproduced byte-for-byte',async()=>{
+ const before=new Uint8Array(fs.readFileSync(process.env.DLIVE_BASELINE_DAT)),expected=new Uint8Array(fs.readFileSync(process.env.DLIVE_POSITIVE_DAT)),edited=before.slice();
+ ctx.dspApi.writeObservedEqGain(edited,'6');assert.deepEqual(edited,expected);api.assertAllowedChanges(before,edited);
+ const reload=api.parseTar(await api.gunzip(await api.gzip(api.writeTar([entry('StageBoxScene010.dat',edited)]))));assert.deepEqual(reload[0].content,expected);
+});

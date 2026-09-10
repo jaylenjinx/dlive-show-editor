@@ -21,5 +21,18 @@
   "gainOffsetFromPayload": 9,
   "beforeHex": "0000",
   "afterHex": "f7ea",
-  "encodingStatus": "Two calibrated values only; continuous conversion and other bands/channels remain unvalidated."
+  "encodingStatus": "Three calibrated values only; continuous conversion and other bands/channels remain unvalidated.",
+  "additionalObservations": [
+    {
+      "displayDb": 6,
+      "displayValueSource": "Attachment supplied in response to request for +6.0 dB; no additional user caption.",
+      "rawHex": "05fa",
+      "signedBigEndian": 1530,
+      "sha256": "df27a1b32c5e1f6d6839eddd8a2f42adc4ade950a0d9817bd3631049f79d7784",
+      "changedOffsetsFromBaseline": [
+        279626,
+        279627
+      ]
+    }
+  ]
 }
