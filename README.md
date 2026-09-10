@@ -51,7 +51,20 @@ Controlled Scene 10 clones now validate the three numerical fields in each 9-byt
 
 V2.1 exposes these three values for all 128 input PEQs. The remaining three state/type bytes per band are still read-only. Width edits use a canonical index value and do not rewrite untouched fractional width state.
 
-## V2: decoded, read-only
+## Decoded / read-only
+
+### Input HPF research (V2.1.2)
+Current dLive 2.12 input HPF records expose exactly five state bytes after the label:
+
+```text
+03 53 96 00 01
+```
+
+The middle `53 96` field decodes to exactly **100 Hz** using the same high-resolution logarithmic coordinate already proven for input PEQ. This interpretation is independently consistent with `togrupe/dlive-midi-tools`, whose dLive HPF implementation uses a logarithmic 20–2000 Hz NRPN control.
+
+The following `00` is a strong HPF-Off candidate because every analysed reference channel stores `00` and the captured ConsoleFlip preview independently reports the same channels as **HPF Off**. The editor now includes a read-only **Input HPF** tab and exports these fields in its research JSON.
+
+HPF writes are intentionally disabled until controlled clones provide one On/Off pair plus several known frequencies. See [`docs/input-hpf.md`](docs/input-hpf.md).
 
 ### Generic length-prefixed records
 A major V2 finding is that many dLive scene objects share a common frame: a 2-byte big-endian payload length followed by a payload whose first field is a NUL-terminated ASCII label. This is validated across name managers, surface bank switchers, AHFX managers, PEQ and compressor records. The Structure tab uses this framing rather than loose string searching.
@@ -138,6 +151,7 @@ The exporter rebuilds only modified nested scene archives, preserves unrecognise
 The web app includes a built-in **Docs** view that is available without loading a show. Start with the **Parameter map**, which is the canonical index of every field currently located or decoded, including record pattern, payload size, byte offset, datatype, transform, evidence, confidence and write status.
 
 - [Canonical parameter map](docs/parameter-map.md)
+- [Input HPF research](docs/input-hpf.md)
 - [Documentation index](docs/README.md)
 - [Consolidated field notes](KNOWN_FORMAT.md)
 - [Machine-readable UI registry](app-parameter-map.js)
