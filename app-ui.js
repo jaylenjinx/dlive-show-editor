@@ -20,7 +20,7 @@ function renderScene() {
   $('#emptyState').classList.add('hidden'); $('#editor').classList.remove('hidden');
   $('#sceneTitle').textContent=state.current.scene.number===65535?'Current state':`Scene ${state.current.scene.number}`;
   $('#sceneStatus').textContent=`${state.current.managers.length} recognised name/colour tables`;
-  renderSceneList(); renderManagers(); renderFx(); renderArchive();
+  renderSceneList(); renderManagers(); renderFx(); renderArchive(); renderResearch();
 }
 
 function renderManagers() {
@@ -78,7 +78,7 @@ function importCsvRows(rows) {
   const byCsv=Object.fromEntries(MANAGERS.filter(m=>m.csv).map(m=>[m.csv.toLowerCase(),m.key]));
   for(const r of rows){
     const first=(r[0]||'').trim(); if(/^\[.+\]$/.test(first)){section=first.toLowerCase();continue;} if(section!=='[channels]'||!first)continue;
-    const key=byCsv[first.toLowerCase()]; const idx=Number(r[1]); if(!key||!idx){skipped++;continue;}
+    const key=byCsv[first.toLowerCase()]; const idx=Number(r[1]); if(!key||!Number.isInteger(idx)||!idx){skipped++;continue;}
     const m=state.current.managers.find(x=>x.key===key); if(!m||idx<1||idx>m.count){skipped++;continue;}
     const name=(r[2]||'').trim(); const col=(r[3]||'').trim().toLowerCase();
     if(name && validName(name)){setName(key,idx,name);changed++;}
@@ -97,13 +97,13 @@ async function applyCurrentToAllScenes() {
     if (scene.number===state.current.scene.number) continue;
     const outer=state.outerEntries.find(e=>e.name===scene.stagePath); if(!outer)continue;
     const nestedEntries=parseTar(await gunzip(outer.content));
-    const datEntry=nestedEntries.find(e=>/StageBoxScene\d+\.dat$/.test(e.name))||nestedEntries.find(e=>e.name.endsWith('.dat')); if(!datEntry)continue;
+    const datEntry=findSceneDat(nestedEntries,scene.number);
     const dat=datEntry.content.slice(); const managers=parseManagers(dat);
     let changed=false;
     for(const src of source){ const dst=managers.find(m=>m.key===src.key); if(!dst)continue; const max=Math.min(dst.items.length,src.items.length);
       for(let i=0;i<max;i++){ const it=dst.items[i],v=src.items[i]; for(let j=0;j<9;j++)dat[it.nameOffset+j]=0; dat.set(asciiBytes(v.name).slice(0,8),it.nameOffset); dat[it.colourOffset]=v.colour; changed=true; }
     }
-    if(changed){datEntry.content=dat;outer.content=await gzip(writeTar(nestedEntries));outer.size=outer.content.length;scene.dirty=true;state.dirtyScenes.add(scene.number);n++;}
+    if(changed){assertAllowedChanges(datEntry.content,dat);datEntry.content=dat;outer.content=await gzip(writeTar(nestedEntries));outer.size=outer.content.length;scene.dirty=true;state.dirtyScenes.add(scene.number);n++;}
   }
   toast(`Applied names/colours to ${n} other scenes.`); renderSceneList();
 }
@@ -113,11 +113,11 @@ async function exportShow() {
     await commitCurrentScene();
     const tar=writeTar(state.outerEntries); const gz=await gzip(tar);
     const check=parseTar(await gunzip(gz));
-    if(!check.some(e=>e.name==='Show/Version.dat')) throw new Error('Export validation failed: Version.dat missing.');
+    await validateExport(state.outerEntries,check);
     const blob=new Blob([gz],{type:'application/gzip'}); const a=document.createElement('a');
     const base=state.fileName.replace(/\.tar\.gz$/i,'').replace(/\.tgz$/i,'');
     a.href=URL.createObjectURL(blob);a.download=`${base || 'dLive Show'} - edited.tar.gz`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
-    toast(`Exported validated copy (${formatBytes(gz.length)}).`);
+    toast(`Exported copy (${formatBytes(gz.length)}); archive checks passed. Verify in Director.`);
   } catch(e){toast(e.message,true);console.error(e);}
 }
 
@@ -125,13 +125,13 @@ async function openFile(file) {
   try {
     $('#openBtn').disabled=true;
     const result=await analyseShow(file);
-    state.fileName=file.name;state.outerEntries=result.entries;state.scenes=result.scenes;state.current=null;state.dirtyScenes.clear();
+    state.fileName=file.name;state.outerEntries=result.entries;state.scenes=result.scenes;state.current=null;state.dirtyScenes.clear();comparisonShow=null;
     const target=state.scenes.find(s=>s.number===10) || state.scenes.find(s=>s.number===65535) || state.scenes[0];
     const outer=state.outerEntries.find(e=>e.name===target.stagePath);const nested=parseTar(await gunzip(outer.content));const dat=nested.find(e=>e.name.endsWith('.dat'))?.content;
     $('#showName').textContent=dat?extractShowName(dat):file.name;
     $('#showMeta').textContent=`${state.scenes.length} StageBox scenes • ${formatBytes(file.size)} • local only`;
     $('#exportBtn').disabled=false;$('#importCsvBtn').disabled=false;
-    renderSceneList();await loadScene(target.number);toast(`Loaded ${file.name}`);
+    renderSceneList();await rawLoadScene(target.number);toast(`Loaded ${file.name}`);
   } catch(e){toast(e.message,true);console.error(e);} finally{$('#openBtn').disabled=false;}
 }
 
@@ -143,3 +143,28 @@ $('#csvInput').onchange=async e=>{const f=e.target.files[0];if(!f||!state.curren
 $('#showUnused').onchange=renderManagers;
 $('#applyAllBtn').onclick=()=>applyCurrentToAllScenes().catch(e=>toast(e.message,true));
 $$('.tab').forEach(b=>b.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));$$('.tab-panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(`#tab${b.dataset.tab[0].toUpperCase()+b.dataset.tab.slice(1)}`).classList.add('active');});
+
+async function validateExport(expected,actual) {
+  if(expected.length!==actual.length) throw new Error('Export entry count differs.');
+  for(let i=0;i<expected.length;i++) {
+    const a=expected[i],b=actual[i];
+    if(a.name!==b.name || a.type!==b.type || a.content.length!==b.content.length || a.content.some((v,j)=>v!==b.content[j])) throw new Error(`Export differs: ${a.name}`);
+    const match=a.name.match(/^Show\/Scenes\/StageBoxScene(\d+)\.tar\.gz$/);
+    if(match) findSceneDat(parseTar(await gunzip(b.content)),Number(match[1]));
+  }
+}
+// Serialize archive mutations so rapid scene changes cannot commit to the wrong scene.
+let operation=Promise.resolve();
+function queueOperation(fn) {
+  operation=operation.then(async()=>{
+    document.body.classList.add('busy');$('.app-shell').inert=true;$('.top-actions').inert=true;
+    try{return await fn();}finally{document.body.classList.remove('busy');$('.app-shell').inert=false;$('.top-actions').inert=false;}
+  }).catch(e=>{toast(e.message,true);console.error(e);});
+  return operation;
+}
+const rawLoadScene=loadScene;loadScene=number=>queueOperation(()=>rawLoadScene(number));
+const rawExportShow=exportShow;exportShow=()=>queueOperation(rawExportShow);$('#exportBtn').onclick=exportShow;
+const rawApplyAll=applyCurrentToAllScenes;applyCurrentToAllScenes=()=>queueOperation(rawApplyAll);
+window.addEventListener('beforeunload',event=>{if(state.dirtyScenes.size){event.preventDefault();event.returnValue='';}});
+
+const rawOpenFile=openFile;openFile=file=>queueOperation(()=>rawOpenFile(file));

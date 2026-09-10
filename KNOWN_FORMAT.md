@@ -22,3 +22,5 @@ The StageBox scene `.dat` tested in development contains ASCII signatures follow
 Each slot is 9 bytes. Names longer than 8 printable ASCII characters are rejected by the app.
 
 This table is based on observed binary layout and should be treated as reverse-engineered/experimental rather than a vendor specification.
+
+Version 2 observations: bytes after the first NUL in a name slot may be nonzero. Names are read only up to that NUL. DSP record framing and outstanding validation are documented in REVERSE_ENGINEERING.md.

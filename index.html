@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>dLive Show Editor — Experimental</title>
+  <title>dLive Show Editor — v2 Research Preview</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="topbar">
     <div>
-      <div class="brand">dLive Show Editor <span class="badge">experimental</span></div>
+      <div class="brand">dLive Show Editor <span class="badge">v2 research preview</span></div>
       <div class="sub">Local, browser-only editor for Allen &amp; Heath dLive show archives</div>
     </div>
     <div class="top-actions">
@@ -36,7 +36,7 @@
       <div id="emptyState" class="empty-state">
         <div class="empty-icon">DL</div>
         <h1>Edit dLive show files without uploading them anywhere</h1>
-        <p>This MVP safely edits the fixed-width channel, bus, matrix, DCA and FX name/colour tables found in dLive StageBox scene data. Unknown DSP fields remain read-only.</p>
+        <p>This research preview edits the fixed-width channel, bus, matrix, DCA and FX name/colour tables found in dLive StageBox scene data. Unknown DSP fields remain read-only.</p>
         <button id="openBtn2" class="primary large">Choose show file</button>
       </div>
 
@@ -49,6 +49,7 @@
           </div>
           <div class="head-actions">
             <label class="toggle"><input id="showUnused" type="checkbox" /> <span>Show unused slots</span></label>
+            <button id="undoBtn">Undo</button><button id="redoBtn">Redo</button>
             <button id="applyAllBtn">Apply names/colours to all scenes</button>
           </div>
         </div>
@@ -56,6 +57,7 @@
         <div class="tabs">
           <button class="tab active" data-tab="names">Names &amp; colours</button>
           <button class="tab" data-tab="fx">FX inspector</button>
+          <button class="tab" data-tab="research">Binary research</button>
           <button class="tab" data-tab="archive">Archive</button>
         </div>
 
@@ -72,6 +74,16 @@
           </div>
         </div>
 
+        <div id="tabResearch" class="tab-panel">
+          <div class="notice warn">DSP mappings are not validated yet. Compare shows saved after changing exactly one parameter in Director. Numeric interpretations and nearby strings are clues, not confirmed fields.</div>
+          <section class="panel"><h2>Scene structure</h2><p id="researchSummary"></p>
+          <div class="table-scroll"><table><thead><tr><th>Table</th><th>Signature</th><th>Names</th><th>Colours</th><th>Slots</th></tr></thead><tbody id="researchTables"></tbody></table></div></section>
+          <section class="panel"><h2>Compare binary data</h2><p>Compare the active scene (A) to a scene in this show or a second show (B).</p>
+          <div class="research-controls"><label>Second show <input id="compareFile" type="file" accept=".gz,.tgz" /></label><span id="comparisonLabel">Current show</span><button id="clearComparison">Use current show</button>
+          <label>Scene B <select id="compareScene"></select></label><button id="compareBtn">Compare</button><button id="downloadReport" disabled>Download JSON report</button></div>
+          <pre id="diffResult" class="binary-output"></pre></section>
+          <section class="panel"><h2>Strings with offsets</h2><label>Find text <input id="stringSearch" type="search" placeholder="e.g. Reverb, EQ, Manager" /></label><p id="stringCount"></p><pre id="researchStrings" class="binary-output"></pre></section>
+        </div>
         <div id="tabArchive" class="tab-panel">
           <div class="notice">The app preserves every unrecognised archive entry byte-for-byte. Scene archives are rebuilt only when their StageBox scene has been edited.</div>
           <section class="panel"><h2>Show archive entries</h2><div id="archiveList" class="archive-list"></div></section>
@@ -83,5 +95,6 @@
   <div id="toast" class="toast"></div>
   <script src="app-core.js"></script>
   <script src="app-ui.js"></script>
+  <script src="research.js"></script>
 </body>
 </html>

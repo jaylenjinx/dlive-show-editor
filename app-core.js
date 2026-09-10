@@ -78,7 +78,7 @@ function formatBytes(n) {
 }
 
 async function gzipTransform(bytes, mode) {
-  const Ctor = mode === 'decompress' ? window.DecompressionStream : window.CompressionStream;
+  const Ctor = mode === 'decompress' ? globalThis.DecompressionStream : globalThis.CompressionStream;
   if (!Ctor) throw new Error(`${mode === 'decompress' ? 'DecompressionStream' : 'CompressionStream'} is not supported by this browser.`);
   const stream = new Blob([bytes]).stream().pipeThrough(new Ctor('gzip'));
   return new Uint8Array(await new Response(stream).arrayBuffer());
@@ -87,30 +87,38 @@ const gunzip = bytes => gzipTransform(bytes, 'decompress');
 const gzip = bytes => gzipTransform(bytes, 'compress');
 
 function parseOctal(bytes, start, len) {
-  const s = asciiAt(bytes, start, len).replace(/\0/g,'').trim();
-  return s ? parseInt(s, 8) : 0;
+  const s = asciiAt(bytes, start, len).trim();
+  if (s && !/^[0-7]+$/.test(s)) throw new Error('Unsupported or invalid TAR numeric field.');
+  const value = s ? parseInt(s, 8) : 0;
+  if (!Number.isSafeInteger(value)) throw new Error('TAR numeric field exceeds safe range.');
+  return value;
 }
 function parseTar(bytes) {
-  const entries = [];
+  const entries = [], names = new Set();
   let off = 0;
   while (off + 512 <= bytes.length) {
-    let allZero = true;
-    for (let i=off; i<off+512; i++) if (bytes[i] !== 0) { allZero = false; break; }
-    if (allZero) break;
-    const name = asciiAt(bytes, off, 100);
-    const prefix = asciiAt(bytes, off+345, 155);
-    const fullName = prefix ? `${prefix}/${name}` : name;
-    const mode = parseOctal(bytes, off+100, 8) || 0o644;
-    const size = parseOctal(bytes, off+124, 12);
-    const mtime = parseOctal(bytes, off+136, 12);
-    const type = bytes[off+156] ? String.fromCharCode(bytes[off+156]) : '0';
-    const start = off + 512;
-    const end = start + size;
-    if (end > bytes.length) throw new Error(`Invalid TAR entry size for ${fullName}`);
-    entries.push({ name: fullName, mode, size, mtime, type, content: bytes.slice(start, end) });
-    off = start + Math.ceil(size/512)*512;
+    const header = bytes.slice(off, off+512);
+    if (header.every(b => b === 0)) {
+      if (bytes.slice(off).some(b => b !== 0)) throw new Error('Unexpected data after TAR terminator.');
+      return entries;
+    }
+    const stored = parseOctal(header,148,8);
+    let sum=0; for(let i=0;i<512;i++) sum += i>=148 && i<156 ? 32 : header[i];
+    if (sum !== stored) throw new Error(`TAR checksum mismatch at ${off}.`);
+    const name=asciiAt(header,0,100), prefix=asciiAt(header,345,155);
+    const fullName=prefix ? `${prefix}/${name}` : name;
+    if (!fullName || names.has(fullName)) throw new Error('Empty or duplicate TAR path.');
+    names.add(fullName);
+    const mode=parseOctal(header,100,8), size=parseOctal(header,124,12), mtime=parseOctal(header,136,12);
+    const type=header[156] ? String.fromCharCode(header[156]) : '0';
+    // Extended headers can override paths/sizes. Reject until explicitly supported.
+    if (!['0','5','1','2'].includes(type)) throw new Error(`Unsupported TAR entry type ${type}: ${fullName}`);
+    const start=off+512, end=start+size, next=start+Math.ceil(size/512)*512;
+    if (next>bytes.length) throw new Error(`Truncated TAR entry: ${fullName}`);
+    entries.push({name:fullName,mode,size,mtime,type,header,content:bytes.slice(start,end),padding:bytes.slice(end,next)});
+    off=next;
   }
-  return entries;
+  throw new Error('Missing TAR terminator or truncated header.');
 }
 
 function writeAscii(buf, off, len, text) {
@@ -118,10 +126,20 @@ function writeAscii(buf, off, len, text) {
   buf.set(b.slice(0,len), off);
 }
 function writeOctal(buf, off, len, value) {
-  const s = Math.max(0, value|0).toString(8).padStart(len-1, '0').slice(-(len-1)) + '\0';
+  if (!Number.isSafeInteger(value) || value < 0 || value.toString(8).length > len-1) throw new Error('TAR number out of range.');
+  const s = value.toString(8).padStart(len-1, '0') + '\0';
   writeAscii(buf, off, len, s);
 }
 function tarHeader(entry) {
+  if (entry.header) {
+    const h=entry.header.slice();
+    if (parseOctal(h,124,12) === entry.content.length) return h;
+    writeOctal(h,124,12,entry.content.length);
+    h.fill(32,148,156);
+    const sum=h.reduce((a,b)=>a+b,0);
+    writeAscii(h,148,8,sum.toString(8).padStart(6,'0')+'\0 ');
+    return h;
+  }
   const h = new Uint8Array(512);
   let name = entry.name;
   let prefix = '';
@@ -148,14 +166,15 @@ function tarHeader(entry) {
 }
 function writeTar(entries) {
   let total = 1024;
-  for (const e of entries) total += 512 + Math.ceil((e.type==='5' ? 0 : e.content.length)/512)*512;
+  for (const e of entries) total += 512 + Math.ceil((e.content.length)/512)*512;
   const out = new Uint8Array(total);
   let off=0;
   for (const e of entries) {
     out.set(tarHeader(e), off); off += 512;
-    if (e.type !== '5' && e.content.length) {
-      out.set(e.content,off); off += Math.ceil(e.content.length/512)*512;
-    }
+    if (e.content.length) out.set(e.content,off);
+    const padLength=(512-e.content.length%512)%512;
+    if (e.padding?.length===padLength) out.set(e.padding,off+e.content.length);
+    off += Math.ceil(e.content.length/512)*512;
   }
   return out;
 }
@@ -164,8 +183,14 @@ function parseManagers(dat) {
   const result = [];
   for (const spec of MANAGERS) {
     const sig = asciiBytes(spec.signature);
-    const pos = indexOfBytes(dat, sig);
-    if (pos < 0) continue;
+    const positions=[];
+    for(let at=indexOfBytes(dat,sig);at>=0;at=indexOfBytes(dat,sig,at+1)) {
+      const embedded=MANAGERS.some(other=>other.signature.length>spec.signature.length && other.signature.endsWith(spec.signature) &&
+        at>=other.signature.length-spec.signature.length && indexOfBytes(dat,asciiBytes(other.signature),at-(other.signature.length-spec.signature.length))===at-(other.signature.length-spec.signature.length));
+      if(!embedded)positions.push(at);
+    }
+    if(positions.length!==1)continue; // Ambiguous tables are never writable.
+    const pos=positions[0];
     const dataStart = pos + sig.length + 2;
     if (dat[pos+sig.length] !== 0 || dat[pos+sig.length+1] !== 1) continue;
     const colourStart = dataStart + spec.count*9;
@@ -180,9 +205,10 @@ function parseManagers(dat) {
         colourOffset:colourStart+i,
       });
     }
+    if (items.some(it=>!validName(it.name) || !dat.slice(it.nameOffset,it.nameOffset+9).includes(0) || it.colour>7)) continue;
     result.push({ ...spec, pos, dataStart, colourStart, items });
   }
-  return result;
+  return result.filter(m=>!result.some(n=>n!==m && m.dataStart<n.colourStart+n.count && n.dataStart<m.colourStart+m.count));
 }
 
 function extractPrintableStrings(bytes, min=5) {
@@ -224,18 +250,19 @@ async function loadScene(sceneNumber) {
   const outer = state.outerEntries.find(e=>e.name===scene.stagePath);
   const nestedTar = await gunzip(outer.content);
   const nestedEntries = parseTar(nestedTar);
-  const datEntry = nestedEntries.find(e => /StageBoxScene\d+\.dat$/.test(e.name)) || nestedEntries.find(e => e.name.endsWith('.dat'));
+  const datEntry = findSceneDat(nestedEntries,sceneNumber);
   if (!datEntry) throw new Error(`No StageBox scene .dat found inside scene ${sceneNumber}`);
   const datBytes = datEntry.content.slice();
   const managers = parseManagers(datBytes);
-  state.current = { scene, outer, nestedEntries, datEntry, datBytes, managers, dirty:false };
+  state.current = { scene, outer, nestedEntries, datEntry, datBytes, managers, dirty:false, undo:[], redo:[] };
   renderScene();
 }
 
 async function commitCurrentScene() {
   const c = state.current;
   if (!c || !c.dirty) return;
-  c.datEntry.content = c.datBytes;
+  assertAllowedChanges(c.datEntry.content,c.datBytes);
+  c.datEntry.content = c.datBytes.slice();
   c.datEntry.size = c.datBytes.length;
   const nestedTar = writeTar(c.nestedEntries);
   c.outer.content = await gzip(nestedTar);
@@ -245,16 +272,43 @@ async function commitCurrentScene() {
   c.dirty = false;
 }
 
-function setName(managerKey, index, name) {
-  if (!validName(name)) { toast('Names must be 8 ASCII characters or fewer.', true); return false; }
-  const m = state.current.managers.find(x=>x.key===managerKey); if (!m) return false;
-  const item = m.items[index-1];
-  for (let i=0;i<9;i++) state.current.datBytes[item.nameOffset+i]=0;
-  state.current.datBytes.set(asciiBytes(name), item.nameOffset);
-  item.name=name;
-  markDirty(); return true;
+function changeItem(managerKey,index,field,value) {
+  const c=state.current, m=c?.managers.find(x=>x.key===managerKey);
+  if (!m || !Number.isInteger(index) || index<1 || index>m.count) return false;
+  const item=m.items[index-1];
+  if (field==='name' ? !validName(value) : !Number.isInteger(value)||value<0||value>7) return false;
+  if (item[field]===value) return true;
+  c.undo.push({managerKey,index,field,before:item[field],after:value}); c.redo=[];
+  writeItem(c,item,field,value); markDirty(); return true;
 }
-function setColour(managerKey,index,colour) {
-  const m=state.current.managers.find(x=>x.key===managerKey); if (!m) return;
-  const item=m.items[index-1]; item.colour=Number(colour); state.current.datBytes[item.colourOffset]=item.colour; markDirty();
+function writeItem(c,item,field,value) {
+  if(field==='name') { c.datBytes.fill(0,item.nameOffset,item.nameOffset+9); c.datBytes.set(asciiBytes(value),item.nameOffset); }
+  else c.datBytes[item.colourOffset]=value;
+  item[field]=value;
+}
+function setName(managerKey,index,name) {
+  if(!validName(name)) { toast('Names must be 8 ASCII characters or fewer.',true); return false; }
+  return changeItem(managerKey,index,'name',name);
+}
+function setColour(managerKey,index,colour) { return changeItem(managerKey,index,'colour',Number(colour)); }
+function historyStep(redo=false) {
+  const c=state.current, from=redo?c.redo:c.undo, to=redo?c.undo:c.redo, edit=from.pop();
+  if(!edit) return;
+  const item=c.managers.find(m=>m.key===edit.managerKey).items[edit.index-1];
+  writeItem(c,item,edit.field,redo?edit.after:edit.before); to.push(edit); markDirty(); renderManagers(); renderFx();
+}
+function findSceneDat(entries,number) {
+  const matches=entries.filter(e=>e.type==='0' && /^StageBoxScene\d+\.dat$/.test(e.name.split('/').pop()) && Number(e.name.match(/StageBoxScene(\d+)\.dat$/)[1])===number);
+  if(matches.length!==1) throw new Error(`Expected one StageBoxScene${number}.dat; found ${matches.length}.`);
+  return matches[0];
+}
+function assertAllowedChanges(before,after) {
+  if(before.length!==after.length) throw new Error('Scene length changed.');
+  const allowed=new Uint8Array(before.length);
+  for(const m of parseManagers(before)) for(const it of m.items) {
+    allowed.fill(1,it.nameOffset,it.nameOffset+9); allowed[it.colourOffset]=1;
+  }
+  for(let i=0;i<before.length;i++) if(before[i]!==after[i]&&!allowed[i]) throw new Error(`Unexpected write at offset ${i}.`);
+  const original=parseManagers(before), edited=parseManagers(after);
+  if(original.length!==edited.length || original.some(m=>!edited.some(n=>n.key===m.key&&n.pos===m.pos))) throw new Error('Edited manager validation failed.');
 }
