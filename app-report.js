@@ -1,8 +1,10 @@
 function exportResearchReport(){
   if(!state.current)return;
   const c=state.current;
+  const mixerState=c.stage?parseInputMixerChannelState(c.stage.datBytes):null;
+  const compressorStates=c.stage?parseInputCompressorStates(c.stage.datBytes):[];
   const report={
-    format:'dlive-show-editor-research-v2',
+    format:'dlive-show-editor-research-v2.2',
     generatedAt:new Date().toISOString(),
     sourceFile:state.fileName,
     showVersion:getTextEntry(state.outerEntries,'Show/Version.dat')?.trim()||null,
@@ -24,9 +26,22 @@ function exportResearchReport(){
     inputHpf:c.stage?parseInputHpfs(c.stage.datBytes).map(h=>({
       channel:h.channel,frameStart:h.frameStart,payloadLength:h.payloadLength,stateLength:h.stateLength,
       discriminator:h.discriminator,frequencyRaw:h.frequencyRaw,frequencyHz:h.frequencyHz,
-      enableRaw:h.enableRaw,tailRaw:h.tailRaw,shapeMatchesReference:h.shapeMatchesReference,
+      modeRaw:h.modeRaw,bypassRaw:h.bypassRaw,active:h.active,bypassKnown:h.bypassKnown,
       rawHex:hexRange(h.raw)
     })):[],
+    inputMixer:mixerState?{
+      frameStart:mixerState.frameStart,payloadLength:mixerState.payloadLength,stateLength:mixerState.stateLength,
+      headerHex:hexRange(mixerState.header),blockSize:mixerState.blockSize,
+      channels:mixerState.channels.map(ch=>({
+        channel:ch.channel,blockStart:ch.blockStart,blockSize:ch.blockSize,
+        faderOffset:ch.faderOffset,faderRaw:ch.faderRaw,faderDb:ch.faderDb,faderInfinite:ch.faderInfinite,
+        panOffset:ch.panOffset,panRaw:ch.panRaw,panPercent:ch.panPct,panLabel:ch.panLabel
+      }))
+    }:null,
+    inputCompressorState:compressorStates.map(x=>({
+      channel:x.channel,frameStart:x.frameStart,payloadLength:x.payloadLength,stateLength:x.stateLength,
+      typeRaw:x.typeRaw,modelRaw:x.modelRaw,enableRaw:x.enableRaw,active:x.active,enableKnown:x.enableKnown
+    })),
     ahfx:c.stage?.ahfx.map(f=>({
       slot:f.slot,frameStart:f.frameStart,payloadLength:f.payloadLength,engineId:f.engineId,
       engineName:f.engineName,preset:f.preset,payloadHex:hexRange(f.payload)
@@ -37,6 +52,6 @@ function exportResearchReport(){
     }
   };
   const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'}),a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);a.download=`dlive-scene-${c.scene.number}-research-v2.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  a.href=URL.createObjectURL(blob);a.download=`dlive-scene-${c.scene.number}-research-v2.2.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
   toast('Exported reverse-engineering JSON report.');
 }
