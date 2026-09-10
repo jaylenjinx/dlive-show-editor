@@ -1,3 +1,13 @@
+function setPrimaryView(view){
+  const docs=view==='docs';
+  $('#editorShell').classList.toggle('hidden',docs);
+  $('#docsView').classList.toggle('hidden',!docs);
+  $('#editorNavBtn').classList.toggle('active',!docs);
+  $('#docsNavBtn').classList.toggle('active',docs);
+  if(docs && typeof renderDocs==='function')renderDocs();
+  if(!docs && location.hash.startsWith('#docs-'))history.replaceState(null,'',location.pathname+location.search);
+}
+
 async function openFile(file){
   try{
     $('#openBtn').disabled=true;
@@ -31,4 +41,11 @@ $('#applyAllBtn').onclick=()=>applyCurrentToAllScenes().catch(e=>toast(e.message
 $$('.tab').forEach(b=>b.onclick=()=>{
   $$('.tab').forEach(x=>x.classList.remove('active'));$$('.tab-panel').forEach(x=>x.classList.remove('active'));
   b.classList.add('active');const id=`#tab${b.dataset.tab[0].toUpperCase()+b.dataset.tab.slice(1)}`;$(id).classList.add('active');
+});
+
+$('#editorNavBtn').onclick=()=>setPrimaryView('editor');
+$('#docsNavBtn').onclick=()=>setPrimaryView('docs');
+if(location.hash.startsWith('#docs-'))setPrimaryView('docs');
+window.addEventListener('hashchange',()=>{
+  if(location.hash.startsWith('#docs-')){setPrimaryView('docs'); if(typeof renderDocs==='function')renderDocs();}
 });
