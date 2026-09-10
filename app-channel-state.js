@@ -69,7 +69,7 @@ function renderChannelState(){
   const inputs=state.current.stage.managers.find(x=>x.key==='inputs');
 
   const toolbar=document.createElement('section');toolbar.className='panel peq-toolbar';
-  toolbar.innerHTML=`<div class="manager-head inline"><h2>Input channel</h2><span class="confidence decoded">CROSS-CHECKED READ</span></div>`;
+  toolbar.innerHTML='<div class="manager-head inline"><h2>Input channel</h2><span class="confidence decoded">CROSS-CHECKED READ</span></div>';
   const select=document.createElement('select');select.className='peq-channel-select';
   for(const ch of mixer.channels){
     const name=inputs?.items[ch.channel-1]?.name||'';
@@ -106,3 +106,8 @@ function renderChannelState(){
   };
   select.onchange=draw;draw();
 }
+
+// This module loads after app-render-main.js. Extend scene rendering without
+// changing the core renderer so the reverse-engineering inspector stays modular.
+const renderSceneBeforeChannelState=renderScene;
+renderScene=function(){renderSceneBeforeChannelState();renderChannelState();};
