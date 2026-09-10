@@ -29,7 +29,7 @@ function renderScene(){
   const c=state.current;
   $('#sceneTitle').textContent=c.scene.number===65535?'Current state':`Scene ${c.scene.number}`;
   $('#sceneName').textContent=c.stage?extractShowName(c.stage.datBytes):'Surface-only scene';
-  updateDirtyStatus();renderSceneList();renderManagers();renderPeq();renderSurface();renderFx();renderSystem();renderResearch();renderArchive();
+  updateDirtyStatus();renderSceneList();renderManagers();renderPeq();renderHpf();renderSurface();renderFx();renderSystem();renderResearch();renderArchive();
 }
 function renderManagers(){
   const root=$('#managerGrid');root.innerHTML='';
