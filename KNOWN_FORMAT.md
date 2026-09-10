@@ -245,3 +245,80 @@ V2 lists these signatures and offsets to support controlled experiments.
   - RackUltra Return +0x5E
 
 These addresses describe the live MIDI API rather than the offline file layout, but they provide useful semantic confirmation of object classes.
+
+## 9. Input PEQ numeric band fields — CONTROLLED-DIFF VERIFIED (dLive 2.12)
+
+A labelled input PEQ record is framed normally and contains a NUL-terminated label, a band-count byte (`04`), four 9-byte band records, and one trailing byte. The band record layout isolated from Scene 10 clones is:
+
+```text
+byte 0..1  gain        signed int16 big-endian, high-resolution dB domain
+byte 2..3  frequency   uint16 big-endian, logarithmic frequency coordinate
+byte 4..5  bell width  uint16 big-endian, A&H width-index domain + fractional low byte
+byte 6..8  state/type  not mapped yet; preserve
+```
+
+### Gain
+
+Controlled Band 2 examples:
+
+```text
++1 dB   01 03   = +259  = +1.01171875 dB internal
++3 dB   03 03   = +771  = +3.01171875 dB internal
+-3 dB   FC FD   = -771  = -3.01171875 dB internal
+-15 dB  F1 00   = -3840 = -15.0 dB
++15 dB  0F 00   = +3840 = +15.0 dB
+```
+
+Decoder/encoder used by V2.1:
+
+```text
+gain_dB = signed_int16_be / 256
+raw_gain = round(clamp(gain_dB, -15, +15) * 256)
+```
+
+The small offset on some user-entered nominal values is consistent with the console retaining a higher-resolution encoder position while displaying a rounded value. Untouched raw values are never normalised by the editor.
+
+### Frequency
+
+Controlled Band 2 examples:
+
+```text
+100 Hz    53 96 = 21398
+200 Hz    65 96 = 26006
+500 Hz    7D 62 = 32098
+1 kHz     8F 62 = 36706
+5 kHz     B9 2D = 47405
+10 kHz    CB 2D = 52013
+```
+
+All six match exactly:
+
+```text
+raw_frequency = floor(4608 * log2(frequency_hz / 4))
+frequency_hz  = 4 * 2^(raw_frequency / 4608)
+```
+
+This same high-resolution term appears in Allen & Heath's published dLive MIDI frequency formula before it is reduced to the MIDI 0..127 value. This is strong independent confirmation that the offline show stores the high-resolution internal frequency coordinate directly.
+
+### Bell width
+
+Allen & Heath calls this control **Bell Width** (1.5 octave to 1/9 octave), not conventional constant-Q. The controlled scenes yield:
+
+```text
+1.5   00 00   high-byte index 0
+1.3   02 00   high-byte index 2
+1.1   04 58   high-byte index 4
+0.95  06 A8   high-byte index 6
+0.8   09 D6   high-byte index 9
+2/3   0C 70   high-byte index 12
+0.45  10 32   high-byte index 16
+0.3   13 F4   high-byte index 19
+1/6   16 8E   high-byte index 22
+1/9   18 00   high-byte index 24
+```
+
+The high byte matches the official dLive MIDI width table index exactly. The low byte is retained as sub-step/high-resolution state. V2.1 decodes the displayed width from the high-byte index and preserves the fractional low byte unless the user changes width. A width edit writes the canonical `index << 8` representation; filter/state bytes remain untouched.
+
+### Record geometry
+
+For channels 1–99 the PEQ payload is 70 bytes; for channels 100–128 it is 71 bytes solely because the ASCII channel number adds one character. The parameter geometry after the NUL-terminated label is otherwise identical.
