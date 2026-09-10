@@ -39,7 +39,7 @@ uint16_be payload_length
 payload[payload_length]
 ```
 
-For labelled objects, the payload generally starts with a NUL-terminated printable ASCII label. This framing is validated across name/colour managers, surface banks, PEQ, compressor and RackUltra records.
+For labelled objects, the payload generally starts with a NUL-terminated printable ASCII label. This framing is validated across name/colour managers, surface banks, PEQ, HPF, compressor and RackUltra records.
 
 ## Name / colour managers
 
@@ -165,6 +165,41 @@ The controlled data follows the Allen & Heath Bell Width index in the high byte.
 
 The final three band bytes remain the highest-value PEQ experiment: controlled Bell/Shelf/HPF/LPF and PEQ In/Out scenes should identify filter type and bypass/state.
 
+## Input HPF
+
+Record pattern:
+
+```text
+Highpass Filter Input Channel NN\0
+03 53 96 00 01
+```
+
+The state portion is five bytes in every analysed current/reference input channel. Channels 100–128 have a one-byte larger overall payload only because the ASCII label is one character longer.
+
+| Field | State-relative offset | Type | Transform | Confidence | Write | Evidence |
+|---|---:|---|---|---|---|---|
+| Discriminator/type | `+0` | `uint8` | observed constant `0x03` | Decoded/parser guard | No | All 128 current/reference input HPF records |
+| Frequency | `+1..2` | `uint16_be` | candidate `raw = floor(4608 × log2(f/4))`; inverse `f = 4 × 2^(raw/4608)` | **High-confidence decoded** | No | `0x5396` decodes exactly to 100 Hz; independent dLive MIDI implementation documents logarithmic 20–2000 Hz HPF |
+| Enable/bypass candidate | `+3` | `uint8` | `0x00 = Off` in current reference; On value unknown | Partial | No | All reference records store `00`; ConsoleFlip independently reports those channels as HPF Off |
+| Tail/state | `+4` | `uint8` | observed constant `0x01` | Unknown | No | All analysed reference records |
+
+The frequency interpretation is strongly supported but not yet promoted to write because the current controlled show does not contain isolated HPF frequency changes. The On representation has also not yet been observed.
+
+Required promotion set:
+
+```text
+HPF OFF 100
+HPF ON 100
+HPF ON 20
+HPF ON 50
+HPF ON 200
+HPF ON 500
+HPF ON 1000
+HPF ON 2000
+```
+
+See [`input-hpf.md`](input-hpf.md) for the full evidence chain.
+
 ## RackUltra / AHFX
 
 Records are labelled `AHFX Manager 01` through `AHFX Manager 08`.
@@ -204,7 +239,6 @@ No RackUltra DSP parameter is writable yet. One-parameter controlled clones of a
 
 | Record pattern | Suspected/known semantic area | Payload status | Write | Next experiment |
 |---|---|---|---|---|
-| `Highpass Filter Input Channel NN` | HPF frequency/on | framed; offsets unknown | No | HPF on/off + several frequencies |
 | `Compressor, Input Channel NN` | Compressor | 156-byte payload observed in current reference | No | threshold, ratio, attack, release, knee, makeup, on/off |
 | `Gate, Input Channel NN` | Gate | framed | No | threshold/depth/attack/hold/release/on-off |
 | `Delay, Input Channel NN` | Input delay | framed | No | 0 ms plus several known delays |
@@ -229,4 +263,4 @@ A writable field should ideally satisfy all of the following:
 5. Exported shows survive TAR/GZIP round-trip validation.
 6. Where available, an independent semantic reference (for example dLive MIDI) agrees with the interpretation.
 
-The JavaScript source of truth used by the site's interactive table is [`app-parameter-map.js`](../app-parameter-map.js).
+The interactive site's base registry is [`app-parameter-map.js`](../app-parameter-map.js). Provisional HPF entries are currently layered in by [`app-parameter-map-hpf.js`](../app-parameter-map-hpf.js) until controlled HPF scenes are available for final promotion.
