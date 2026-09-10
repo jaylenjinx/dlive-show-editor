@@ -1,266 +1,184 @@
 # dLive 2.12 parameter map
 
-This is the canonical working index for fields currently identified in the dLive show-file format. It is **unofficial reverse-engineering documentation**, not an Allen & Heath specification.
+This is the canonical human-readable index for fields currently identified in the dLive show-file format. It is **unofficial reverse-engineering documentation**, not an Allen & Heath specification.
 
-The map deliberately separates four states:
+Confidence states:
 
-- **Verified write** — isolated/reproduced from controlled examples and enabled in the editor.
-- **Partial / conservative write** — semantics are understood, but the writer intentionally emits only a conservative canonical form.
-- **Decoded / read-only** — meaning is high-confidence, but the project does not yet generate the field.
-- **Located / unknown** — the record is identifiable, but parameter offsets or transforms are still unresolved.
+- **Verified write** — encoding and a narrow safe write boundary are independently established.
+- **Partial / conservative write** — semantics are understood but the writer deliberately emits only a canonical subset.
+- **Decoded / read-only** — meaning is high-confidence, but generation remains disabled until isolated write tests are complete.
+- **Located / unknown** — the record/field is identifiable but its transform or semantics remain incomplete.
 
-The current primary target is **dLive firmware 2.12**. Historical/factory scenes are useful evidence but are not assumed to share every current-state field layout.
-
-## Show/container fields
-
-| Record | Field | Offset | Type | Transform | Confidence | Write | Evidence |
-|---|---|---:|---|---|---|---|---|
-| `Show/Version.dat` | Show format version | whole file | ASCII integer | `parseInt(text)` | Decoded | No | Reference shows; current target reports format `14` |
-| `Show/MixConfig/MixConfig.dat` | Record/version | `0` | `uint8` | observed `01` | Decoded | No | Reference MixConfig |
-| `Show/MixConfig/MixConfig.dat` | Mono Group count | `1` | `uint8` | direct count | Decoded | No | Agrees with Scene 10 mixer config |
-| `Show/MixConfig/MixConfig.dat` | Stereo Group count | `2` | `uint8` | direct count | Decoded | No | Agrees with Scene 10 mixer config |
-| `Show/MixConfig/MixConfig.dat` | Mono RackExtra FX send count | `3` | `uint8` | direct count | Decoded | No | Global config + mixer structures |
-| `Show/MixConfig/MixConfig.dat` | Stereo RackExtra FX send count | `4` | `uint8` | direct count | Decoded | No | Global config + mixer structures |
-| `Show/MixConfig/MixConfig.dat` | Mono Aux count | `5` | `uint8` | direct count | Decoded | No | Global config + Scene 10 buses |
-| `Show/MixConfig/MixConfig.dat` | Stereo Aux count | `6` | `uint8` | direct count | Decoded | No | Global config + Scene 10 buses |
-| `Show/MixConfig/MixConfig.dat` | Unknown | `7` | `uint8` | unknown | Unknown | No | Observed only |
-| `Show/MixConfig/MixConfig.dat` | Unknown | `8` | `uint8` | unknown | Unknown | No | Observed only |
-| `Show/MixConfig/MixConfig.dat` | Mono Matrix count | `9` | `uint8` | direct count | Decoded | No | Global config + Scene 10 matrices |
-| `Show/MixConfig/MixConfig.dat` | Stereo Matrix count | `10` | `uint8` | direct count | Decoded | No | Global config + Scene 10 matrices |
-| `Show/MixConfig/MixConfig.dat` | Unknown | `11` | `uint8` | unknown | Unknown | No | Observed only |
-| `Show/MixConfig/MixConfig.dat` | Unknown | `12` | `uint8` | unknown | Unknown | No | Observed only |
+Primary target: **dLive firmware 2.12**.
 
 ## Common framed-record rule
 
-A broad class of StageBox and Surface objects follows:
+Many StageBox and Surface objects use:
 
 ```text
 uint16_be payload_length
 payload[payload_length]
 ```
 
-For labelled objects, the payload generally starts with a NUL-terminated printable ASCII label. This framing is validated across name/colour managers, surface banks, PEQ, HPF, compressor and RackUltra records.
+For labelled objects the payload normally begins with a NUL-terminated printable ASCII label. This framing is confirmed across name/colour managers, surface banks, PEQ, HPF, compressors, Input Mixer and RackUltra records.
 
-## Name / colour managers
+## Names and colours
 
-Pattern:
+| Field | Offset / shape | Type | Transform | Confidence | Write |
+|---|---|---|---|---|---|
+| Object name | N × 9-byte slots after manager signature/version | fixed ASCII[9] | max 8 printable ASCII bytes + NUL/padding | **Verified write** | **Yes** |
+| Colour | immediately after all name slots | `uint8` | `0 Off, 1 Red, 2 Green, 3 Yellow, 4 Blue, 5 Magenta, 6 Cyan, 7 White` | **Verified write** | **Yes** |
 
-```text
-uint16_be payload_length
-ASCII signature
-00 01
-N × 9-byte names
-N × 1-byte colours
-```
-
-| Field | Offset | Type | Transform | Confidence | Write | Evidence |
-|---|---|---|---|---|---|---|
-| Object name | after signature + 2; one 9-byte slot/object | fixed ASCII[9] | max 8 printable ASCII bytes + NUL/padding | **Verified write** | **Yes** | Scene 10 + successful archive round trip |
-| Colour | immediately after all name slots | `uint8` | `0 Off, 1 Red, 2 Green, 3 Yellow, 4 Blue, 5 Magenta, 6 Cyan, 7 White` | **Verified write** | **Yes** | Show binary + independent MIDI colour constants |
-
-Recognised managers currently include Inputs, mono/stereo Groups, mono/stereo Auxes, Mains, mono/stereo Matrices, RackExtra FX sends/returns, RackUltra FX sends/returns and DCAs.
+Recognised managers include Inputs, mono/stereo Groups, mono/stereo Auxes, Mains, mono/stereo Matrices, RackExtra FX sends/returns, RackUltra FX sends/returns and DCAs.
 
 ## Surface bank assignments
 
-Records:
-
-- `Channel Left Bank Switcher`
-- `Channel Middle Bank Switcher`
-- `Channel Right Bank Switcher`
-
-Each strip assignment is two bytes:
+Each C-class strip assignment is:
 
 ```text
 [ strip_type, zero_based_object_index ]
 ```
 
-| Field | Offset | Type | Confidence | Write | Evidence |
-|---|---|---|---|---|---|
-| Strip type | assignment byte `0` | `uint8 enum` | **Verified write** | **Yes** | Factory C1500/C2500/C3500/S3000/S5000/S7000 Strip Assign scenes |
-| Object index | assignment byte `1` | `uint8` | **Verified write** | **Yes** | Factory strip scenes + Scene 10 C1500 layout |
+Both bytes are **Verified Write**, based on factory C1500/C2500/C3500/S3000/S5000/S7000 strip-assignment scenes.
 
-Verified strip type IDs:
-
-| Hex | Object |
-|---:|---|
-| `00` | Blank |
-| `01` | Input |
-| `02` | Mono Group |
-| `03` | Stereo Group |
-| `04` | Mono Aux |
-| `05` | Stereo Aux |
-| `06` | RackExtra FX Send |
-| `08` | Main |
-| `0A` | Mono Matrix |
-| `0B` | Stereo Matrix |
-| `0C` | RackExtra FX Return |
-| `0D` | DCA |
-| `13` | RackUltra FX Return |
-
-Unknown strip type values are preserved and not offered as writable choices.
+Verified type IDs include `00 Blank`, `01 Input`, `02 Mono Group`, `03 Stereo Group`, `04 Mono Aux`, `05 Stereo Aux`, `06 RackExtra FX Send`, `08 Main`, `0A Mono Matrix`, `0B Stereo Matrix`, `0C RackExtra FX Return`, `0D DCA`, `13 RackUltra FX Return`.
 
 ## Input PEQ
 
-Record pattern:
-
-```text
-Parametric EQ, Input Channel NN\0
-04
-[band 1: 9 bytes]
-[band 2: 9 bytes]
-[band 3: 9 bytes]
-[band 4: 9 bytes]
-[tail]
-```
-
-Each band:
+Each input has four 9-byte bands:
 
 ```text
 GG GG  FF FF  WW WW  SS SS SS
-│      │      │      └─ filter/state/type (unmapped)
+│      │      │      └─ filter/state/type — unknown
 │      │      └──────── Bell Width
 │      └─────────────── frequency
 └────────────────────── gain
 ```
 
-| Field | Band-relative offset | Type | Transform | Confidence | Write | Evidence |
-|---|---:|---|---|---|---|---|
-| Gain | `+0..1` | signed `int16_be` | `gain_dB = raw / 256` | **Verified write** | **Yes** | Controlled `+1,+3,-3,-15,+15 dB` scenes |
-| Frequency | `+2..3` | `uint16_be` | `raw = floor(4608 × log2(f/4))` | **Verified write** | **Yes** | Controlled `100,200,500,1k,5k,10k Hz` scenes; exact fit |
-| Bell Width | `+4..5` | `uint16_be` | high byte = A&H width index; low byte = fractional internal precision | **Partial / conservative write** | **Yes** | Controlled width sequence from `1.5` to `1/9` |
-| Filter/state/type | `+6..8` | 3 raw bytes | unknown | Unknown | No | Stable across gain/frequency/width experiments |
+| Field | Band offset | Type | Transform | Confidence | Write |
+|---|---:|---|---|---|---|
+| Gain | `+0..1` | `int16_be` | `dB = raw / 256` | **Verified write** | **Yes** |
+| Frequency | `+2..3` | `uint16_be` | `raw = floor(4608 × log2(f/4))` | **Verified write** | **Yes** |
+| Bell Width | `+4..5` | `uint16_be` | high byte = A&H width index; low byte = internal fraction | **Partial write** | **Yes** |
+| Filter/state/type | `+6..8` | 3 raw bytes | unknown | Unknown | No |
 
-### PEQ gain
-
-```text
-gain_dB = int16_be(raw) / 256
-raw     = round(gain_dB × 256)
-```
-
-Examples:
-
-```text
-06 00 -> +6.0 dB
-F1 00 -> -15.0 dB
-```
-
-### PEQ frequency
-
-```text
-raw = floor(4608 × log2(f / 4))
-f   = 4 × 2^(raw / 4608)
-```
-
-Examples:
-
-```text
-100 Hz  -> 0x5396
-200 Hz  -> 0x6596
-1 kHz   -> 0x8F62
-```
-
-### PEQ Bell Width
-
-The controlled data follows the Allen & Heath Bell Width index in the high byte. The low byte carries finer internal position/precision. The current writer preserves untouched raw values exactly; deliberate width edits write the canonical `index << 8` representation.
-
-The final three band bytes remain the highest-value PEQ experiment: controlled Bell/Shelf/HPF/LPF and PEQ In/Out scenes should identify filter type and bypass/state.
+Controlled evidence covers gain `+1,+3,-3,-15,+15 dB`, frequency `100,200,500,1k,5k,10k Hz`, and Bell Width from `1.5` through `1/9`.
 
 ## Input HPF
 
-Record pattern:
+Current-format record state after the label:
 
 ```text
-Highpass Filter Input Channel NN\0
-03 53 96 00 01
+03 FF FF MM BB
+│  └─┬─┘ │  └─ bypass: 00 On, 01 Off
+│    │   └──── unknown mode/state byte — preserve
+│    └──────── frequency
+└───────────── HPF discriminator/type
 ```
 
-The state portion is five bytes in every analysed current/reference input channel. Channels 100–128 have a one-byte larger overall payload only because the ASCII label is one character longer.
+| Field | State offset | Type | Transform | Confidence | Write |
+|---|---:|---|---|---|---|
+| Discriminator/type | `+0` | `uint8` | observed `03` | Decoded/parser guard | No |
+| Frequency | `+1..2` | `uint16_be` | `raw = floor(4608 × log2(f/4))`; `f = 4 × 2^(raw/4608)` | **Verified write** | **Yes** |
+| Unknown mode/state | `+3` | `uint8` | unknown; usually `00`, real `01` observed | Unknown | No |
+| Bypass | `+4` | `uint8` | `00` active/on, `01` bypassed/off | **Verified write** | **Yes** |
 
-| Field | State-relative offset | Type | Transform | Confidence | Write | Evidence |
-|---|---:|---|---|---|---|---|
-| Discriminator/type | `+0` | `uint8` | observed constant `0x03` | Decoded/parser guard | No | All 128 current/reference input HPF records |
-| Frequency | `+1..2` | `uint16_be` | candidate `raw = floor(4608 × log2(f/4))`; inverse `f = 4 × 2^(raw/4608)` | **High-confidence decoded** | No | `0x5396` decodes exactly to 100 Hz; independent dLive MIDI implementation documents logarithmic 20–2000 Hz HPF |
-| Enable/bypass candidate | `+3` | `uint8` | `0x00 = Off` in current reference; On value unknown | Partial | No | All reference records store `00`; ConsoleFlip independently reports those channels as HPF Off |
-| Tail/state | `+4` | `uint8` | observed constant `0x01` | Unknown | No | All analysed reference records |
+Evidence: the `Jaylen Aug 15` event show contains active and bypassed HPFs across multiple frequencies. ConsoleFlip independently rendered 108 input cards; **108/108 matched** native On/Off state and rounded decoded frequency. The writer modifies only bytes `+1..2` and `+4`.
 
-The frequency interpretation is strongly supported but not yet promoted to write because the current controlled show does not contain isolated HPF frequency changes. The On representation has also not yet been observed.
+See [`input-hpf.md`](input-hpf.md).
 
-Required promotion set:
+## Input Mixer / channel state
+
+Two different real dLive 2.12 mixer configurations reveal:
 
 ```text
-HPF OFF 100
-HPF ON 100
-HPF ON 20
-HPF ON 50
-HPF ON 200
-HPF ON 500
-HPF ON 1000
-HPF ON 2000
+Input Mixer\0
+12-byte mixer header
+128 × blockSize-byte input blocks
+
+blockSize = (stateLength - 12) / 128
 ```
 
-See [`input-hpf.md`](input-hpf.md) for the full evidence chain.
+Observed block sizes:
+
+| Show | blockSize |
+|---|---:|
+| Jaylen Aug 15 | 169 bytes |
+| Hardcore Start | 224 bytes |
+
+### Input fader
+
+```text
+offset = blockStart + blockSize - 84
+raw    = int16_be
+0x8001 -> -infinity
+else dB = raw / 256
+```
+
+**Decoded / read-only.** The end-relative offset holds in both mixer configurations and ConsoleFlip's rendered faders agree with the decoded values.
+
+### Input pan
+
+```text
+offset = blockStart + blockSize - 82
+0x00 = 100% L
+0x25 = centre
+0x4A = 100% R
+pan_percent = (raw - 37) / 37 × 100
+```
+
+**Decoded / read-only.** ConsoleFlip's dial angles agree with native values in the event show.
+
+### Event-config mono Aux sends
+
+In the 169-byte event block, six mono Aux level fields are observed at `+12,+16,+20,+24,+28,+32`, each as `int16_be / 256 dB` with `0x8001 = -infinity`. These offsets are **configuration-specific evidence only** and are not writable until the variable bus-layout rule is solved.
+
+See [`input-mixer.md`](input-mixer.md).
+
+## Input compressor
+
+Record: `Compressor, Input Channel NN`.
+
+| Field | State offset | Type | Transform | Confidence | Write |
+|---|---:|---|---|---|---|
+| Processor/type byte | `+0` | `uint8` | observed `08` in current event material | Located | No |
+| Model/type candidate | `+1` | `uint8` | multiple values observed (`01`,`04`,`06`, ...) | Located | No |
+| Enable | `+2` | `uint8` | `00` Off, `01` On | **Decoded / read-only** | No |
+| Remaining parameters | `+3...` | mixed | unknown | Unknown | No |
+
+ConsoleFlip's event preview matched compressor state byte `+2` on all 108 visible cards, including active CH14, CH16 and CH18.
 
 ## RackUltra / AHFX
 
-Records are labelled `AHFX Manager 01` through `AHFX Manager 08`.
+`AHFX Manager 01` through `AHFX Manager 08` use a 262-byte payload in the current reference, or 264 bytes including the two-byte frame prefix.
 
-In the current 2.12 reference show:
+| Field | Offset | Confidence | Write |
+|---|---|---|---|
+| Payload length | frame `-2..-1` | Verified framing | No |
+| Engine/model ID | signature `+0x13..0x14` | Decoded | No |
+| Preset label | signature `+0x15` | Decoded | No |
+| DSP state | remainder | Unknown | No |
 
-```text
-payload length = 0x0106 = 262 bytes
-total framed record = 264 bytes
-```
+Observed model IDs include Spaces (`1c03`,`1c04`), Plate (`1d00`), Rhythm Delay (`2d00`), Saturator (`2b00`), Amp/Cab (`2a00`), Shifter (`2400`), Dual Harmony (`2300`), Tuner (`1e00`) and Gridder (`2800`).
 
-| Field | Offset | Type | Confidence | Write | Evidence |
-|---|---:|---|---|---|---|
-| Payload length | frame `-2..-1` | `uint16_be` | Verified framing | No | Eight consecutive managers |
-| Engine/model ID | signature `+0x13..0x14` | two raw bytes | Decoded | No | Scene 1 reset vs Scene 10 same-engine comparisons |
-| Preset label | signature `+0x15` | NUL-terminated ASCII in fixed region | Decoded | No | Scene 1 / Scene 10 labels |
-| DSP parameter state | remainder | mixed | Unknown | No | Localised byte differences exist but transforms are not proven |
+## MixConfig.dat
 
-Observed model IDs:
+The observed file is 13 bytes. Several count fields have plausible/high-confidence labels in the current parser, but not every byte has been independently proved across configurations. **No MixConfig field is writable.** As more mixer configurations are analysed, labels that cannot be independently reproduced should be downgraded rather than assumed.
 
-| ID | Model family observed |
-|---|---|
-| `1c03` | Spaces / 480 Large family |
-| `1c04` | Spaces / 480 Medium family |
-| `1d00` | Plate Reverb Designer |
-| `2d00` | Rhythm Delay |
-| `2b00` | Saturator |
-| `2a00` | Amp/Cab |
-| `2400` | Shifter |
-| `2300` | Dual Harmony |
-| `1e00` | Tuner |
-| `2800` | Gridder |
+## Other located records
 
-No RackUltra DSP parameter is writable yet. One-parameter controlled clones of a single engine are required before promotion.
+| Record | Status | Next useful controlled experiment |
+|---|---|---|
+| `Gate, Input Channel NN` | Located | threshold/depth/attack/hold/release/on-off |
+| `Delay, Input Channel NN` | Located | 0 ms plus several known delays |
+| `Stereo Image, Input Channel NN` | Located | width/stereo-image modes; ordinary input pan is now known to live in `Input Mixer` |
+| `Digital Attenuator Input Channel NN` | Located; variable historical lengths observed | current-scene digital trim/attenuation values |
+| `Send Source Select ...` | Located | one Aux source/pre-post sequence |
+| `Preamp Model ...` | Located | gain/pad/48V controlled scenes |
+| RackUltra DSP | Located inside `AHFX Manager NN` | one-parameter clones for one engine |
 
-## Located processing/routing records still awaiting field maps
+## Promotion policy
 
-| Record pattern | Suspected/known semantic area | Payload status | Write | Next experiment |
-|---|---|---|---|---|
-| `Compressor, Input Channel NN` | Compressor | 156-byte payload observed in current reference | No | threshold, ratio, attack, release, knee, makeup, on/off |
-| `Gate, Input Channel NN` | Gate | framed | No | threshold/depth/attack/hold/release/on-off |
-| `Delay, Input Channel NN` | Input delay | framed | No | 0 ms plus several known delays |
-| `Stereo Image, Input Channel NN` | pan/width/stereo image | framed | No | pan L/C/R; stereo width variants |
-| `Digital Attenuator Input Channel NN` | digital attenuation state | **variable length observed** | No | controlled current-scene level/trim experiment |
-| `Send Source Select ...` | send source / pre-post | framed | No | one aux source pre/post sequence |
-| `Input Mixer` | mix assignments/levels | framed, config dependent | No | fader/pan/send controlled scenes |
-| `Preamp Model ...` | preamp state/model | framed | No | gain/pad/48V controlled scenes |
+A field becomes writable only when the project can define a narrow safe byte boundary and reproduce the intended value. Controlled one-parameter clones are preferred. Independent semantic evidence such as ConsoleFlip output or the dLive MIDI protocol is used as a cross-check, not as permission to guess unknown bytes.
 
-### Important serialization warning
-
-`Digital Attenuator Input Channel NN` has been observed with different serialized lengths between current and factory/reset material. This is evidence that identical labels do **not** necessarily imply one universal fixed C-style structure. The project therefore treats current dLive 2.12 scene clones as the primary parameter evidence.
-
-## Evidence and promotion policy
-
-A writable field should ideally satisfy all of the following:
-
-1. The same parameter is changed in several controlled clones.
-2. Only the expected local bytes change apart from scene metadata.
-3. The numeric transform is repeatable across the parameter range.
-4. Record boundaries remain valid after writing.
-5. Exported shows survive TAR/GZIP round-trip validation.
-6. Where available, an independent semantic reference (for example dLive MIDI) agrees with the interpretation.
-
-The interactive site's base registry is [`app-parameter-map.js`](../app-parameter-map.js). Provisional HPF entries are currently layered in by [`app-parameter-map-hpf.js`](../app-parameter-map-hpf.js) until controlled HPF scenes are available for final promotion.
+The interactive site's source of truth is [`app-parameter-map.js`](../app-parameter-map.js) plus focused add-on registries such as [`app-parameter-map-hpf.js`](../app-parameter-map-hpf.js) and [`app-parameter-map-channel-state.js`](../app-parameter-map-channel-state.js).
