@@ -21,7 +21,7 @@
   "gainOffsetFromPayload": 9,
   "beforeHex": "0000",
   "afterHex": "f7ea",
-  "encodingStatus": "Six calibrated values; signed big-endian interpretation supported by +/-3 dB pair. Division by 256 is consistent with all rounded display values, but continuous conversion remains a hypothesis.",
+  "encodingStatus": "Experimental signed Q8.8 conversion supported by eight display observations and exact +/-15 endpoints. Measured values use exact lookup bytes; unmeasured settings use round(dB*256), not yet verified by Director.",
   "additionalObservations": [
     {
       "displayDb": 6,
@@ -60,6 +60,20 @@
       "signedBigEndian": -771,
       "sha256": "6b53c52411a3a0691082d6a0a1afa6b7eec8b019e962f0f804aa48919da37c24",
       "gainBytesOffset": 279626
+    },
+    {
+      "scene": 14,
+      "displayDb": -15,
+      "rawHex": "f100",
+      "signedBigEndian": -3840,
+      "sha256": "e1f270f3df68aed94a2e6fb9c45781682b0874953535b29ae6c0c11dc46ab758"
+    },
+    {
+      "scene": 15,
+      "displayDb": 15,
+      "rawHex": "0f00",
+      "signedBigEndian": 3840,
+      "sha256": "15f22f2ecf8ea8e0fb03934462a18660a25341816a09f67a8c021a5cc35914a7"
     }
   ],
   "entryMethod": "User confirms gain values were typed directly into Director."

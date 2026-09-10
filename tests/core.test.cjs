@@ -41,7 +41,7 @@ if(process.env.DLIVE_SAMPLE) test('real show: all scenes parse, preserve metadat
  let count=0;
  for(const e of entries){const match=e.name.match(/^Show\/Scenes\/StageBoxScene(\d+)\.tar\.gz$/);if(!match)continue;
   const nested=api.parseTar(await api.gunzip(e.content));const d=api.findSceneDat(nested,Number(match[1]));
-  const m=api.parseManagers(d.content);assert.equal(m.length,['001','010','011','012','013','65535'].includes(match[1])?14:12,`scene ${match[1]} manager count`);
+  const m=api.parseManagers(d.content);assert.equal(m.length,['001','010','011','012','013','014','015','65535'].includes(match[1])?14:12,`scene ${match[1]} manager count`);
   const edited=d.content.slice();edited[m[0].dataStart]=65;api.assertAllowedChanges(d.content,edited);
   d.content=edited;const reload=api.parseTar(await api.gunzip(await api.gzip(api.writeTar(nested))));
   assert.deepEqual(reload[0].content,edited);count++;
@@ -74,7 +74,7 @@ test('calibrated EQ gain reproduces observed bytes and is reversible',()=>{
  ctx.dspApi.writeObservedEqGain(after,'0');assert.deepEqual(after,before);
 });
 test('uncalibrated DSP values and altered or ambiguous records fail closed',()=>{
- const b=eqFixture();assert.throws(()=>ctx.dspApi.writeObservedEqGain(b,'-8'),/not been calibrated/);
+ const b=eqFixture();assert.throws(()=>ctx.dspApi.writeObservedEqGain(b,'-15.1'),/Gain must/);
  const other=b.slice();other[40]^=1;assert.equal(ctx.dspApi.observedEqField(other),null);assert.throws(()=>api.assertAllowedChanges(b,other),/Unexpected write/);
  const raw=b.slice();raw[44]=0x80;assert.throws(()=>api.assertAllowedChanges(b,raw),/Unexpected write/);
  const duplicate=new Uint8Array(144);duplicate.set(b);duplicate.set(b,72);assert.equal(ctx.dspApi.observedEqField(duplicate),null);
@@ -119,5 +119,21 @@ if(process.env.DLIVE_CALIBRATION_DIR) test('private scenes 11–13 reproduce tar
   const baseField=ctx.dspApi.observedEqField(baseline),baseEdit=baseline.slice();ctx.dspApi.writeObservedEqGain(baseEdit,value);
   assert.deepEqual(baseEdit.slice(baseField.offset-9,baseField.offset+28),expected.slice(offset-9,offset+28));
   const reload=api.parseTar(await api.gunzip(await api.gzip(api.writeTar([entry(`StageBoxScene${scene}.dat`,edited)]))));assert.deepEqual(reload[0].content,expected);
+ }
+});
+
+test('experimental continuous gain is bounded and rounds to the requested display',()=>{
+ for(let tenths=-150;tenths<=150;tenths++) {
+  const before=eqFixture(),after=before.slice(),gain=String(tenths/10);
+  ctx.dspApi.writeObservedEqGain(after,gain);api.assertAllowedChanges(before,after);
+  assert.equal(Number(ctx.dspApi.observedEqField(after).value),Number(gain));
+ }
+ for(const bad of ['',null,'NaN','Infinity','15.1','-15.1','1.23'])assert.throws(()=>ctx.dspApi.writeObservedEqGain(eqFixture(),bad));
+});
+if(process.env.DLIVE_CALIBRATION_DIR) test('endpoint records reproduce Director saves exactly',()=>{
+ const dir=process.env.DLIVE_CALIBRATION_DIR;
+ for(const [scene,value] of [[14,'-15'],[15,'15']]) {
+  const expected=new Uint8Array(fs.readFileSync(require('node:path').join(dir,`StageBoxScene${String(scene).padStart(3,'0')}-calibration.dat`)));
+  const edited=expected.slice();ctx.dspApi.writeObservedEqGain(edited,'0');ctx.dspApi.writeObservedEqGain(edited,value);assert.deepEqual(edited,expected);
  }
 });

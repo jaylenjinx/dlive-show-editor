@@ -69,8 +69,8 @@
 
         <div id="tabDsp" class="tab-panel">
           <section class="panel"><h2>Input 16 · EQ band 2</h2>
-          <p>Experimental gain control calibrated from your controlled Director saves. Only the observed values are available.</p>
-          <label>Gain <select id="eqGain" disabled><option value="">Unavailable</option><option value="-8.1">−8.1 dB</option><option value="-3">−3.0 dB</option><option value="0">0.0 dB</option><option value="1">+1.0 dB</option><option value="3">+3.0 dB</option><option value="6">+6.0 dB</option></select></label>
+          <p>Experimental gain control calibrated from your controlled Director saves. Range: −15 to +15 dB, in 0.1 dB steps. Measured values use exact saved bytes; other values use the inferred fixed-point scale and need Director verification.</p>
+          <label>Gain <input id="eqGain" type="number" min="-15" max="15" step="0.1" disabled /></label>
           <p id="eqGainStatus" role="status"></p>
           <p>Enabled only when this EQ record matches the sample apart from these gain bytes. Undo/Redo and Export copy include this edit. Reopen the exported copy in Director to verify it.</p>
           </section>

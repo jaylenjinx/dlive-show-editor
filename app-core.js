@@ -294,7 +294,7 @@ function setColour(managerKey,index,colour) { return changeItem(managerKey,index
 function historyStep(redo=false) {
   const c=state.current, from=redo?c.redo:c.undo, to=redo?c.undo:c.redo, edit=from.pop();
   if(!edit) return;
-  if(edit.dsp)writeObservedEqGain(c.datBytes,redo?edit.after:edit.before);
+  if(edit.dsp)writeObservedEqRaw(c.datBytes,redo?edit.after:edit.before);
   else {const item=c.managers.find(m=>m.key===edit.managerKey).items[edit.index-1];writeItem(c,item,edit.field,redo?edit.after:edit.before);}
   to.push(edit); markDirty(); renderManagers(); renderFx(); renderDsp();
 }

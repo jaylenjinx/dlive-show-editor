@@ -64,7 +64,7 @@ This is an independent experimental tool, not an Allen & Heath product. Always e
 
 ## Version 2 research preview
 
-This branch prepares the editor for DSP reverse engineering. **It now supports a narrowly calibrated Input 16 / PEQ band 2 gain change among −8.1, −3, 0, +1, +3 and +6 dB. Other DSP values remain unavailable.** See [REVERSE_ENGINEERING.md](REVERSE_ENGINEERING.md) for actual observations and the controlled-save experiment needed next.
+This branch prepares the editor for DSP reverse engineering. **It now supports experimental Input 16 / PEQ band 2 gain editing from −15 to +15 dB in 0.1 dB steps. Eight measured settings use exact bytes; other settings use an inferred scale and need Director verification. Other DSP controls remain unavailable.** See [REVERSE_ENGINEERING.md](REVERSE_ENGINEERING.md) for actual observations and the controlled-save experiment needed next.
 
 Added: Binary research tab, scene/show comparisons, known-versus-unknown byte classification, offset-bearing string search, DSP comparisons by record label, JSON evidence export, and Undo/Redo for edits within the current scene session (history resets when switching scenes).
 
@@ -72,4 +72,4 @@ Archive handling now verifies TAR checksums and bounds, rejects ambiguous paths 
 
 Run tests with `node --test tests/core.test.cjs`. Set `DLIVE_SAMPLE` to the supplied Hardcore Start archive path to include the optional real-show regression test. No sample is uploaded or bundled.
 
-The DSP editing tab is enabled only for the measured EQ record context. See `research/eq-gain-observation.json` for the gain observations. It includes Undo/Redo and export validation. A continuous gain range requires more calibration saves.
+The DSP editing tab is enabled only for the measured EQ record context. See `research/eq-gain-observation.json` for the gain observations. It includes Undo/Redo and export validation. Unmeasured gain settings require an export/reopen check in Director.

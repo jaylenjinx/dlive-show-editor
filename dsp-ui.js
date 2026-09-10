@@ -12,7 +12,7 @@ function setObservedDsp(value) {
   if(!field)throw new Error('No calibrated EQ record found.');
   if(field.value===value)return;
   writeObservedEqGain(c.datBytes,value);
-  c.undo.push({dsp:true,before:field.value,after:value});c.redo=[];
+  c.undo.push({dsp:true,before:field.raw,after:observedEqField(c.datBytes).raw});c.redo=[];
   markDirty();renderDsp();
 }
 $('#eqGain').onchange=event=>{

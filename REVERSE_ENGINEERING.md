@@ -1,6 +1,6 @@
 # Version 2 DSP research — 11 September 2026
 
-Status: research preview; a narrowly calibrated Input 16 / PEQ band 2 gain control supports six measured values: −8.1, −3, 0, +1, +3 and +6 dB. Continuous DSP editing remains unvalidated.
+Status: experimental Input 16 / PEQ band 2 gain control now spans −15 to +15 dB in 0.1 dB steps. Eight settings are measured; remaining settings use an inferred scale and need Director validation.
 
 ## Evidence from the supplied show
 
@@ -75,3 +75,11 @@ The user explicitly mapped Scene 11 to +1 dB, Scene 12 to +3 dB and Scene 13 to 
 The +3 and −3 pair supports a signed big-endian two's-complement field. A Q8.8 interpretation is consistent with every observed display after rounding to one decimal place. Display rounding does not uniquely determine the scale: division by 255 also matches all six reported displays after rounding. Therefore the UI retains exact measured-byte lookup values rather than claiming a continuous encoding has been verified. The tests reproduce each target EQ record and verify that all bytes outside the two-byte field remain unchanged, preserving each scene's own metadata.
 
 The user confirmed these gains were typed directly into Director, rather than obtained by dragging a knob. This excludes manual positioning as the explanation for the measured raw values. A simple round(dB × 256) encoder does not reproduce the typed-value saves (for example +3 produces 771, not 768). Quantization or a different conversion remains unresolved.
+
+## Endpoint samples and experimental range control
+
+Scene 14 (−15 dB) stores `f100`, signed −3840. Scene 15 (+15 dB) stores `0f00`, signed +3840. These endpoints are exactly ±15 × 256, strongly supporting a signed Q8.8 interpretation together with all intermediate displays. This remains an inference about unmeasured values: the observed intermediate raw integers are not exact round(display × 256), so the editor retains exact lookup bytes for all eight measured settings and uses round(dB × 256) for other 0.1 dB settings within ±15 dB.
+
+The UI now has a numeric gain input for Input 16 / band 2 only. Record framing and every other EQ byte must still match the calibration context. Existing valid raw gains are preserved on load. Undo/Redo records raw integers, so it restores the exact prior bytes rather than reconstructing them from the rounded display. Gain writes remain limited to two bytes. No other channels, bands, Q, frequency, or dynamics controls have been enabled.
+
+Seventeen tests pass, including all 301 permitted display values, invalid-value rejection, exact endpoint reproduction, and the supplied show's 15 scenes. Testing an inferred value against our own decoder checks implementation consistency, not Director acceptance. Reopening an exported copy with an unmeasured gain in Director remains the next validation step.
