@@ -8,6 +8,10 @@ The current primary reference is **dLive firmware 2.12**. The project distinguis
 - **Decoded / read-only** — structure or semantics are understood, but one or more encoding details are still unproven.
 - **Unknown** — bytes are preserved exactly.
 
+## Canonical reference
+
+- **[Parameter map](parameter-map.md)** — the master table of known records, byte offsets, datatypes, transforms, evidence, confidence and write status.
+
 ## Documents
 
 - [Archive layout](archive-layout.md)
@@ -21,4 +25,4 @@ The current primary reference is **dLive firmware 2.12**. The project distinguis
 - [Controlled PEQ frequency/width experiment](controlled-peq-frequency-width.md)
 - [ConsoleFlip public/static analysis](consoleflip-public-analysis.md)
 
-The longer consolidated field notes remain in [`KNOWN_FORMAT.md`](../KNOWN_FORMAT.md).
+The longer consolidated field notes remain in [`KNOWN_FORMAT.md`](../KNOWN_FORMAT.md). The interactive site version of the parameter map is driven by [`app-parameter-map.js`](../app-parameter-map.js).
