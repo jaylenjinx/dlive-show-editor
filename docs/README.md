@@ -4,8 +4,8 @@ These notes describe structures observed while building **dLive Show Editor**. T
 
 The current primary reference is **dLive firmware 2.12**. The project distinguishes three confidence levels:
 
-- **Verified write** — structure and encoding reproduced from controlled examples and safe enough for the editor to generate.
-- **Decoded / read-only** — structure or semantics are understood, but one or more encoding details are still unproven.
+- **Verified write** — structure and encoding reproduced or independently cross-checked strongly enough for the editor to generate only the proven bytes.
+- **Decoded / read-only** — structure or semantics are understood, but one or more write-boundary details are still unproven.
 - **Unknown** — bytes are preserved exactly.
 
 ## Canonical reference
@@ -20,10 +20,12 @@ The current primary reference is **dLive firmware 2.12**. The project distinguis
 - [Surface strip layout](surface-layout.md)
 - [Input PEQ](input-peq.md)
 - [Input HPF](input-hpf.md)
+- [Input Mixer channel state](input-mixer.md)
 - [RackUltra / AHFX](rackultra.md)
 - [Research method](research-method.md)
 - [Controlled PEQ gain experiment](controlled-peq-diff.md)
 - [Controlled PEQ frequency/width experiment](controlled-peq-frequency-width.md)
+- [Jaylen Aug 15 / ConsoleFlip cross-check](event-show-consoleflip-crosscheck.md)
 - [ConsoleFlip public/static analysis](consoleflip-public-analysis.md)
 
-The longer consolidated field notes remain in [`KNOWN_FORMAT.md`](../KNOWN_FORMAT.md). The interactive site version of the parameter map is driven by [`app-parameter-map.js`](../app-parameter-map.js), with provisional HPF findings layered in by [`app-parameter-map-hpf.js`](../app-parameter-map-hpf.js).
+The longer consolidated field notes remain in [`KNOWN_FORMAT.md`](../KNOWN_FORMAT.md). The interactive site version of the parameter map is driven by [`app-parameter-map.js`](../app-parameter-map.js) plus the focused HPF and channel-state add-on registries.
