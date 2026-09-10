@@ -1,163 +1,133 @@
-# dLive Show Editor v2.1
+# dLive Show Editor v2.2
 
-Experimental, browser-only editor and reverse-engineering inspector for Allen & Heath dLive show archives (`.tar.gz`).
+Experimental, browser-only editor and reverse-engineering inspector for Allen & Heath dLive show archives (`.tar.gz`). The current primary target is **dLive firmware 2.12**.
 
-V2/V2.1 were developed against a real DM32/C1500 show and the factory-style strip-assignment scenes carried inside that show. The app never uploads a show to a server.
+The application processes shows locally in your browser. It does not upload show files to a server.
 
-## V2: verified writable
+## Live site
+
+https://jaylenjinx.github.io/dlive-show-editor/
+
+## Verified writable fields
 
 ### Names and colours
-Edits fixed-width dLive name/colour manager tables for Inputs, Groups, Auxes, Mains, Matrices, RackExtra FX, RackUltra FX and DCAs.
 
-- names: fixed 9-byte slots, max 8 printable ASCII characters
+- Inputs, Groups, Auxes, Mains, Matrices, RackExtra FX, RackUltra FX and DCAs
+- names: fixed 9-byte slots, maximum 8 printable ASCII characters
 - colours: one-byte IDs 0–7
-- CSV name/colour import retained from v1
 
-### Surface strip layout
-V2 now pairs `StageBoxSceneNNN` and `SurfaceSceneNNN` archives and edits the six surface layers.
+### C-class surface strip assignments
 
-The supplied dLive factory `C1500 Strip Assign` scene provides a controlled reference. The record has a 2-byte big-endian payload-length prefix; its payload contains the label, a version/width header and `6 × bankWidth` two-byte strip assignments. Each strip assignment is:
+The supplied factory Strip Assign scenes identify two-byte `[type, zero_based_index]` assignments across six surface layers. The editor writes only independently identified strip types and preserves unknown assignments.
+
+### Input PEQ
+
+For all 128 input channels:
+
+- Gain: signed `int16_be`, `dB = raw / 256`
+- Frequency: `raw = floor(4608 * log2(Hz / 4))`
+- Bell Width: A&H width index in the high byte; untouched fractional low-byte precision is preserved
+
+The final three PEQ state/type bytes remain read-only.
+
+### Input HPF — v2.2
+
+A second real event show and an independent ConsoleFlip preview resolve the current five-byte HPF state:
 
 ```text
-[type, zero_based_index]
+03 FF FF MM BB
+│  └─┬─┘ │  └─ bypass: 00 On, 01 Off
+│    │   └──── unknown mode/state — preserved
+│    └──────── frequency
+└───────────── HPF discriminator/type
 ```
 
-The editor only offers strip type IDs observed and independently identified in the factory scenes. Unknown raw assignments are shown but not overwritten.
+HPF frequency uses the same logarithmic coordinate as PEQ and is writable from **20–2000 Hz**. The editor changes only frequency bytes `+1..2` and bypass byte `+4`.
 
-Verified strip types currently exposed:
-
-| Type | Object |
-|---:|---|
-| 0 | Blank |
-| 1 | Input |
-| 2 | Mono Group |
-| 3 | Stereo Group |
-| 4 | Mono Aux |
-| 5 | Stereo Aux |
-| 6 | RackExtra FX Send |
-| 8 | Main |
-| 10 | Mono Matrix |
-| 11 | Stereo Matrix |
-| 12 | RackExtra FX Return |
-| 13 | DCA |
-| 19 | RackUltra FX Return |
-
-### Input PEQ editor (V2.1)
-Controlled Scene 10 clones now validate the three numerical fields in each 9-byte input-PEQ band record:
-
-- **Gain** — signed 16-bit big-endian, effectively 8.8 fixed-point dB (`raw / 256`).
-- **Frequency** — high-resolution logarithmic coordinate (`raw = floor(4608 * log2(Hz / 4))`). Six controlled frequencies from 100 Hz to 10 kHz matched exactly.
-- **Bell Width** — the high byte maps directly to Allen & Heath's published width index (`1.5` through `1/9` octave); the low byte is extra internal precision and is preserved when untouched.
-
-V2.1 exposes these three values for all 128 input PEQs. The remaining three state/type bytes per band are still read-only. Width edits use a canonical index value and do not rewrite untouched fractional width state.
+ConsoleFlip independently rendered 108 input cards from the real event show; all 108 matched the native bypass state and rounded decoded frequency.
 
 ## Decoded / read-only
 
-### Input HPF research (V2.1.2)
-Current dLive 2.12 input HPF records expose exactly five state bytes after the label:
+### Input Mixer channel state — v2.2
+
+Two different real dLive 2.12 mixer configurations reveal:
 
 ```text
-03 53 96 00 01
+Input Mixer\0
+12-byte mixer header
+128 × blockSize-byte input blocks
 ```
 
-The middle `53 96` field decodes to exactly **100 Hz** using the same high-resolution logarithmic coordinate already proven for input PEQ. This interpretation is independently consistent with `togrupe/dlive-midi-tools`, whose dLive HPF implementation uses a logarithmic 20–2000 Hz NRPN control.
-
-The following `00` is a strong HPF-Off candidate because every analysed reference channel stores `00` and the captured ConsoleFlip preview independently reports the same channels as **HPF Off**. The editor now includes a read-only **Input HPF** tab and exports these fields in its research JSON.
-
-HPF writes are intentionally disabled until controlled clones provide one On/Off pair plus several known frequencies. See [`docs/input-hpf.md`](docs/input-hpf.md).
-
-### Generic length-prefixed records
-A major V2 finding is that many dLive scene objects share a common frame: a 2-byte big-endian payload length followed by a payload whose first field is a NUL-terminated ASCII label. This is validated across name managers, surface bank switchers, AHFX managers, PEQ and compressor records. The Structure tab uses this framing rather than loose string searching.
-
-### RackUltra / AHFX records
-Each RackUltra slot in the supplied show is a 262-byte length-prefixed payload (264 bytes including its 2-byte prefix), anchored by:
+Observed channel-block sizes are 169 and 224 bytes, but these fields remain stable relative to each block end:
 
 ```text
-AHFX Manager 01
-...
-AHFX Manager 08
+fader offset = blockSize - 84
+pan offset   = blockSize - 82
 ```
 
-V2 parses:
+Fader:
 
-- record offset
-- record size
-- two-byte engine ID
-- stored preset label
-- same-engine byte differences against the show's Scene 1 reset baseline
-- complete raw record
-
-Engine IDs observed so far include:
-
-| ID | Observed model family |
-|---|---|
-| `1c03` | Spaces Reverb / 480 Large family |
-| `1c04` | Spaces Reverb / 480 Medium family |
-| `1d00` | Plate Reverb Designer |
-| `2d00` | Rhythm Delay |
-| `2b00` | Saturator |
-| `2a00` | Amp/Cab |
-| `2400` | Shifter |
-| `2300` | Dual Harmony |
-| `1e00` | Tuner |
-| `2800` | Gridder |
-
-DSP parameter writes remain disabled until individual parameter encodings are reproducible from controlled test scenes.
-
-### MixConfig.dat
-The supplied show uses a 13-byte mixer-config record. Several count bytes are strongly identified by comparing the global config to the serialized mixer structures, but four fields remain unknown. V2 therefore displays the data without writing it.
-
-### Structure inspector
-The Structure tab enumerates human-readable record labels and their byte offsets in both MixRack and Surface scene data. This is useful for creating controlled before/after test files.
-
-## MIDI protocol cross-reference
-
-Thanks to Tobias Grupe's [`togrupe/dlive-midi-tools`](https://github.com/togrupe/dlive-midi-tools), V2 also includes a read-only protocol cross-reference. That project documents dLive live-control semantics including:
-
-- proprietary SysEx for names, colours and socket preamp functions
-- NRPN for fader level, HPF, DCA assignment, main/group/aux routing
-- CC for mute
-- MIDI over TCP on port 51325
-- technical channel offsets for Inputs, Groups, Auxes, Matrices, RackExtra FX, RackUltra FX and DCAs
-
-This is not copied into the show-file encoder. It is used as an independent semantic reference while reverse-engineering offline scene structures.
-
-## Run
-
-Open `index.html` in a modern browser.
-
-If local-file restrictions get in the way:
-
-```bash
-python3 -m http.server 8080
+```text
+raw == 0x8001  -> -infinity
+otherwise dB   = int16_be(raw) / 256
 ```
 
-Then open `http://localhost:8080`.
+Pan:
 
-## Safety
+```text
+0x00 = hard L
+0x25 = centre
+0x4A = hard R
+```
 
-This is not an Allen & Heath product. Keep the original show and verify every exported show in dLive Director/Preview before using it on a live system.
+Both mappings agree with ConsoleFlip's rendered event-show controls. They remain read-only until isolated one-parameter clones prove the write boundary.
 
-V2 deliberately distinguishes:
+### Input compressor On/Off
 
-- **Verified write** — fixed structures confirmed by controlled examples and round-trip validation.
-- **Decoded/read-only** — structure is identified, but one or more field encodings are not yet safe to generate.
-- **Unknown** — bytes are preserved exactly.
+Inside `Compressor, Input Channel NN`:
 
-The exporter rebuilds only modified nested scene archives, preserves unrecognised outer entries, reopens the complete generated `.tar.gz`, checks outer entry count and verifies modified nested scene `.dat` files before download.
+```text
+state +2 = 00  -> Off
+state +2 = 01  -> On
+```
+
+This matches all 108 visible ConsoleFlip channel cards in the event-show preview. Other compressor parameters remain under investigation.
+
+### Aux-send evidence
+
+The 169-byte event configuration exposes six mono Aux levels as signed fixed-point dB fields at block offsets `+12,+16,+20,+24,+28,+32`. These offsets are **configuration-specific** and remain read-only until the general bus-layout rule is solved.
+
+### RackUltra / AHFX
+
+The editor parses RackUltra record framing, engine IDs, preset labels and same-engine byte differences, but does not write DSP parameters yet.
+
+### MixConfig and structure inspector
+
+`MixConfig.dat`, generic framed-record discovery and unknown processing/routing records are exposed for research without unsafe writes.
 
 ## Documentation
 
-The web app includes a built-in **Docs** view that is available without loading a show. Start with the **Parameter map**, which is the canonical index of every field currently located or decoded, including record pattern, payload size, byte offset, datatype, transform, evidence, confidence and write status.
+The site has a built-in **Docs** section available without loading a show.
 
 - [Canonical parameter map](docs/parameter-map.md)
-- [Input HPF research](docs/input-hpf.md)
+- [Input HPF](docs/input-hpf.md)
+- [Input Mixer / channel state](docs/input-mixer.md)
+- [Event show / ConsoleFlip cross-check](docs/event-show-consoleflip-crosscheck.md)
 - [Documentation index](docs/README.md)
 - [Consolidated field notes](KNOWN_FORMAT.md)
-- [Machine-readable UI registry](app-parameter-map.js)
+
+The interactive parameter map is driven by `app-parameter-map.js` and focused add-on registries.
+
+## Safety model
+
+The project distinguishes:
+
+- **Verified write** — narrow byte boundary and transform are understood strongly enough to generate.
+- **Decoded/read-only** — values can be interpreted, but writes are not yet isolated/proven.
+- **Unknown** — bytes are preserved exactly.
+
+Always keep the original show and verify edited files in dLive Director/Preview before using them on a live system.
 
 ## GitHub Pages
 
-Pushes to `main` trigger [`.github/workflows/pages.yml`](.github/workflows/pages.yml), which publishes the static application with GitHub Pages. The project URL is:
-
-`https://jaylenjinx.github.io/dlive-show-editor/`
+Pushes to `main` trigger `.github/workflows/pages.yml` and publish the static application to GitHub Pages.
