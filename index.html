@@ -43,7 +43,7 @@
     <div id="emptyState" class="empty-state">
       <div class="empty-icon">DL2</div>
       <h1>Edit proven dLive structures, inspect the rest</h1>
-      <p>V2.1 adds a controlled-diff verified input PEQ editor on top of paired MixRack/Surface scenes, C-class layer editing, RackUltra inspection and mixer-config research tools.</p>
+      <p>V2.1 adds a controlled-diff verified input PEQ editor plus a high-confidence read-only HPF decoder, paired MixRack/Surface scenes, C-class layer editing, RackUltra inspection and mixer-config research tools.</p>
       <button id="openBtn2" class="primary large">Choose show file</button>
     </div>
 
@@ -64,6 +64,7 @@
       <div class="tabs">
         <button class="tab active" data-tab="names">Names &amp; colours</button>
         <button class="tab" data-tab="peq">Input PEQ</button>
+        <button class="tab" data-tab="hpf">Input HPF</button>
         <button class="tab" data-tab="surface">Surface layout</button>
         <button class="tab" data-tab="fx">RackUltra</button>
         <button class="tab" data-tab="system">Mixer config</button>
@@ -77,8 +78,13 @@
       </div>
 
       <div id="tabPeq" class="tab-panel">
-        <div class="notice safe"><strong>Controlled-diff write:</strong> dLive 2.12 input PEQ gain and frequency encodings are now directly verified from isolated Scene 10 clones. Bell width uses the official A&amp;H width index in the high byte; changing width writes the canonical zero-fraction form. Filter type/state bytes remain read-only.</div>
+        <div class="notice safe"><strong>Controlled-diff write:</strong> dLive 2.12 input PEQ gain and frequency encodings are directly verified from isolated Scene 10 clones. Bell width uses the official A&amp;H width index in the high byte; changing width writes the canonical zero-fraction form. Filter type/state bytes remain read-only.</div>
         <div id="peqEditor"></div>
+      </div>
+
+      <div id="tabHpf" class="tab-panel">
+        <div class="notice warn"><strong>High-confidence read-only:</strong> input HPF records expose a five-byte state payload. The frequency field decodes cleanly with the same logarithmic coordinate as PEQ, and <code>00</code> aligns with HPF Off in the ConsoleFlip preview. Writes stay disabled until controlled HPF On/Off and multi-frequency scenes are available.</div>
+        <div id="hpfEditor"></div>
       </div>
 
       <div id="tabSurface" class="tab-panel">
@@ -134,10 +140,13 @@
 <script src="app-format.js"></script>
 <script src="app-parsers.js"></script>
 <script src="app-peq.js"></script>
+<script src="app-hpf.js"></script>
 <script src="app-model.js"></script>
 <script src="app-report.js"></script>
 <script src="app-parameter-map.js"></script>
+<script src="app-parameter-map-hpf.js"></script>
 <script src="app-docs.js"></script>
+<script src="app-docs-hpf.js"></script>
 <script src="app-parameter-map-docs.js"></script>
 <script src="app-render-main.js"></script>
 <script src="app-render-inspect.js"></script>
