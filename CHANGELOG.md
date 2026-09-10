@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.2
+
+- Added a high-confidence read-only decoder for `Highpass Filter Input Channel NN` records.
+- Identified the current HPF state payload as five bytes: `03 FF FF EE 01` where the middle two bytes are a frequency candidate and `EE` is the enable/bypass candidate.
+- Confirmed reference HPF frequency bytes `53 96` decode exactly to 100 Hz with the same high-resolution logarithmic coordinate used by input PEQ.
+- Cross-checked the logarithmic frequency behaviour against `togrupe/dlive-midi-tools`, which exposes dLive HPF as a 20–2000 Hz logarithmic NRPN control.
+- Cross-checked state byte `00` against the captured ConsoleFlip preview, which reports the same reference channels as HPF Off.
+- Added an Input HPF editor tab in read-only mode, HPF documentation, parameter-map entries and HPF data in research JSON exports.
+- Added a controlled HPF test matrix required before frequency/enable writes can be promoted.
+
 ## v2.1.1
 
 - Added a canonical dLive 2.12 parameter map with record pattern, payload size, offsets, datatype, transform, evidence, confidence and write status.
