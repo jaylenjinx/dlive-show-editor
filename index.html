@@ -13,6 +13,10 @@
     <div class="brand">dLive Show Editor <span class="badge">v2.1 experimental</span></div>
     <div class="sub">Local dLive show editing + binary structure inspector</div>
   </div>
+  <nav class="primary-nav" aria-label="Main navigation">
+    <button id="editorNavBtn" class="nav-link active" type="button">Editor</button>
+    <button id="docsNavBtn" class="nav-link" type="button">Docs</button>
+  </nav>
   <div class="top-actions">
     <button id="openBtn" class="primary">Open show</button>
     <button id="importCsvBtn" disabled>Import CSV</button>
@@ -23,7 +27,7 @@
   </div>
 </header>
 
-<main class="app-shell">
+<main id="editorShell" class="app-shell">
   <aside class="sidebar">
     <section class="show-card">
       <div class="eyebrow">SHOW</div>
@@ -115,12 +119,23 @@
   </section>
 </main>
 
+<main id="docsView" class="docs-shell hidden">
+  <aside class="docs-sidebar">
+    <div class="eyebrow">DOCUMENTATION</div>
+    <h2>Show-file format</h2>
+    <p>Unofficial notes built from controlled dLive 2.12 scene diffs.</p>
+    <nav id="docsNav" class="docs-nav" aria-label="Documentation sections"></nav>
+  </aside>
+  <article id="docsArticle" class="docs-article"></article>
+</main>
+
 <div id="toast" class="toast"></div>
 <script src="app-format.js"></script>
 <script src="app-parsers.js"></script>
 <script src="app-peq.js"></script>
 <script src="app-model.js"></script>
 <script src="app-report.js"></script>
+<script src="app-docs.js"></script>
 <script src="app-render-main.js"></script>
 <script src="app-render-inspect.js"></script>
 <script src="app-ui.js"></script>
