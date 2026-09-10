@@ -28,7 +28,6 @@
         <div class="show-name" id="showName">No show loaded</div>
         <div class="show-meta" id="showMeta">Open a dLive .tar.gz file to begin.</div>
       </section>
-
       <div class="nav-title">Scenes</div>
       <div id="sceneList" class="scene-list"></div>
     </aside>
@@ -61,42 +60,28 @@
         </div>
 
         <div id="tabNames" class="tab-panel active">
-          <div class="notice safe">
-            <strong>Safe-write mode:</strong> only recognised 9-byte name slots and their 1-byte colour values are modified. Names are limited to 8 ASCII characters to preserve the binary layout.
-          </div>
+          <div class="notice safe"><strong>Safe-write mode:</strong> only recognised 9-byte name slots and their 1-byte colour values are modified. Names are limited to 8 ASCII characters to preserve the binary layout.</div>
           <div id="managerGrid" class="manager-grid"></div>
         </div>
 
         <div id="tabFx" class="tab-panel">
-          <div class="notice warn">
-            <strong>Read-only DSP inspector:</strong> RackUltra/RackExtra DSP parameter encoding is not publicly documented. This build will inspect strings and slot names, but will not write DSP bytes.
-          </div>
+          <div class="notice warn"><strong>Read-only DSP inspector:</strong> RackUltra/RackExtra DSP parameter encoding is not publicly documented. This build will inspect strings and slot names, but will not write DSP bytes.</div>
           <div class="fx-grid">
-            <section class="panel">
-              <h2>RackUltra send names</h2>
-              <div id="ufxSlots"></div>
-            </section>
-            <section class="panel">
-              <h2>Detected FX-related strings</h2>
-              <div id="fxStrings" class="string-list"></div>
-            </section>
+            <section class="panel"><h2>RackUltra send names</h2><div id="ufxSlots"></div></section>
+            <section class="panel"><h2>Detected FX-related strings</h2><div id="fxStrings" class="string-list"></div></section>
           </div>
         </div>
 
         <div id="tabArchive" class="tab-panel">
-          <div class="notice">
-            The app preserves every unrecognised archive entry byte-for-byte. Scene archives are rebuilt only when their StageBox scene has been edited.
-          </div>
-          <section class="panel">
-            <h2>Show archive entries</h2>
-            <div id="archiveList" class="archive-list"></div>
-          </section>
+          <div class="notice">The app preserves every unrecognised archive entry byte-for-byte. Scene archives are rebuilt only when their StageBox scene has been edited.</div>
+          <section class="panel"><h2>Show archive entries</h2><div id="archiveList" class="archive-list"></div></section>
         </div>
       </div>
     </section>
   </main>
 
   <div id="toast" class="toast"></div>
-  <script src="app.js"></script>
+  <script src="app-core.js"></script>
+  <script src="app-ui.js"></script>
 </body>
 </html>
