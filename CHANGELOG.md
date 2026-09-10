@@ -1,14 +1,25 @@
 # Changelog
 
+## v2.2
+
+- Promoted input HPF frequency and On/Off to **Verified Write** using a second real event show and an independent ConsoleFlip preview.
+- Corrected the HPF five-byte state map to `03 FF FF MM BB`: frequency is bytes 1–2, byte 3 is unknown/preserved, and byte 4 is bypass (`00` On, `01` Off).
+- Verified HPF state and rounded frequency against all 108 input cards rendered by ConsoleFlip for the event show.
+- Added a generic read-only `Input Mixer` channel-state decoder.
+- Identified `Input Mixer` as a 12-byte header followed by 128 equal per-input blocks; observed block sizes are 169 and 224 bytes in two different real mixer configurations.
+- Decoded input fader at `blockSize - 84`: signed 16-bit big-endian `/256 dB`, with `0x8001` representing `-infinity`.
+- Decoded input pan at `blockSize - 82`: `0x00` hard L, `0x25` centre, `0x4A` hard R.
+- Decoded input compressor On/Off at compressor state byte `+2` (`00` Off, `01` On), matching all 108 ConsoleFlip event-show cards.
+- Located six mono Aux send level fields in the 169-byte event configuration; kept them read-only/configuration-specific until the variable bus-layout rule is solved.
+- Added a Channel State editor tab, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research JSON exports.
+
 ## v2.1.2
 
 - Added a high-confidence read-only decoder for `Highpass Filter Input Channel NN` records.
-- Identified the current HPF state payload as five bytes: `03 FF FF EE 01` where the middle two bytes are a frequency candidate and `EE` is the enable/bypass candidate.
+- Identified the current HPF state payload as five bytes and established the frequency coordinate as a strong candidate.
 - Confirmed reference HPF frequency bytes `53 96` decode exactly to 100 Hz with the same high-resolution logarithmic coordinate used by input PEQ.
-- Cross-checked the logarithmic frequency behaviour against `togrupe/dlive-midi-tools`, which exposes dLive HPF as a 20–2000 Hz logarithmic NRPN control.
-- Cross-checked state byte `00` against the captured ConsoleFlip preview, which reports the same reference channels as HPF Off.
-- Added an Input HPF editor tab in read-only mode, HPF documentation, parameter-map entries and HPF data in research JSON exports.
-- Added a controlled HPF test matrix required before frequency/enable writes can be promoted.
+- Cross-checked logarithmic frequency behaviour against `togrupe/dlive-midi-tools`.
+- Added the initial Input HPF inspector and research documentation.
 
 ## v2.1.1
 
