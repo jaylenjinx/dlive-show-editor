@@ -132,3 +132,15 @@ V2 deliberately distinguishes:
 - **Unknown** — bytes are preserved exactly.
 
 The exporter rebuilds only modified nested scene archives, preserves unrecognised outer entries, reopens the complete generated `.tar.gz`, checks outer entry count and verifies modified nested scene `.dat` files before download.
+
+## Documentation
+
+The web app includes a built-in **Docs** view that is available without loading a show. The same reverse-engineering notes are versioned under [`docs/`](docs/README.md), with the consolidated field map in [`KNOWN_FORMAT.md`](KNOWN_FORMAT.md).
+
+## GitHub Pages
+
+Pushes to `main` trigger [`.github/workflows/pages.yml`](.github/workflows/pages.yml), which publishes the static application with GitHub Pages. The expected project URL is:
+
+`https://jaylenjinx.github.io/dlive-show-editor/`
+
+If Pages has not previously been enabled for the repository, select **Settings → Pages → Source → GitHub Actions** once.
