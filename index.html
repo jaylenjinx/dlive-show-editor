@@ -43,7 +43,7 @@
     <div id="emptyState" class="empty-state">
       <div class="empty-icon">DL2</div>
       <h1>Edit proven dLive structures, inspect the rest</h1>
-      <p>V2.2 includes verified input PEQ, HPF, LPF, fader, pan and compressor On/Off editing, alongside C-class layer editing, RackUltra inspection and mixer-config research tools.</p>
+      <p>V2.2 includes verified input PEQ gain/frequency and edge-band filter types, HPF, LPF, fader, pan and compressor On/Off editing, alongside C-class layer editing, RackUltra inspection and mixer-config research tools.</p>
       <button id="openBtn2" class="primary large">Choose show file</button>
     </div>
 
@@ -80,7 +80,7 @@
       </div>
 
       <div id="tabPeq" class="tab-panel">
-        <div class="notice safe"><strong>Controlled-diff write:</strong> dLive 2.12 input PEQ gain and frequency encodings are directly verified from isolated Scene 10 clones. Bell width uses the official A&amp;H width index in the high byte; changing width writes the canonical zero-fraction form. Filter type/state bytes remain read-only.</div>
+        <div class="notice safe"><strong>Controlled-diff write:</strong> gain and frequency are verified, Bell Width has a conservative canonical writer, and the Band 1/4 filter-type byte is now isolated. Band 1 offers HPF / PEQ / Low Shelf; Band 4 offers LPF / PEQ / High Shelf. The final two band-state bytes remain read-only.</div>
         <div id="peqEditor"></div>
       </div>
 
@@ -156,9 +156,11 @@
 <script src="app-model.js"></script>
 <script src="app-report.js"></script>
 <script src="app-parameter-map.js"></script>
+<script src="app-parameter-map-peq-types.js"></script>
 <script src="app-parameter-map-hpf.js"></script>
 <script src="app-parameter-map-channel-state.js"></script>
 <script src="app-docs.js"></script>
+<script src="app-docs-peq-types.js"></script>
 <script src="app-docs-hpf.js"></script>
 <script src="app-docs-channel-state.js"></script>
 <script src="app-parameter-map-docs.js"></script>
