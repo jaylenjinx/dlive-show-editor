@@ -12,6 +12,8 @@
 - Kept LPF bytes `+1..+2` and `+5..+9` read-only/preserved because real-event material shows legitimate filter-shape/state variation there.
 - Promoted PEQ edge-band filter type at band byte `+6` to **Verified Write**. Controlled CH16 Band 1 scenes isolate `04=HPF`, `00=PEQ/Bell`, `01=Low Shelf`; Band 4 scenes isolate `03=LPF`, `00=PEQ/Bell`, `02=High Shelf`.
 - Confirmed every adjacent PEQ type scene changes exactly one non-label byte in the complete StageBox scene: the target band's `+6` type byte. The editor restricts Band 1 to HPF/Bell/Low Shelf and Band 4 to LPF/Bell/High Shelf; bytes `+7..8` remain read-only/preserved.
+- Promoted global PEQ In/Out to **Verified Write** using controlled CH16 scenes `EQ In`, `EQ Out`, `EQ In 2`, `EQ Out 2`.
+- Identified the single trailing byte after the four PEQ bands as bypass: `00=In/active`, `01=Out/bypassed`. In the clean duplicate pair, this is the only post-header byte that changes in the complete 412,047-byte StageBox scene.
 - Identified `Input Mixer` as a 12-byte header followed by 128 equal per-input blocks; current-format block size is mixer-configuration dependent.
 - Promoted input fader to **Verified Write** using controlled CH16 clones at `-∞`, `-30`, `-20.3`, `-12.2`, `-5.9`, approximately `0`, `+5` and `+10 dB`.
 - Established the generic fader locator as `blockStart + blockSize - 84`; the same end-relative field survives different channel-block sizes.
@@ -24,7 +26,7 @@
 - Used the event-show ConsoleFlip preview as an independent 108-channel cross-check, then confirmed the write boundary with controlled CH16 clones. The clean `Comp 2 On` / `Comp 2 Off` pair changes only state `+2` outside the scene label.
 - Added a strict compressor writer guard for the verified current-format shape (`stateLength=127`, processor discriminator `0x08`, existing enable `00/01`); compressor model and all dynamics parameters remain read-only.
 - Located six mono Aux send level fields in the 169-byte event configuration; kept them read-only/configuration-specific until the variable bus-layout rule is solved.
-- Added Channel State tooling, LPF tooling/docs, expanded PEQ type tooling/docs, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research documentation.
+- Added Channel State tooling, LPF tooling/docs, expanded PEQ type/bypass tooling/docs, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research documentation.
 
 ## v2.1.2
 
