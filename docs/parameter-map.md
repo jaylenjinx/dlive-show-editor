@@ -20,7 +20,7 @@ uint16_be payload_length
 payload[payload_length]
 ```
 
-For labelled objects the payload normally begins with a NUL-terminated printable ASCII label. This framing is confirmed across name/colour managers, surface banks, PEQ, HPF, compressors, Input Mixer and RackUltra records.
+For labelled objects the payload normally begins with a NUL-terminated printable ASCII label. This framing is confirmed across name/colour managers, surface banks, PEQ, HPF, LPF, compressors, Input Mixer and RackUltra records.
 
 ## Names and colours
 
@@ -86,6 +86,38 @@ Current-format record state after the label:
 Evidence: the `Jaylen Aug 15` event show contains active and bypassed HPFs across multiple frequencies. ConsoleFlip independently rendered 108 input cards; **108/108 matched** native On/Off state and rounded decoded frequency. A later controlled CH16 experiment changed only byte `+3` across the labelled slope scenes `6db BW`, `12db BW`, `18db BW`, `24db BW` and `18db Bessel`.
 
 See [`input-hpf.md`](input-hpf.md).
+
+## Input LPF
+
+Current-format record state after the label:
+
+```text
+04 00 00 FF FF SS SS SS SS SS BB
+│        └─┬─┘                └─ bypass: 00 On, 01 Off
+│          └──────────────────── frequency
+└─────────────────────────────── LPF discriminator/type
+```
+
+| Field | State offset | Type | Transform | Confidence | Write |
+|---|---:|---|---|---|---|
+| Discriminator/type | `+0` | `uint8` | observed `04` | Decoded/parser guard | No |
+| Preserved state | `+1..2` | 2 raw bytes | unknown | Located | No |
+| Frequency | `+3..4` | `uint16_be` | same high-resolution log coordinate as PEQ/HPF; 20 kHz endpoint observed as `0xDD2E` | **Verified write** | **Yes** |
+| Filter shape/state | `+5..9` | 5 raw bytes | not fully decoded; real-show variation observed | Located | No |
+| Bypass | `+10` | `uint8` | `00` active/on, `01` bypassed/off | **Verified write** | **Yes** |
+
+Controlled CH16 scenes cover Off, 20 kHz, 10 kHz, 5 kHz, 1 kHz, 500 Hz, 200 Hz, 50 Hz and 20 Hz. `LPF Off` versus `LPF On 20khz` changes only byte `+10` outside the scene label; adjacent frequency scenes change only bytes `+3..4` outside the label.
+
+Interior frequency points follow:
+
+```text
+raw = floor(4608 × log2(f / 4))
+f   = 4 × 2^(raw / 4608)
+```
+
+The observed 20 kHz maximum is `0xDD2E`, one code above the simple floor result, so the writer reproduces that endpoint explicitly. Bytes `+1..2` and `+5..9` are always preserved.
+
+See [`input-lpf.md`](input-lpf.md).
 
 ## Input Mixer / channel state
 
@@ -179,4 +211,4 @@ The observed file is 13 bytes. Several count fields have plausible/high-confiden
 
 A field becomes writable only when the project can define a narrow safe byte boundary and reproduce the intended value. Controlled one-parameter clones are preferred. Independent semantic evidence such as ConsoleFlip output or the dLive MIDI protocol is used as a cross-check, not as permission to guess unknown bytes.
 
-The interactive site's source of truth is [`app-parameter-map.js`](../app-parameter-map.js) plus focused add-on registries such as [`app-parameter-map-hpf.js`](../app-parameter-map-hpf.js) and [`app-parameter-map-channel-state.js`](../app-parameter-map-channel-state.js).
+The interactive site's source of truth is [`app-parameter-map.js`](../app-parameter-map.js), focused add-on registries and the LPF module.
