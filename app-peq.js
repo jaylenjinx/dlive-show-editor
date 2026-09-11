@@ -1,6 +1,6 @@
 // Input PEQ decoder/editor — derived from controlled dLive 2.12 scene diffs.
 // Record: uint16_be length, NUL-terminated label, byte bandCount (4),
-// then 4 × 9-byte band payloads, plus one trailing byte.
+// then 4 × 9-byte band payloads, plus one trailing PEQ bypass byte.
 // Band bytes: [gain_i16_be, frequency_u16_be, width_u16_be, type_u8, state_u8, state_u8].
 
 const PEQ_WIDTH_TABLE = [
@@ -70,7 +70,14 @@ function parseInputPeqs(dat){
       });
     }
     const tailStart=bandStart+count*9;
-    out.push({channel,label,frameStart:pos-2,pos,payloadLength,totalLength:payloadLength+2,count,bands,tail:dat.slice(tailStart,pos+payloadLength)});
+    const frameEnd=pos+payloadLength;
+    const tail=dat.slice(tailStart,frameEnd);
+    const bypassRaw=tail.length===1?tail[0]:null;
+    const bypassKnown=bypassRaw===0||bypassRaw===1;
+    out.push({
+      channel,label,frameStart:pos-2,pos,payloadLength,totalLength:payloadLength+2,count,bands,
+      tailStart,tail,bypassRaw,bypassKnown,active:bypassRaw===0
+    });
   }
   return out;
 }
@@ -103,6 +110,14 @@ function setPeqType(channel,band,rawValue){
   b.stateBytes[0]=raw;
   markStageDirty();return true;
 }
+function setPeqActive(channel,active){
+  const p=getInputPeq(channel);
+  if(!p||p.tail.length!==1||!p.bypassKnown)return false;
+  const raw=active?0:1;
+  state.current.stage.datBytes[p.tailStart]=raw;
+  p.tail[0]=raw;p.bypassRaw=raw;p.bypassKnown=true;p.active=raw===0;
+  markStageDirty();return true;
+}
 
 function formatHz(hz){
   if(hz>=10000)return `${(hz/1000).toFixed(hz%1000<10?0:1)} kHz`;
@@ -130,6 +145,18 @@ function renderPeq(){
   const draw=()=>{
     root.dataset.channel=select.value;cards.innerHTML='';
     const p=getInputPeq(select.value);if(!p)return;
+
+    const globalCard=document.createElement('article');globalCard.className='panel peq-band-card';
+    globalCard.innerHTML=`
+      <div class="manager-head inline"><h2>PEQ processing</h2><span class="confidence ${p.bypassKnown?'verified':'unknown'}">${p.bypassKnown?'VERIFIED WRITE':'READ ONLY'}</span></div>
+      <label class="peq-field"><span>PEQ state <small>trailing record byte</small></span><select data-k="active"><option value="1">In</option><option value="0">Out / bypassed</option></select><code>${p.bypassRaw==null?'—':hexByte(p.bypassRaw)}</code></label>
+      <div class="peq-field readonly"><span>Bypass offset</span><code>frame + 0x${(p.tailStart-p.frameStart).toString(16)}</code><span>${p.tail.length===1?'single trailing byte':`${p.tail.length}-byte tail`}</span></div>`;
+    const activeSelect=globalCard.querySelector('[data-k="active"]');
+    activeSelect.value=p.active?'1':'0';
+    if(!p.bypassKnown)activeSelect.disabled=true;
+    activeSelect.onchange=()=>{if(setPeqActive(p.channel,activeSelect.value==='1'))renderPeq();else toast('PEQ In/Out write blocked by structure validation.',true);};
+    cards.appendChild(globalCard);
+
     for(const b of p.bands){
       const card=document.createElement('article');card.className='panel peq-band-card';
       const typeOptions=peqTypeOptions(b.band);
@@ -157,7 +184,7 @@ function renderPeq(){
       cards.appendChild(card);
     }
     const meta=document.createElement('div');meta.className='notice peq-meta';
-    meta.innerHTML=`CH ${p.channel} PEQ frame <code>0x${p.frameStart.toString(16)}</code> · payload ${p.payloadLength} bytes. Band 1/4 type byte +6 is verified writable; untouched width precision and remaining state bytes are preserved.`;
+    meta.innerHTML=`CH ${p.channel} PEQ frame <code>0x${p.frameStart.toString(16)}</code> · payload ${p.payloadLength} bytes. Global In/Out trailing byte and Band 1/4 type byte +6 are verified writable; untouched width precision and remaining state bytes are preserved.`;
     cards.appendChild(meta);
   };
   select.onchange=draw;draw();
