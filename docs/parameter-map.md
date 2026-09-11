@@ -83,13 +83,13 @@ Current-format record state after the label:
 | Slope / filter type | `+3` | `uint8 enum` | `05=6 dB BW`, `00=12 dB BW`, `01=18 dB BW`, `02=24 dB BW`, `03=18 dB Bessel`; `04` unmapped | **Verified write** | **Yes** |
 | Bypass | `+4` | `uint8` | `00` active/on, `01` bypassed/off | **Verified write** | **Yes** |
 
-Evidence: the `Jaylen Aug 15` event show contains active and bypassed HPFs across multiple frequencies. ConsoleFlip independently rendered 108 input cards; **108/108 matched** native On/Off state and rounded decoded frequency. A later controlled CH16 experiment changed only byte `+3` across the labelled slope scenes `6db BW`, `12db BW`, `18db BW`, `24db BW` and `18db Bessel`. The writer modifies only bytes `+1..2`, a known value at `+3`, and byte `+4`.
+Evidence: the `Jaylen Aug 15` event show contains active and bypassed HPFs across multiple frequencies. ConsoleFlip independently rendered 108 input cards; **108/108 matched** native On/Off state and rounded decoded frequency. A later controlled CH16 experiment changed only byte `+3` across the labelled slope scenes `6db BW`, `12db BW`, `18db BW`, `24db BW` and `18db Bessel`.
 
 See [`input-hpf.md`](input-hpf.md).
 
 ## Input Mixer / channel state
 
-Two different real dLive 2.12 mixer configurations reveal:
+Current-format `Input Mixer` records decompose as:
 
 ```text
 Input Mixer\0
@@ -99,12 +99,7 @@ Input Mixer\0
 blockSize = (stateLength - 12) / 128
 ```
 
-Observed block sizes:
-
-| Show | blockSize |
-|---|---:|
-| Jaylen Aug 15 | 169 bytes |
-| Hardcore Start | 224 bytes |
+Observed block sizes include 169, 208 and 224 bytes. The fader and pan fields remain stable relative to the end of each block.
 
 ### Input fader
 
@@ -115,19 +110,20 @@ raw    = int16_be
 else dB = raw / 256
 ```
 
-**Verified write.** Controlled CH16 clones at `-∞`, `-30`, `-20.3`, `-12.2`, `-5.9`, approximately `0`, `+5` and `+10 dB` changed only these two bytes. The end-relative locator also matches the 169-byte event configuration. The editor currently writes the directly tested finite range `-30…+10 dB` plus `-∞`.
+**Verified write.** Controlled CH16 clones at `-∞`, `-30`, `-20.3`, `-12.2`, `-5.9`, approximately `0`, `+5` and `+10 dB` changed only these two bytes. The editor currently writes the directly tested finite range `-30…+10 dB` plus `-∞`.
 
 ### Input pan
 
 ```text
 offset = blockStart + blockSize - 82
 0x00 = 100% L
-0x25 = centre
+0x25 = exact centre
 0x4A = 100% R
 pan_percent = (raw - 37) / 37 × 100
+canonical raw = 37 + trunc(pan_percent × 37 / 100)
 ```
 
-**Decoded / read-only.** ConsoleFlip's dial angles agree with native values in the event show. Isolated pan clones are the next promotion test.
+**Verified write.** Controlled CH16 pan clones changed only this byte: `100L=00`, `50L=13`, labelled near-centre `=24`, `50R=37`, `100R=4A`. The original Scene 10 centre is `25`, establishing the exact centre code. The writer uses `25` for exact centre and quantises percentages across the 0…74 coordinate.
 
 ### Event-config mono Aux sends
 
@@ -141,12 +137,14 @@ Record: `Compressor, Input Channel NN`.
 
 | Field | State offset | Type | Transform | Confidence | Write |
 |---|---:|---|---|---|---|
-| Processor/type byte | `+0` | `uint8` | observed `08` in current event material | Located | No |
+| Processor/type byte | `+0` | `uint8` | observed `08` in verified current-format shape | Decoded/parser guard | No |
 | Model/type candidate | `+1` | `uint8` | multiple values observed (`01`,`04`,`06`, ...) | Located | No |
-| Enable | `+2` | `uint8` | `00` Off, `01` On | **Decoded / read-only** | No |
+| Enable | `+2` | `uint8` | `00` Off, `01` On | **Verified write** | **Yes** |
 | Remaining parameters | `+3...` | mixed | unknown | Unknown | No |
 
-ConsoleFlip's event preview matched compressor state byte `+2` on all 108 visible cards, including active CH14, CH16 and CH18.
+ConsoleFlip's event preview first matched state byte `+2` on all 108 visible cards. Controlled CH16 scenes later isolated the byte directly. The clean `Comp 2 On` / `Comp 2 Off` pair changes only state `+2` outside the scene label, toggling `01` / `00`.
+
+The editor writes compressor enable only when the record matches the verified current-format shape: state length 127, processor discriminator `08`, and an existing enable byte of `00` or `01`. The model byte and every dynamics parameter are preserved exactly.
 
 ## RackUltra / AHFX
 
@@ -163,7 +161,7 @@ Observed model IDs include Spaces (`1c03`,`1c04`), Plate (`1d00`), Rhythm Delay 
 
 ## MixConfig.dat
 
-The observed file is 13 bytes. Several count fields have plausible/high-confidence labels in the current parser, but not every byte has been independently proved across configurations. **No MixConfig field is writable.** As more mixer configurations are analysed, labels that cannot be independently reproduced should be downgraded rather than assumed.
+The observed file is 13 bytes. Several count fields have plausible/high-confidence labels in the current parser, but not every byte has been independently proved across configurations. **No MixConfig field is writable.**
 
 ## Other located records
 
@@ -171,7 +169,7 @@ The observed file is 13 bytes. Several count fields have plausible/high-confiden
 |---|---|---|
 | `Gate, Input Channel NN` | Located | threshold/depth/attack/hold/release/on-off |
 | `Delay, Input Channel NN` | Located | 0 ms plus several known delays |
-| `Stereo Image, Input Channel NN` | Located | width/stereo-image modes; ordinary input pan is now known to live in `Input Mixer` |
+| `Stereo Image, Input Channel NN` | Located | width/stereo-image modes; ordinary input pan lives in `Input Mixer` |
 | `Digital Attenuator Input Channel NN` | Located; variable historical lengths observed | current-scene digital trim/attenuation values |
 | `Send Source Select ...` | Located | one Aux source/pre-post sequence |
 | `Preamp Model ...` | Located | gain/pad/48V controlled scenes |
