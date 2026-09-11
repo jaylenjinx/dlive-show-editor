@@ -115,10 +115,10 @@ Inside `Compressor, Input Channel NN`:
 ```text
 state +1    = compressor model / engine family
 state +2    = 00 Off / 01 On
-state +8..9 = threshold, signed int16_be / 256 dB
+state +8..9 = common threshold on Manual RMS + Opto, signed int16_be / 256 dB
 ```
 
-The model byte is now decoded from controlled CH16 model scenes:
+The model byte is decoded from controlled CH16 model scenes:
 
 ```text
 00 Manual Peak
@@ -138,9 +138,21 @@ The model byte is now decoded from controlled CH16 model scenes:
 
 The event-show ConsoleFlip preview matched the enable byte across all 108 visible input cards. Controlled CH16 clones then isolated On/Off directly with the clean `Comp 2 On` / `Comp 2 Off` pair.
 
-A separate **Manual RMS** (`state +1 = 0x01`) threshold series used `-46, -30, -20, -10, 0, +10, +18 dB`. Every adjacent pair changed only `state +8..9` outside the scene-label bytes. Examples: `D2 00 = -46.00 dB`, `E1 FD ≈ -30.01 dB`, `00 03 ≈ +0.01 dB`, `12 00 = +18.00 dB`.
+A controlled **Manual RMS** (`0x01`) threshold series and an independent **Opto** (`0x02`) threshold series both isolate `state +8..9` as signed fixed-point `/256 dB`. Manual RMS covers `-46, -30, -20, -10, 0, +10, +18 dB`; Opto covers `-46, -20.3, 0, +10.5, +18 dB`. Every adjacent threshold pair changes only those two bytes outside scene-label bytes.
 
-The threshold writer is deliberately guarded to Manual RMS plus the verified current-format processor discriminator/state length. The model scenes show plausible threshold values at the same offset across the other model families, but threshold writes remain read-only for those models until an additional controlled threshold series proves the shared write boundary.
+The threshold writer is therefore enabled for Manual RMS and Opto over the directly verified range **-46…+18 dB**.
+
+The **Bus** model (`0x09`) is different. Its controlled threshold scenes leave `state +8..9` fixed at `-6 dB` and instead change a single byte at `state +51`:
+
+```text
+BUS -15 -> 0
+BUS  -9 -> 24
+BUS   0 -> 60
+BUS +10 -> 96
+BUS +15 -> 120
+```
+
+This strongly suggests a model-specific coordinate close to `dB = raw/4 - 15`, but the scene labelled `+10` stores raw `96`, which maps to `+9 dB` under that otherwise exact transform. Bus threshold therefore remains decoded/read-only until that discrepancy is resolved.
 
 ## Decoded / read-only
 
@@ -154,7 +166,7 @@ LPF bytes `state +1..+2` and `+5..+9` are preserved exactly. Real-event material
 
 ### Compressor model selection and remaining dynamics parameters
 
-Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Ratio, attack, release, knee, makeup and other remaining dynamics parameters are still unmapped for writing. Threshold is writable only for the independently tested Manual RMS model.
+Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Ratio, attack, release, knee, makeup and other remaining dynamics parameters are still unmapped for writing. Common threshold is writable on Manual RMS and Opto; Bus threshold uses a separate located/read-only coordinate.
 
 ### Aux-send evidence
 
