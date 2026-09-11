@@ -24,6 +24,9 @@
 - Added canonical pan percentage writes over `-100…+100` using the 0…74 raw coordinate while preserving exact centre as `0x25`.
 - Promoted input compressor On/Off to **Verified Write** at compressor state byte `+2` (`00` Off, `01` On).
 - Used the event-show ConsoleFlip preview as an independent 108-channel cross-check, then confirmed the write boundary with controlled CH16 clones. The clean `Comp 2 On` / `Comp 2 Off` pair changes only state `+2` outside the scene label.
+- Promoted Manual RMS **Parallel Wet** at `state +3..+4` and **Parallel Dry** at `state +5..+6` to **Verified Write**. Controlled `−∞, −40, −20, −10, −5, 0 dB` series each change only their own two bytes; encoding is signed `int16_be / 256 dB` with `0x8001 = −∞`.
+- Promoted Manual RMS **Parallel On/Off** at `state +7` to **Verified Write**. Two independent duplicate On/Off pairs toggle only this byte, proving `00=Off`, `01=On`.
+- Added guarded Parallel Wet/Dry writers over the directly tested finite range `−40…0 dB` plus `−∞`, and a guarded On/Off writer for Manual RMS (`0x01`).
 - Promoted common compressor threshold at `state +8..+9` to **Verified Write for Manual RMS (`0x01`) and Opto (`0x02`)**. Manual RMS scenes at `−46, −30, −20, −10, 0, +10, +18 dB` and independent Opto scenes at `−46, −20.3, 0, +10.5, +18 dB` each change only these two bytes outside scene-label bytes.
 - Confirmed the common threshold encoding is signed `int16_be / 256 dB`; Opto anchors include `D2 00 = −46`, `EB C0 = −20.25`, `00 00 = 0`, `0A 80 = +10.5`, `12 00 = +18 dB`.
 - Added a strict common-threshold writer guard for processor discriminator `0x08`, 127-byte compressor state, model byte `0x01` or `0x02`, and the directly observed range `−46…+18 dB`.
@@ -38,9 +41,9 @@
 - Decoded compressor model/engine byte `state +1` from controlled CH16 scenes: `00 Manual Peak`, `01 Manual RMS`, `02 Opto`, `03 16T`, `04 16VU`, `05 Ducker family`, `06 Peak Limiter 76`, `07 Mighty`, `08 Optronik`, `09 Bus`, `0A Compstortion`.
 - Confirmed `Ducker` and `Ducker Slow` both use model byte `0x05`; the Slow variant changes parameter/default bytes at `+10..13` and `+25..26` rather than using a separate model ID.
 - Kept compressor model selection read-only because console model changes also rewrite model-specific state; writing only `state +1` would create a hybrid compressor state.
-- Fixed the live site loader so compressor threshold/model/ratio/attack/release/knee/makeup extension modules are loaded by `index.html`.
+- Fixed the live site loader so compressor threshold/model/ratio/attack/release/knee/makeup/parallel extension modules are loaded by `index.html`.
 - Located six mono Aux send level fields in the 169-byte event configuration; kept them read-only/configuration-specific until the variable bus-layout rule is solved.
-- Added Channel State tooling, LPF tooling/docs, expanded PEQ type/bypass tooling/docs, compressor threshold/model/ratio/time/knee/makeup tooling/docs, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research documentation.
+- Added Channel State tooling, LPF tooling/docs, expanded PEQ type/bypass tooling/docs, compressor threshold/model/parallel/ratio/time/knee/makeup tooling/docs, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research documentation.
 
 ## v2.1.2
 
