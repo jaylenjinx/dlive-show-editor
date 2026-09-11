@@ -106,25 +106,31 @@ Controlled CH16 clones changed only that byte:
 4A = 100% R
 ```
 
-The editor uses the canonical raw coordinate `0…74` with `37` as centre and writes percentage requests using `raw = 37 + trunc(percent * 37 / 100)`. Only the pan byte is modified.
+The editor uses the canonical raw coordinate `0…74` with `37` as centre and writes percentage requests using `raw = 37 + trunc(pan_percent * 37 / 100)`. Only the pan byte is modified.
 
 ### Input compressor — v2.2
 
 Inside `Compressor, Input Channel NN`:
 
 ```text
-state +1      = compressor model / engine family
-state +2      = 00 Off / 01 On
-state +3..4   = Manual RMS Parallel Wet
-state +5..6   = Manual RMS Parallel Dry
-state +7      = Manual RMS Parallel On/Off
-state +8..9   = common threshold on Manual RMS + Opto
-state +10..11 = Manual RMS attack
-state +12..13 = Manual RMS release
-state +15     = Manual RMS ratio table/index
-state +16..17 = Manual RMS makeup gain
-state +18     = Manual RMS knee
-state +51     = Bus model-specific threshold
+state +1        = compressor model / engine family
+state +2        = 00 Off / 01 On
+state +3..4     = Manual RMS Parallel Wet
+state +5..6     = Manual RMS Parallel Dry
+state +7        = Manual RMS Parallel On/Off
+state +8..9     = common threshold on Manual RMS + Opto
+state +10..11   = Manual RMS attack
+state +12..13   = Manual RMS release
+state +15       = Manual RMS ratio table/index
+state +16..17   = Manual RMS makeup gain
+state +18       = Manual RMS knee
+state +51       = Bus model-specific threshold
+state +107..108 = Manual RMS sidechain low-filter frequency
+state +111      = Manual RMS sidechain low-filter type
+state +116..117 = Manual RMS sidechain high-filter frequency
+state +120      = Manual RMS sidechain high-filter type
+state +123      = Manual RMS sidechain Filter In/Out
+state +124      = Manual RMS sidechain BPF / scene-labelled notch
 ```
 
 The model byte is decoded from controlled CH16 model scenes:
@@ -161,6 +167,8 @@ Manual RMS makeup gain is isolated at `state +16..17` and uses signed `/256 dB`.
 
 Manual RMS knee is a one-byte enum at `state +18`: `00=Normal`, `01=Soft`. Two duplicate Normal/Soft pairs reproduce exactly and change only this byte.
 
+The `ReverseEngineer` controlled show isolates the Manual RMS compressor sidechain filter. Low-filter frequency is at `+107..108` with tested anchors **20 Hz, 100 Hz, 500 Hz, 2 kHz, 5 kHz**; low type at `+111` is `04=Lo-Cut`, `06=Low Shelf`. High-filter frequency is at `+116..117` with anchors **120 Hz, 200 Hz, 500 Hz, 1 kHz, 5 kHz, 10 kHz, 20 kHz**; high type at `+120` is `03=Hi-Cut`, `07=High Shelf`. Filter In/Out is `+123` (`00=In`, `01=Out`) and the operator-labelled notch / A&H BPF option is `+124` (`00=Off`, `01=On`). Each controlled comparison changes only its target byte(s), and the tested frequency ranges match Allen & Heath's published sidechain filter ranges. Frequency writes are deliberately restricted to exact controlled anchors. **Sidechain Source was not included and remains unmapped.**
+
 ## Decoded / read-only
 
 ### PEQ remaining state
@@ -173,7 +181,7 @@ LPF bytes `state +1..+2` and `+5..+9` are preserved exactly. Real-event material
 
 ### Compressor model selection and remaining dynamics parameters
 
-Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Manual RMS parallel/ratio/attack/release/knee/makeup writes are restricted to controlled values/ranges; other model-specific dynamics parameters remain read-only until independently isolated.
+Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Manual RMS parallel/sidechain/ratio/attack/release/knee/makeup writes are restricted to controlled values/ranges. Sidechain Source and other model-specific parameters remain read-only until independently isolated.
 
 ### Aux-send evidence
 
