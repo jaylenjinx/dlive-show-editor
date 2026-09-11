@@ -63,7 +63,10 @@ function exportResearchReport(){
       thresholdWritable:x.thresholdWritableShape??false,
       commonThresholdOffset:x.commonThresholdOffset??null,commonThresholdRaw:x.commonThresholdRaw??null,commonThresholdDb:x.commonThresholdDb??null,
       ratioOffset:x.ratioOffset??null,ratioRaw:x.ratioRaw??null,ratioLabel:x.ratioLabel??null,
-      ratioKnown:x.ratioKnown??false,ratioWritable:x.ratioWritableShape??false
+      ratioKnown:x.ratioKnown??false,ratioWritable:x.ratioWritableShape??false,
+      attackOffset:x.attackOffset??null,attackRaw:x.attackRaw??null,attackMs:x.attackMs??null,attackExact:x.attackExact??false,
+      releaseOffset:x.releaseOffset??null,releaseRaw:x.releaseRaw??null,releaseMs:x.releaseMs??null,releaseExact:x.releaseExact??false,
+      timeWritable:x.timeWritableShape??false
     })),
     ahfx:c.stage?.ahfx.map(f=>({
       slot:f.slot,frameStart:f.frameStart,payloadLength:f.payloadLength,engineId:f.engineId,
