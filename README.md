@@ -29,8 +29,11 @@ For all 128 input channels:
 - Bell Width: A&H width index in the high byte; untouched fractional low-byte precision is preserved
 - Band 1 filter type at band byte `+6`: `04 HPF`, `00 PEQ/Bell`, `01 Low Shelf`
 - Band 4 filter type at band byte `+6`: `03 LPF`, `00 PEQ/Bell`, `02 High Shelf`
+- Global PEQ In/Out: the single trailing byte after Band 4 is `00 In`, `01 Out/bypassed`
 
-Controlled CH16 type scenes changed only the single `+6` type byte outside the scene label. The editor deliberately exposes only the combinations proven for each edge band. The final two PEQ state bytes (`+7..8`) remain read-only and are preserved exactly.
+Controlled CH16 type scenes changed only the single `+6` type byte outside the scene label. Separate duplicated PEQ In/Out scenes then isolated the trailing bypass byte: after the fixed scene-name/header region, the clean `EQ In 2` / `EQ Out 2` pair differs at exactly one byte in the complete 412,047-byte StageBox scene.
+
+The editor deliberately exposes only the type combinations proven for each edge band, and writes PEQ In/Out only when the parsed tail is exactly one known `00/01` byte. The final two PEQ band-state bytes (`+7..8`) remain read-only and are preserved exactly.
 
 ### Input HPF — v2.2
 
@@ -157,7 +160,7 @@ The site has a built-in **Docs** section available without loading a show.
 - [Documentation index](docs/README.md)
 - [Consolidated field notes](KNOWN_FORMAT.md)
 
-The interactive parameter map is driven by `app-parameter-map.js` plus focused add-on registries for PEQ type, HPF and channel state.
+The interactive parameter map is driven by `app-parameter-map.js` plus focused add-on registries for PEQ type/bypass, HPF and channel state.
 
 ## Safety model
 
