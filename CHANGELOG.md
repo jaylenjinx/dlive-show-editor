@@ -3,8 +3,9 @@
 ## v2.2
 
 - Promoted input HPF frequency and On/Off to **Verified Write** using a second real event show and an independent ConsoleFlip preview.
-- Corrected the HPF five-byte state map to `03 FF FF MM BB`: frequency is bytes 1–2, byte 3 is unknown/preserved, and byte 4 is bypass (`00` On, `01` Off).
+- Resolved the HPF five-byte state map as `03 FF FF SS BB`: frequency is bytes 1–2, byte 3 is slope/filter type, and byte 4 is bypass (`00` On, `01` Off).
 - Verified HPF state and rounded frequency against all 108 input cards rendered by ConsoleFlip for the event show.
+- Promoted HPF slope/filter type to **Verified Write** using controlled CH16 clones: `05=6 dB BW`, `00=12 dB BW`, `01=18 dB BW`, `02=24 dB BW`, `03=18 dB Bessel`; `04` remains unmapped and is preserved.
 - Identified `Input Mixer` as a 12-byte header followed by 128 equal per-input blocks; current-format block size is mixer-configuration dependent.
 - Promoted input fader to **Verified Write** using controlled CH16 clones at `-∞`, `-30`, `-20.3`, `-12.2`, `-5.9`, approximately `0`, `+5` and `+10 dB`.
 - Established the generic fader locator as `blockStart + blockSize - 84`; the same end-relative field survives 169-byte and 224-byte channel blocks.
