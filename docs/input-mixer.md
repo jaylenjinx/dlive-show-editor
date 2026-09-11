@@ -1,6 +1,6 @@
 # Input Mixer channel state
 
-> Status: **verified write for input fader, pan and compressor On/Off; decoded/read-only for Aux evidence and remaining compressor parameters**. Validated across multiple real dLive 2.12 mixer configurations and independently cross-checked against ConsoleFlip-rendered channel state.
+> Status: **verified write for input fader, pan, compressor On/Off and compressor threshold on the controlled model 0x01; decoded/read-only for Aux evidence and remaining compressor parameters**. Validated across multiple real dLive 2.12 mixer configurations and independently cross-checked against ConsoleFlip-rendered channel state.
 
 The labelled `Input Mixer` record contains a small header followed by 128 equal-size per-input blocks:
 
@@ -120,7 +120,49 @@ state +0                = 0x08 processor discriminator
 state +2                = 0x00 or 0x01 before writing
 ```
 
-Only state byte `+2` is changed. The compressor model byte at `+1` and every threshold/ratio/attack/release/knee/etc. parameter remain untouched and read-only.
+Only state byte `+2` is changed for On/Off. The compressor model byte at `+1` is preserved.
+
+## Input compressor threshold — verified write for model 0x01
+
+The controlled CH16 threshold scenes isolate a two-byte field at:
+
+```text
+state +8..+9 = int16_be
+threshold_dB = raw / 256
+```
+
+Controlled anchors:
+
+| Scene label | Raw | Decoded |
+|---|---:|---:|
+| `Cmp Thresh -46` | `D2 00` | -46.00 dB |
+| `Cmp Thresh -30` | `E1 FD` | about -30.01 dB |
+| `Cmp Thresh -20` | `EB FD` | about -20.01 dB |
+| `Cmp Thresh -10` | `F5 FD` | about -10.01 dB |
+| `Cmp Thresh 0` | `00 03` | about +0.01 dB |
+| `Cmp Thresh 10` | `0A 03` | about +10.01 dB |
+| `Cmp Thresh 18` | `12 00` | +18.00 dB |
+
+Every adjacent threshold pair changes only bytes `state +8..+9` outside scene-label bytes. The small `FD` / `03` fractional offsets are normal stored-control quantisation around the labelled integer values.
+
+The canonical writer is:
+
+```text
+raw = round(threshold_dB * 256)
+```
+
+with the directly observed range constrained to `-46…+18 dB`.
+
+The supplied threshold experiment used compressor model byte `0x01`. The editor therefore enables threshold writing only when all of these are true:
+
+```text
+state length = 127 bytes
+state +0     = 0x08
+state +1     = 0x01   verified compressor model for this experiment
+state +2     = 0x00 or 0x01
+```
+
+Other compressor models remain threshold read-only until independently tested.
 
 ## Event-show mono Aux send evidence
 
