@@ -59,24 +59,41 @@ Opto controlled scenes cover:
 
 Each adjacent Opto threshold pair changes only state bytes `+8..9` outside the scene label. The editor therefore enables the common threshold writer for Manual RMS and Opto over the directly verified range `-46…+18 dB`.
 
-## Bus threshold is model-specific
+## Bus threshold — verified write
 
-Bus (`0x09`) does **not** use the common threshold field for its user-facing threshold control. In all controlled Bus threshold scenes, `state +8..9` remains `FA 00` (`-6.00 dB`). Instead, exactly one model-specific byte changes at `state +51`:
+Bus (`0x09`) does **not** use the common threshold field for its user-facing threshold control. In all controlled Bus threshold scenes, `state +8..9` remains `FA 00` (`-6.00 dB`). Instead, exactly one model-specific byte changes at `state +51`.
 
-| Scene | Raw `state +51` |
-|---|---:|
-| `BUS -15` | `0` |
-| `BUS -9` | `24` |
-| `BUS 0` | `60` |
-| `BUS 10` | `96` |
-| `BUS 15` | `120` |
+The scene originally labelled `BUS 10` was confirmed by the operator to have been intended as **BUS +9 dB**. With that correction, all five anchors fit exactly:
 
-The endpoints and most interior anchors strongly suggest:
+| Threshold | Raw `state +51` |
+|---:|---:|
+| `-15 dB` | `00` |
+| `-9 dB` | `18` (24) |
+| `0 dB` | `3C` (60) |
+| `+9 dB` | `60` (96) |
+| `+15 dB` | `78` (120) |
+
+The exact transform is therefore:
 
 ```text
-candidate dB = raw / 4 - 15
+threshold_dB = raw / 4 - 15
+raw = round((threshold_dB + 15) * 4)
 ```
 
-That transform gives exact values for `-15`, `-9`, `0`, and `+15`, but raw `96` corresponds to `+9 dB`, while the scene is labelled `BUS 10`.
+The editor treats Bus threshold as **Verified Write** over `-15…+15 dB`, using only state byte `+51`.
 
-The Bus threshold field is therefore **located and semantically identified, but read-only** until the `+10` discrepancy is resolved with another exact console reading. This model-specific result is also evidence that compressor control layouts are not universal across engine families.
+## Manual RMS ratio — verified restricted write
+
+Controlled Manual RMS (`0x01`) scenes isolate compressor ratio to one byte at `state +15`. Every adjacent ratio scene changes only that byte outside scene-label bytes.
+
+| Ratio | Raw |
+|---|---:|
+| `1:1` | `00` |
+| `2:1` | `10` |
+| `4:1` | `18` |
+| `12:1` | `24` |
+| `20:1` | `26` |
+| `40:1` | `27` |
+| `∞:1` | `28` |
+
+This is a discrete ratio table/index rather than a simple linear numeric encoding. The editor therefore exposes only these seven directly tested choices and does not guess intermediate raw table entries. Ratio writes remain guarded to Manual RMS until other compressor models are independently tested.
