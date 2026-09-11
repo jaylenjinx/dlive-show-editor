@@ -43,7 +43,7 @@
     <div id="emptyState" class="empty-state">
       <div class="empty-icon">DL2</div>
       <h1>Edit proven dLive structures, inspect the rest</h1>
-      <p>V2.2 includes verified input PEQ gain/frequency, edge-band filter types and In/Out, HPF, LPF, fader, pan, compressor On/Off, model-specific threshold editing and guarded Manual RMS ratio/attack/release/knee/makeup editing, plus decoded compressor model names, C-class layer editing, RackUltra inspection and mixer-config research tools.</p>
+      <p>V2.2 includes verified input PEQ gain/frequency, edge-band filter types and In/Out, HPF, LPF, fader, pan, compressor On/Off, parallel controls, model-specific threshold editing and guarded Manual RMS ratio/attack/release/knee/makeup editing, plus decoded compressor model names, C-class layer editing, RackUltra inspection and mixer-config research tools.</p>
       <button id="openBtn2" class="primary large">Choose show file</button>
     </div>
 
@@ -95,7 +95,7 @@
       </div>
 
       <div id="tabChannelstate" class="tab-panel">
-        <div class="notice safe"><strong>Verified write:</strong> input fader, pan, compressor On/Off, Manual RMS/Opto threshold, Bus threshold, seven controlled Manual RMS ratio choices, controlled Manual RMS attack/release anchors, makeup gain and Normal/Soft knee are isolated with controlled scenes. Compressor model switching and remaining parameters stay read-only.</div>
+        <div class="notice safe"><strong>Verified write:</strong> input fader, pan, compressor On/Off, Manual RMS parallel Wet/Dry/On-Off, Manual RMS/Opto threshold, Bus threshold, seven controlled Manual RMS ratio choices, controlled Manual RMS attack/release anchors, makeup gain and Normal/Soft knee are isolated with controlled scenes. Compressor model switching and remaining parameters stay read-only.</div>
         <div id="channelStateEditor"></div>
       </div>
 
@@ -172,6 +172,7 @@
 <script src="app-compressor-ratio.js"></script>
 <script src="app-compressor-times.js"></script>
 <script src="app-compressor-knee-gain.js"></script>
+<script src="app-compressor-parallel.js"></script>
 <script src="app-render-inspect.js"></script>
 <script src="app-ui.js"></script>
 </body>
