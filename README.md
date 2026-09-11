@@ -115,6 +115,9 @@ Inside `Compressor, Input Channel NN`:
 ```text
 state +1      = compressor model / engine family
 state +2      = 00 Off / 01 On
+state +3..4   = Manual RMS Parallel Wet
+state +5..6   = Manual RMS Parallel Dry
+state +7      = Manual RMS Parallel On/Off
 state +8..9   = common threshold on Manual RMS + Opto
 state +10..11 = Manual RMS attack
 state +12..13 = Manual RMS release
@@ -144,6 +147,8 @@ The model byte is decoded from controlled CH16 model scenes:
 
 The event-show ConsoleFlip preview matched compressor enable across all 108 visible input cards. Controlled CH16 clones then isolated On/Off directly with the clean `Comp 2 On` / `Comp 2 Off` pair.
 
+Manual RMS Parallel Wet and Dry use signed `int16_be / 256 dB` at `state +3..4` and `+5..6`, with `0x8001` as the explicit `-∞` sentinel. Both controlled series cover `-∞, -40, -20, -10, -5, 0 dB`; every adjacent scene changes only the target two bytes. Parallel On/Off is `state +7`, where two duplicate pairs prove `00=Off`, `01=On`. The editor enables finite Wet/Dry writes over the directly tested **-40…0 dB** range plus `-∞`, guarded to Manual RMS.
+
 A controlled **Manual RMS** (`0x01`) threshold series and an independent **Opto** (`0x02`) threshold series both isolate `state +8..9` as signed fixed-point `/256 dB`. The common threshold writer is enabled for those two models over the directly verified range **-46…+18 dB**.
 
 The **Bus** model (`0x09`) uses a different user-facing threshold field at `state +51`. Corrected controlled anchors are `-15→00`, `-9→18`, `0→3C`, `+9→60`, `+15→78`, giving `threshold_dB = raw/4 - 15`. Bus threshold is **Verified Write** over `-15…+15 dB`.
@@ -168,7 +173,7 @@ LPF bytes `state +1..+2` and `+5..+9` are preserved exactly. Real-event material
 
 ### Compressor model selection and remaining dynamics parameters
 
-Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Manual RMS ratio/attack/release/knee/makeup writes are restricted to controlled values/ranges; other model-specific dynamics parameters remain read-only until independently isolated.
+Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Manual RMS parallel/ratio/attack/release/knee/makeup writes are restricted to controlled values/ranges; other model-specific dynamics parameters remain read-only until independently isolated.
 
 ### Aux-send evidence
 
