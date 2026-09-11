@@ -31,12 +31,16 @@
 - Confirmed exact Bus threshold anchors `−15→00`, `−9→18`, `0→3C`, `+9→60`, `+15→78`, with transform `dB = raw/4 − 15`; each adjacent pair changes only state `+51` outside scene-label bytes while common threshold bytes `+8..9` remain fixed.
 - Isolated Manual RMS compressor ratio at `state +15`. Controlled scenes `Rat 1`, `Rat 2`, `Rat 4`, `Rat 12`, `Rat 20`, `Rat 40`, `Rat Inf` change only this byte outside scene-label bytes.
 - Added a restricted **Verified Write** ratio table for Manual RMS: `00=1:1`, `10=2:1`, `18=4:1`, `24=12:1`, `26=20:1`, `27=40:1`, `28=∞:1`. Untested intermediate ratio-table entries are preserved and not guessed.
+- Isolated Manual RMS **attack** at `state +10..11` and **release** at `state +12..13` as unsigned 16-bit big-endian logarithmic time coordinates. Identical times store identical words on both controls, including `50 ms=6D5C`, `100 ms=745E`, `200 ms=7B5F`.
+- Added restricted attack/release writers using only exact controlled anchors: attack `30 µs…300 ms`, release `50 ms…2 s`. The approximate logarithmic inverse is display-only and is not used to generate untested values.
+- Promoted Manual RMS **makeup gain** at `state +16..17` to **Verified Write**. Controlled `0, +6, +12, +18 dB` scenes isolate only these two bytes; encoding is signed `int16_be / 256 dB`, with writes limited to the directly tested `0…+18 dB` range.
+- Promoted Manual RMS **knee** at `state +18` to **Verified Write** with `00=Normal`, `01=Soft`. Two independent duplicate Normal/Soft pairs toggle only this byte; duplicate Normal scenes are byte-identical and duplicate Soft scenes are byte-identical.
 - Decoded compressor model/engine byte `state +1` from controlled CH16 scenes: `00 Manual Peak`, `01 Manual RMS`, `02 Opto`, `03 16T`, `04 16VU`, `05 Ducker family`, `06 Peak Limiter 76`, `07 Mighty`, `08 Optronik`, `09 Bus`, `0A Compstortion`.
 - Confirmed `Ducker` and `Ducker Slow` both use model byte `0x05`; the Slow variant changes parameter/default bytes at `+10..13` and `+25..26` rather than using a separate model ID.
 - Kept compressor model selection read-only because console model changes also rewrite model-specific state; writing only `state +1` would create a hybrid compressor state.
-- Fixed the live site loader so compressor threshold/model/ratio extension modules are loaded by `index.html`.
+- Fixed the live site loader so compressor threshold/model/ratio/attack/release/knee/makeup extension modules are loaded by `index.html`.
 - Located six mono Aux send level fields in the 169-byte event configuration; kept them read-only/configuration-specific until the variable bus-layout rule is solved.
-- Added Channel State tooling, LPF tooling/docs, expanded PEQ type/bypass tooling/docs, compressor threshold/model/ratio tooling/docs, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research documentation.
+- Added Channel State tooling, LPF tooling/docs, expanded PEQ type/bypass tooling/docs, compressor threshold/model/ratio/time/knee/makeup tooling/docs, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research documentation.
 
 ## v2.1.2
 
