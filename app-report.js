@@ -58,10 +58,12 @@ function exportResearchReport(){
       channel:x.channel,frameStart:x.frameStart,payloadLength:x.payloadLength,stateLength:x.stateLength,
       typeRaw:x.typeRaw,modelRaw:x.modelRaw,modelLabel:x.modelLabel||null,
       enableRaw:x.enableRaw,active:x.active,enableKnown:x.enableKnown,
+      thresholdKind:x.thresholdKind??null,
       thresholdOffset:x.thresholdOffset??null,thresholdRaw:x.thresholdRaw??null,thresholdDb:x.thresholdDb??null,
       thresholdWritable:x.thresholdWritableShape??false,
-      busThresholdOffset:x.busThresholdOffset??null,busThresholdRaw:x.busThresholdRaw??null,
-      busThresholdCandidateDb:x.busThresholdCandidateDb??null
+      commonThresholdOffset:x.commonThresholdOffset??null,commonThresholdRaw:x.commonThresholdRaw??null,commonThresholdDb:x.commonThresholdDb??null,
+      ratioOffset:x.ratioOffset??null,ratioRaw:x.ratioRaw??null,ratioLabel:x.ratioLabel??null,
+      ratioKnown:x.ratioKnown??false,ratioWritable:x.ratioWritableShape??false
     })),
     ahfx:c.stage?.ahfx.map(f=>({
       slot:f.slot,frameStart:f.frameStart,payloadLength:f.payloadLength,engineId:f.engineId,
