@@ -96,6 +96,11 @@ function setInputFaderInfinite(channel){
 
 function renderChannelState(){
   const root=$('#channelStateEditor');if(!root)return;
+  const banner=$('#tabChannelstate .notice');
+  if(banner){
+    banner.className='notice safe';
+    banner.innerHTML='<strong>Verified fader write:</strong> input fader location and encoding are isolated from controlled clones and survive different mixer configurations. Pan and compressor remain cross-checked read-only.';
+  }
   root.innerHTML='';
   const decoded=ensureChannelState();
   if(!decoded?.mixer){root.innerHTML='<div class="notice warn">This scene does not match the validated Input Mixer framing.</div>';return;}
