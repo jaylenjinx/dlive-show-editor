@@ -185,11 +185,14 @@ Record: `Compressor, Input Channel NN`.
 | Processor/type byte | `+0` | `uint8` | observed `08` in verified current-format shape | Decoded/parser guard | No |
 | Model/type candidate | `+1` | `uint8` | multiple values observed (`01`,`04`,`06`, ...) | Located | No |
 | Enable | `+2` | `uint8` | `00` Off, `01` On | **Verified write** | **Yes** |
-| Remaining parameters | `+3...` | mixed | unknown | Unknown | No |
+| Threshold | `+8..9` | `int16_be` | `threshold_dB = raw / 256` | **Verified write for model `0x01`** | **Yes, guarded** |
+| Remaining parameters | other state bytes | mixed | unknown | Unknown | No |
 
 ConsoleFlip's event preview first matched state byte `+2` on all 108 visible cards. Controlled CH16 scenes later isolated the byte directly. The clean `Comp 2 On` / `Comp 2 Off` pair changes only state `+2` outside the scene label, toggling `01` / `00`.
 
-The editor writes compressor enable only when the record matches the verified current-format shape: state length 127, processor discriminator `08`, and an existing enable byte of `00` or `01`. The model byte and every dynamics parameter are preserved exactly.
+Controlled CH16 threshold scenes then isolate `state +8..9` at `−46, −30, −20, −10, 0, +10, +18 dB`. Observed anchors are `D2 00 = −46.00 dB`, `E1 FD ≈ −30.01 dB`, `EB FD ≈ −20.01 dB`, `F5 FD ≈ −10.01 dB`, `00 03 ≈ +0.01 dB`, `0A 03 ≈ +10.01 dB`, `12 00 = +18.00 dB`. Every adjacent threshold scene changes only these two bytes outside scene-label bytes.
+
+Compressor enable is guarded to the verified current-format shape: state length 127, processor discriminator `08`, and existing enable `00/01`. Threshold adds a further conservative guard requiring compressor model byte `01`, because that is the model used by the controlled threshold experiment. The verified threshold write range is `−46…+18 dB`.
 
 ## RackUltra / AHFX
 
@@ -224,4 +227,4 @@ The observed file is 13 bytes. Several count fields have plausible/high-confiden
 
 A field becomes writable only when the project can define a narrow safe byte boundary and reproduce the intended value. Controlled one-parameter clones are preferred. Independent semantic evidence such as ConsoleFlip output or the dLive MIDI protocol is used as a cross-check, not as permission to guess unknown bytes.
 
-The interactive site's source of truth is [`app-parameter-map.js`](../app-parameter-map.js), focused add-on registries and the LPF module.
+The interactive site's source of truth is [`app-parameter-map.js`](../app-parameter-map.js) plus focused add-on registries and verified processing extensions.
