@@ -220,3 +220,86 @@ Every adjacent Wet scene changes only `state +3..4`; every adjacent Dry scene ch
 Parallel enable is one byte at `state +7`: `00=Off`, `01=On`. Two duplicate On/Off pairs independently toggle only that byte.
 
 The editor therefore enables Manual RMS Parallel Wet/Dry writes over the directly tested finite range `-40…0 dB` plus the explicit `0x8001` `-∞` sentinel, and enables Parallel On/Off at `state +7`.
+
+## Manual RMS compressor sidechain filter — verified restricted write
+
+The renamed `ReverseEngineer` controlled show isolates most of the compressor sidechain controls. Sidechain **Source was not varied** and remains intentionally unmapped.
+
+```text
+state +107..108 = sidechain low-filter frequency
+state +111      = sidechain low-filter type
+state +116..117 = sidechain high-filter frequency
+state +120      = sidechain high-filter type
+state +123      = sidechain Filter In/Out
+state +124      = operator-labelled notch / A&H BPF option
+```
+
+Allen & Heath documents the compressor sidechain with a 20 Hz–5 kHz Lo-Cut filter, a 120 Hz–20 kHz Hi-Cut filter, shelf options, and a BPF option. The controlled scene ranges independently match those published limits.
+
+### Low filter frequency
+
+| Scene | Raw |
+|---:|---:|
+| `20 Hz` | `29 CB` |
+| `100 Hz` | `53 96` |
+| `500 Hz` | `7D 62` |
+| `2 kHz` | `A1 62` |
+| `5 kHz` | `B9 2E` |
+
+Every adjacent low-frequency scene changes only `state +107..108` outside the scene label.
+
+### Low filter type
+
+```text
+state +111
+04 = Lo-Cut
+06 = Low Shelf
+```
+
+The `filter low cut` / `filter low shelf` pair changes only this byte.
+
+### High filter frequency
+
+| Scene | Raw |
+|---:|---:|
+| `120 Hz` | `58 53` |
+| `200 Hz` | `65 96` |
+| `500 Hz` | `7D 62` |
+| `1 kHz` | `8F 62` |
+| `5 kHz` | `B9 2D` |
+| `10 kHz` | `CB 2D` |
+| `20 kHz` | `DD 2E` |
+
+Every adjacent high-frequency scene changes only `state +116..117` outside the scene label.
+
+### High filter type
+
+```text
+state +120
+03 = Hi-Cut
+07 = High Shelf
+```
+
+The `filter high cut` / `filter high shelf` pair changes only this byte.
+
+### Filter In/Out
+
+```text
+state +123
+00 = In / active
+01 = Out / bypassed
+```
+
+Two independent `Filter on/off` pairs reproduce this one-byte toggle exactly.
+
+### BPF / scene-labelled notch
+
+```text
+state +124
+00 = Off
+01 = On
+```
+
+The controlled scenes were labelled `filter notch on` / `filter notch off`. Allen & Heath documentation describes a BPF option for this sidechain section, so the editor deliberately calls the field **BPF / notch** rather than asserting a stronger semantic interpretation from the binary alone.
+
+The sidechain frequency words follow the same logarithmic family already seen elsewhere in the show file, but some round-number console labels land one code either side of a simple floor/round formula. The writer therefore exposes **only the exact controlled frequency anchors** above. Type and On/Off writes use only the directly proven enum values. All sidechain writers remain guarded to Manual RMS (`0x01`).
