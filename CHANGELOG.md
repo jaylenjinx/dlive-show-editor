@@ -27,14 +27,16 @@
 - Promoted common compressor threshold at `state +8..+9` to **Verified Write for Manual RMS (`0x01`) and Opto (`0x02`)**. Manual RMS scenes at `−46, −30, −20, −10, 0, +10, +18 dB` and independent Opto scenes at `−46, −20.3, 0, +10.5, +18 dB` each change only these two bytes outside scene-label bytes.
 - Confirmed the common threshold encoding is signed `int16_be / 256 dB`; Opto anchors include `D2 00 = −46`, `EB C0 = −20.25`, `00 00 = 0`, `0A 80 = +10.5`, `12 00 = +18 dB`.
 - Added a strict common-threshold writer guard for processor discriminator `0x08`, 127-byte compressor state, model byte `0x01` or `0x02`, and the directly observed range `−46…+18 dB`.
-- Located the **Bus** (`0x09`) model threshold at model-specific `state +51`. Controlled Bus scenes labelled `−15, −9, 0, +10, +15` store raw `0,24,60,96,120`; every adjacent pair changes only this byte outside scene-label bytes, while common threshold bytes `+8..9` stay fixed at `−6 dB`.
-- Kept Bus threshold read-only: the anchors strongly suggest `dB ≈ raw/4 − 15`, but scene `BUS +10` stores raw `96`, corresponding to `+9 dB` under that otherwise exact transform.
+- Promoted the **Bus** (`0x09`) model threshold at model-specific `state +51` to **Verified Write** after the operator corrected the scene labelled `BUS 10` to the intended `BUS +9` value.
+- Confirmed exact Bus threshold anchors `−15→00`, `−9→18`, `0→3C`, `+9→60`, `+15→78`, with transform `dB = raw/4 − 15`; each adjacent pair changes only state `+51` outside scene-label bytes while common threshold bytes `+8..9` remain fixed.
+- Isolated Manual RMS compressor ratio at `state +15`. Controlled scenes `Rat 1`, `Rat 2`, `Rat 4`, `Rat 12`, `Rat 20`, `Rat 40`, `Rat Inf` change only this byte outside scene-label bytes.
+- Added a restricted **Verified Write** ratio table for Manual RMS: `00=1:1`, `10=2:1`, `18=4:1`, `24=12:1`, `26=20:1`, `27=40:1`, `28=∞:1`. Untested intermediate ratio-table entries are preserved and not guessed.
 - Decoded compressor model/engine byte `state +1` from controlled CH16 scenes: `00 Manual Peak`, `01 Manual RMS`, `02 Opto`, `03 16T`, `04 16VU`, `05 Ducker family`, `06 Peak Limiter 76`, `07 Mighty`, `08 Optronik`, `09 Bus`, `0A Compstortion`.
 - Confirmed `Ducker` and `Ducker Slow` both use model byte `0x05`; the Slow variant changes parameter/default bytes at `+10..13` and `+25..26` rather than using a separate model ID.
 - Kept compressor model selection read-only because console model changes also rewrite model-specific state; writing only `state +1` would create a hybrid compressor state.
-- Fixed the live site loader so the compressor-threshold and compressor-model extension modules are actually loaded by `index.html`.
+- Fixed the live site loader so compressor threshold/model/ratio extension modules are loaded by `index.html`.
 - Located six mono Aux send level fields in the 169-byte event configuration; kept them read-only/configuration-specific until the variable bus-layout rule is solved.
-- Added Channel State tooling, LPF tooling/docs, expanded PEQ type/bypass tooling/docs, compressor threshold/model tooling/docs, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research documentation.
+- Added Channel State tooling, LPF tooling/docs, expanded PEQ type/bypass tooling/docs, compressor threshold/model/ratio tooling/docs, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research documentation.
 
 ## v2.1.2
 
