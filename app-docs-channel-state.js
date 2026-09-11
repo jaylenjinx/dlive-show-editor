@@ -2,9 +2,9 @@
 
 const channelStateInsert=DOC_SECTIONS.findIndex(s=>s.id==='surface');
 DOC_SECTIONS.splice(channelStateInsert<0?DOC_SECTIONS.length:channelStateInsert,0,{
-  id:'channel-state',title:'Channel state',eyebrow:'Fader + pan verified write',
+  id:'channel-state',title:'Channel state',eyebrow:'Fader + pan + comp verified write',
   html:`
-    <h1>Input Mixer channel state</h1>
+    <h1>Input Mixer and compressor channel state</h1>
     <p>Real dLive 2.12 shows with different mixer configurations reveal a repeatable structure inside the labelled <code>Input Mixer</code> record:</p>
     <pre><code>Input Mixer\0
 12-byte mixer header
@@ -31,15 +31,16 @@ canonical raw = 37 + trunc(pan_percent × 37 / 100)</code></pre>
     <p>A controlled CH16 series changed only this one byte and produced <code>00</code> for 100L, <code>13</code> for 50L, <code>24</code> for the labelled near-centre clone, <code>37</code> for 50R and <code>4A</code> for 100R. The original Scene 10 exact centre is <code>25</code>.</p>
     <p>The <code>24</code> near-centre result is one raw step left of canonical centre, consistent with normal control quantisation. The writer uses <code>25</code> for an exact 0/C request and quantises other percentages onto the 0…74 raw range.</p>
 
-    <h2>Input compressor enable — read only</h2>
-    <p>The separate <code>Compressor, Input Channel NN</code> record has an independently cross-checked enable byte:</p>
+    <h2>Input compressor enable — verified write</h2>
+    <p>The separate <code>Compressor, Input Channel NN</code> record has its On/Off byte at:</p>
     <pre><code>state + 2 = 00  -> Comp Off
 state + 2 = 01  -> Comp On</code></pre>
-    <p>All 108 visible channel cards in the event-show ConsoleFlip preview matched this byte. Other compressor parameters and the model/type byte are still being mapped.</p>
+    <p>The real event-show ConsoleFlip preview first matched this byte on all 108 visible input cards. A later controlled CH16 file then provided two On/Off pairs. The clean <code>Comp 2 On</code>/<code>Comp 2 Off</code> pair changes only this single state byte outside the scene label, proving the write boundary.</p>
+    <div class="docs-callout"><strong>Current compressor guard:</strong> writing is enabled only for the verified current-format input-compressor shape: processor discriminator <code>08</code>, 127 state bytes after the label, and an existing enable byte of <code>00</code> or <code>01</code>. The model byte and every dynamics parameter are preserved exactly.</div>
 
     <h2>Aux-send evidence</h2>
     <p>In the 169-byte event configuration, six mono Aux send levels are visible as signed 16-bit fixed-point values at block offsets <code>+12,+16,+20,+24,+28,+32</code>. They use the same <code>raw/256 dB</code> convention and <code>0x8001</code> −∞ sentinel. These offsets are <strong>not yet treated as universal</strong> because bus configuration changes the variable portion of each channel block.</p>
 
-    <div class="docs-callout warning"><strong>Write policy:</strong> fader and pan are verified writable. Compressor and aux state remain read-only until their own isolated one-parameter scene clones prove safe generation.</div>
+    <div class="docs-callout warning"><strong>Write policy:</strong> fader, pan and compressor On/Off are verified writable. Compressor model/parameters and routing/Aux state remain read-only until separately isolated.</div>
   `
 });
