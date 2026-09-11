@@ -115,7 +115,9 @@ Inside `Compressor, Input Channel NN`:
 ```text
 state +1    = compressor model / engine family
 state +2    = 00 Off / 01 On
-state +8..9 = common threshold on Manual RMS + Opto, signed int16_be / 256 dB
+state +8..9 = common threshold on Manual RMS + Opto
+state +15   = Manual RMS ratio table/index
+state +51   = Bus model-specific threshold
 ```
 
 The model byte is decoded from controlled CH16 model scenes:
@@ -136,23 +138,35 @@ The model byte is decoded from controlled CH16 model scenes:
 
 `Ducker` and `Ducker Slow` both use model byte `05`; the Slow variant is represented by different parameter/default state rather than a separate model ID.
 
-The event-show ConsoleFlip preview matched the enable byte across all 108 visible input cards. Controlled CH16 clones then isolated On/Off directly with the clean `Comp 2 On` / `Comp 2 Off` pair.
+The event-show ConsoleFlip preview matched compressor enable across all 108 visible input cards. Controlled CH16 clones then isolated On/Off directly with the clean `Comp 2 On` / `Comp 2 Off` pair.
 
-A controlled **Manual RMS** (`0x01`) threshold series and an independent **Opto** (`0x02`) threshold series both isolate `state +8..9` as signed fixed-point `/256 dB`. Manual RMS covers `-46, -30, -20, -10, 0, +10, +18 dB`; Opto covers `-46, -20.3, 0, +10.5, +18 dB`. Every adjacent threshold pair changes only those two bytes outside scene-label bytes.
+A controlled **Manual RMS** (`0x01`) threshold series and an independent **Opto** (`0x02`) threshold series both isolate `state +8..9` as signed fixed-point `/256 dB`. The common threshold writer is enabled for those two models over the directly verified range **-46…+18 dB**.
 
-The threshold writer is therefore enabled for Manual RMS and Opto over the directly verified range **-46…+18 dB**.
-
-The **Bus** model (`0x09`) is different. Its controlled threshold scenes leave `state +8..9` fixed at `-6 dB` and instead change a single byte at `state +51`:
+The **Bus** model (`0x09`) uses a different user-facing threshold field. Controlled scenes leave `state +8..9` fixed and isolate one byte at `state +51`. After correcting the scene originally labelled `BUS 10` to the intended **BUS +9**, the anchors are exact:
 
 ```text
-BUS -15 -> 0
-BUS  -9 -> 24
-BUS   0 -> 60
-BUS +10 -> 96
-BUS +15 -> 120
+-15 dB -> 00
+ -9 dB -> 18
+  0 dB -> 3C
+ +9 dB -> 60
++15 dB -> 78
 ```
 
-This strongly suggests a model-specific coordinate close to `dB = raw/4 - 15`, but the scene labelled `+10` stores raw `96`, which maps to `+9 dB` under that otherwise exact transform. Bus threshold therefore remains decoded/read-only until that discrepancy is resolved.
+with `threshold_dB = raw / 4 - 15`. Bus threshold is therefore **Verified Write** over `-15…+15 dB`.
+
+Manual RMS ratio is isolated at `state +15`. The field is a discrete table/index, so the editor exposes only the directly tested choices:
+
+```text
+00 = 1:1
+10 = 2:1
+18 = 4:1
+24 = 12:1
+26 = 20:1
+27 = 40:1
+28 = Infinity:1
+```
+
+Every adjacent ratio scene changes only that one byte outside scene-label bytes. Untested intermediate ratio table values are preserved rather than guessed.
 
 ## Decoded / read-only
 
@@ -166,7 +180,7 @@ LPF bytes `state +1..+2` and `+5..+9` are preserved exactly. Real-event material
 
 ### Compressor model selection and remaining dynamics parameters
 
-Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Ratio, attack, release, knee, makeup and other remaining dynamics parameters are still unmapped for writing. Common threshold is writable on Manual RMS and Opto; Bus threshold uses a separate located/read-only coordinate.
+Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Ratio writes are currently restricted to the seven controlled Manual RMS choices; attack, release, knee, makeup and other remaining dynamics parameters are still unmapped for writing.
 
 ### Aux-send evidence
 
