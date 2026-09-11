@@ -5,13 +5,15 @@
 - Promoted input HPF frequency and On/Off to **Verified Write** using a second real event show and an independent ConsoleFlip preview.
 - Corrected the HPF five-byte state map to `03 FF FF MM BB`: frequency is bytes 1–2, byte 3 is unknown/preserved, and byte 4 is bypass (`00` On, `01` Off).
 - Verified HPF state and rounded frequency against all 108 input cards rendered by ConsoleFlip for the event show.
-- Added a generic read-only `Input Mixer` channel-state decoder.
-- Identified `Input Mixer` as a 12-byte header followed by 128 equal per-input blocks; observed block sizes are 169 and 224 bytes in two different real mixer configurations.
-- Decoded input fader at `blockSize - 84`: signed 16-bit big-endian `/256 dB`, with `0x8001` representing `-infinity`.
-- Decoded input pan at `blockSize - 82`: `0x00` hard L, `0x25` centre, `0x4A` hard R.
-- Decoded input compressor On/Off at compressor state byte `+2` (`00` Off, `01` On), matching all 108 ConsoleFlip event-show cards.
+- Identified `Input Mixer` as a 12-byte header followed by 128 equal per-input blocks; current-format block size is mixer-configuration dependent.
+- Promoted input fader to **Verified Write** using controlled CH16 clones at `-∞`, `-30`, `-20.3`, `-12.2`, `-5.9`, approximately `0`, `+5` and `+10 dB`.
+- Established the generic fader locator as `blockStart + blockSize - 84`; the same end-relative field survives 169-byte and 224-byte channel blocks.
+- Verified fader encoding as signed 16-bit big-endian `/256 dB`, with `0x8001` representing `-∞`.
+- Added guarded fader editing for the directly tested finite range `-30…+10 dB` plus `-∞`; only the two fader bytes are modified.
+- Decoded input pan at `blockSize - 82`: `0x00` hard L, `0x25` centre, `0x4A` hard R; remains read-only pending isolated pan clones.
+- Decoded input compressor On/Off at compressor state byte `+2` (`00` Off, `01` On), matching all 108 ConsoleFlip event-show cards; remains read-only pending isolated clones.
 - Located six mono Aux send level fields in the 169-byte event configuration; kept them read-only/configuration-specific until the variable bus-layout rule is solved.
-- Added a Channel State editor tab, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research JSON exports.
+- Added Channel State tooling, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research JSON exports.
 
 ## v2.1.2
 
