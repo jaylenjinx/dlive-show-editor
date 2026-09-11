@@ -89,3 +89,38 @@ function injectCompressorThresholdUi(){
 
 const renderChannelStateBeforeThreshold=renderChannelState;
 renderChannelState=function(){renderChannelStateBeforeThreshold();injectCompressorThresholdUi();};
+
+// Keep the interactive canonical registry in sync with the verified writer.
+if(typeof PARAMETER_MAP!=='undefined'&&!PARAMETER_MAP.some(x=>x.id==='input-comp-threshold')){
+  PARAMETER_MAP.push({
+    id:'input-comp-threshold',area:'Input compressor',record:'Compressor, Input Channel NN',payload:'current-format state length 127 bytes after label',
+    field:'Compressor threshold',offset:'state + 8..9',datatype:'int16 big-endian',
+    transform:'threshold_dB = raw / 256; canonical raw = round(dB × 256)',
+    confidence:'verified',write:true,
+    evidence:'Controlled CH16 clones: −46, −30, −20, −10, 0, +10, +18 dB. Every adjacent pair changes only state +8..9 outside scene-label bytes.',
+    notes:'Writer is deliberately guarded to compressor model byte 0x01, processor discriminator 0x08 and the verified 127-byte state shape. Verified range −46…+18 dB.'
+  });
+}
+
+// Extend the built-in Channel State documentation without duplicating the base page.
+if(typeof DOC_SECTIONS!=='undefined'){
+  const sec=DOC_SECTIONS.find(s=>s.id==='channel-state');
+  if(sec&&!sec.html.includes('Compressor threshold — verified write')){
+    sec.eyebrow='Fader + pan + compressor verified write';
+    sec.html+=`
+      <h2>Compressor threshold — verified write</h2>
+      <pre><code>state + 8..9 = int16_be
+threshold_dB = raw / 256</code></pre>
+      <table class="docs-table"><thead><tr><th>Scene</th><th>Raw</th><th>Decoded</th></tr></thead><tbody>
+        <tr><td>−46 dB</td><td><code>D2 00</code></td><td>−46.00 dB</td></tr>
+        <tr><td>−30 dB</td><td><code>E1 FD</code></td><td>≈ −30.01 dB</td></tr>
+        <tr><td>−20 dB</td><td><code>EB FD</code></td><td>≈ −20.01 dB</td></tr>
+        <tr><td>−10 dB</td><td><code>F5 FD</code></td><td>≈ −10.01 dB</td></tr>
+        <tr><td>0 dB</td><td><code>00 03</code></td><td>≈ +0.01 dB</td></tr>
+        <tr><td>+10 dB</td><td><code>0A 03</code></td><td>≈ +10.01 dB</td></tr>
+        <tr><td>+18 dB</td><td><code>12 00</code></td><td>+18.00 dB</td></tr>
+      </tbody></table>
+      <p>The tiny <code>FD</code>/<code>03</code> fractions show normal control quantisation around the labelled integer values; the encoding is the same signed <code>/256 dB</code> convention used elsewhere.</p>
+      <div class="docs-callout"><strong>Writer guard:</strong> threshold writing is enabled only for the controlled compressor model byte <code>01</code> in the verified current-format record. Other compressor models remain read-only until separately tested.</div>`;
+  }
+}
