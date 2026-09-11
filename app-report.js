@@ -73,7 +73,17 @@ function exportResearchReport(){
       timeWritable:x.timeWritableShape??false,
       makeupOffset:x.makeupOffset??null,makeupRaw:x.makeupRaw??null,makeupDb:x.makeupDb??null,
       kneeOffset:x.kneeOffset??null,kneeRaw:x.kneeRaw??null,kneeLabel:x.kneeLabel??null,kneeKnown:x.kneeKnown??false,
-      kneeGainWritable:x.kneeGainWritableShape??false
+      kneeGainWritable:x.kneeGainWritableShape??false,
+      sidechain:{
+        lowFrequencyOffset:x.scLoFreqOffset??null,lowFrequencyRaw:x.scLoFreqRaw??null,lowFrequencyHz:x.scLoFreqHz??null,lowFrequencyExact:x.scLoFreqExact??false,
+        lowTypeOffset:x.scLoTypeOffset??null,lowTypeRaw:x.scLoTypeRaw??null,lowTypeLabel:x.scLoTypeLabel??null,lowTypeKnown:x.scLoTypeKnown??false,
+        highFrequencyOffset:x.scHiFreqOffset??null,highFrequencyRaw:x.scHiFreqRaw??null,highFrequencyHz:x.scHiFreqHz??null,highFrequencyExact:x.scHiFreqExact??false,
+        highTypeOffset:x.scHiTypeOffset??null,highTypeRaw:x.scHiTypeRaw??null,highTypeLabel:x.scHiTypeLabel??null,highTypeKnown:x.scHiTypeKnown??false,
+        filterOffset:x.scFilterOffset??null,filterRaw:x.scFilterRaw??null,filterActive:x.scFilterActive??false,filterKnown:x.scFilterKnown??false,
+        middleOffset:x.scMiddleOffset??null,middleRaw:x.scMiddleRaw??null,middleActive:x.scMiddleActive??false,middleKnown:x.scMiddleKnown??false,
+        writable:x.scWritableShape??false,
+        source:'unmapped / not varied in controlled test'
+      }
     })),
     ahfx:c.stage?.ahfx.map(f=>({
       slot:f.slot,frameStart:f.frameStart,payloadLength:f.payloadLength,engineId:f.engineId,
