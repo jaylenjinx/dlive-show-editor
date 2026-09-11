@@ -1,6 +1,6 @@
 # Input Mixer channel state
 
-> Status: **decoded / read-only**. Validated across two different real dLive 2.12 mixer configurations and independently cross-checked against ConsoleFlip-rendered channel state.
+> Status: **verified write for input fader; decoded/read-only for pan and Aux evidence**. Validated across two different real dLive 2.12 mixer configurations and independently cross-checked against ConsoleFlip-rendered channel state.
 
 The labelled `Input Mixer` record contains a small header followed by 128 equal-size per-input blocks:
 
@@ -37,18 +37,6 @@ raw == -32767 (0x8001)  =>  -infinity
 otherwise                 =>  fader_dB = raw / 256
 ```
 
-Observed examples from the event show:
-
-| Raw | Decoded |
-|---|---:|
-| `00 00` | 0.00 dB |
-| `04 B6` | +4.7109 dB |
-| `EC 00` | -20.00 dB |
-| `E0 10` | -31.9375 dB |
-| `80 01` | -infinity |
-
-ConsoleFlip's server-rendered fader heights agree with these decoded values. In the event preview, finite faders also follow the visual mapping approximately `(dB + 80) / 90 × 100%`, while `-infinity` renders at 0%.
-
 The offset resolves to:
 
 ```text
@@ -56,7 +44,22 @@ The offset resolves to:
 224-byte block  -> block +140
 ```
 
-The editor displays this value but does not write it yet.
+A controlled CH16 experiment in the 224-byte Hardcore Start configuration changed only these two fader bytes:
+
+| Scene label | Raw | Decoded |
+|---|---:|---:|
+| `-inf` | `80 01` | -infinity |
+| `-30` | `E2 00` | -30.00 dB |
+| `-20.3` | `EB AD` | about -20.32 dB |
+| `-12.2` | `F3 BD` | about -12.26 dB |
+| `-5.9` | `FA 17` | about -5.91 dB |
+| `0` | `FF DF` | about -0.13 dB; physical fader did not land exactly at zero |
+| `5` | `05 00` | +5.00 dB |
+| `10` | `0A 00` | +10.00 dB |
+
+This controlled result independently confirms both the signed `/256 dB` transform and the generic end-relative locator. The event show's ConsoleFlip-rendered fader heights also agree with the decoded values.
+
+The editor now treats input fader as **Verified Write** and changes only these two bytes. The finite writer is conservatively constrained to the directly tested range `-30…+10 dB`, plus the `0x8001` -infinity sentinel.
 
 ## Input pan
 
@@ -81,6 +84,8 @@ The offset resolves to:
 169-byte block  -> block +87
 224-byte block  -> block +142
 ```
+
+Pan remains read-only pending isolated L/C/R scene clones.
 
 ## Event-show mono Aux send evidence
 
@@ -112,24 +117,16 @@ Each apparent mono-Aux entry occupies four bytes and looks like:
 
 **These send offsets are configuration-specific evidence only.** The 224-byte Hardcore Start blocks contain additional bus-related state before the stable end-relative fader/pan region. A general bus-layout rule must be solved before Aux send editing is enabled.
 
-## Write status
+## Next controlled experiment
 
-Fader and pan are independently decoded and cross-checked, but remain read-only because we have not yet produced isolated one-parameter scene clones. The next high-value controlled set is:
+The highest-value next set is input pan on one channel while leaving every other parameter untouched:
 
 ```text
-FADER -inf
-FADER -40
-FADER -20
-FADER -10
-FADER 0
-FADER +5
-FADER +10
-
-PAN L100
-PAN L50
+PAN 100L
+PAN 50L
 PAN C
-PAN R50
-PAN R100
+PAN 50R
+PAN 100R
 ```
 
-If only the mapped fields change, those values can be promoted to verified write.
+If only the mapped pan byte changes, pan can be promoted to verified write with the same end-relative structural guard as fader.
