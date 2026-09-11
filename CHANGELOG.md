@@ -24,9 +24,11 @@
 - Added canonical pan percentage writes over `-100…+100` using the 0…74 raw coordinate while preserving exact centre as `0x25`.
 - Promoted input compressor On/Off to **Verified Write** at compressor state byte `+2` (`00` Off, `01` On).
 - Used the event-show ConsoleFlip preview as an independent 108-channel cross-check, then confirmed the write boundary with controlled CH16 clones. The clean `Comp 2 On` / `Comp 2 Off` pair changes only state `+2` outside the scene label.
-- Added a strict compressor writer guard for the verified current-format shape (`stateLength=127`, processor discriminator `0x08`, existing enable `00/01`); compressor model and all dynamics parameters remain read-only.
+- Promoted compressor threshold to **Verified Write for the controlled compressor model `0x01`**. Controlled CH16 scenes at `−46, −30, −20, −10, 0, +10, +18 dB` isolate state `+8..+9` as signed `int16_be / 256 dB`.
+- Confirmed the threshold anchors `D2 00 = −46.00 dB`, `E1 FD ≈ −30.01 dB`, `EB FD ≈ −20.01 dB`, `F5 FD ≈ −10.01 dB`, `00 03 ≈ +0.01 dB`, `0A 03 ≈ +10.01 dB`, `12 00 = +18.00 dB`; every adjacent pair changes only those threshold bytes outside scene-label bytes.
+- Added a strict threshold writer guard for processor discriminator `0x08`, 127-byte compressor state, model byte `0x01`, and the directly observed range `−46…+18 dB`; other compressor models remain threshold read-only.
 - Located six mono Aux send level fields in the 169-byte event configuration; kept them read-only/configuration-specific until the variable bus-layout rule is solved.
-- Added Channel State tooling, LPF tooling/docs, expanded PEQ type/bypass tooling/docs, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research documentation.
+- Added Channel State tooling, LPF tooling/docs, expanded PEQ type/bypass tooling/docs, compressor-threshold tooling/docs, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research documentation.
 
 ## v2.1.2
 
