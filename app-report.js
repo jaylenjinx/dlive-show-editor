@@ -26,7 +26,8 @@ function exportResearchReport(){
     inputHpf:c.stage?parseInputHpfs(c.stage.datBytes).map(h=>({
       channel:h.channel,frameStart:h.frameStart,payloadLength:h.payloadLength,stateLength:h.stateLength,
       discriminator:h.discriminator,frequencyRaw:h.frequencyRaw,frequencyHz:h.frequencyHz,
-      modeRaw:h.modeRaw,bypassRaw:h.bypassRaw,active:h.active,bypassKnown:h.bypassKnown,
+      slopeRaw:h.slopeRaw,slopeLabel:h.slope?.label||null,
+      bypassRaw:h.bypassRaw,active:h.active,bypassKnown:h.bypassKnown,
       rawHex:hexRange(h.raw)
     })):[],
     inputMixer:mixerState?{
