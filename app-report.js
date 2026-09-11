@@ -22,7 +22,11 @@ function exportResearchReport(){
       bank:b.key,frameStart:b.frameStart,payloadLength:b.payloadLength,version:b.version,width:b.width,
       layers:b.layers.map(row=>row.map(x=>({type:x.type,index:x.index})))
     }))||[],
-    inputPeq:c.stage?.peqs.map(p=>({channel:p.channel,frameStart:p.frameStart,payloadLength:p.payloadLength,bands:p.bands.map(b=>({band:b.band,gainRaw:b.gainRaw,gainDb:b.gainDb,frequencyRaw:b.frequencyRaw,frequencyHz:b.frequencyHz,widthRaw:b.widthRaw,widthIndex:b.widthIndex,widthLabel:b.widthLabel,widthFraction:b.widthFraction,stateHex:hexRange(b.stateBytes)}))}))||[],
+    inputPeq:c.stage?.peqs.map(p=>({channel:p.channel,frameStart:p.frameStart,payloadLength:p.payloadLength,bands:p.bands.map(b=>({
+      band:b.band,gainRaw:b.gainRaw,gainDb:b.gainDb,frequencyRaw:b.frequencyRaw,frequencyHz:b.frequencyHz,
+      widthRaw:b.widthRaw,widthIndex:b.widthIndex,widthLabel:b.widthLabel,widthFraction:b.widthFraction,
+      typeRaw:b.typeRaw,typeLabel:b.typeLabel,stateHex:hexRange(b.stateBytes),remainingStateHex:hexRange(b.remainingStateBytes||b.stateBytes.slice(1))
+    }))}))||[],
     inputHpf:c.stage?parseInputHpfs(c.stage.datBytes).map(h=>({
       channel:h.channel,frameStart:h.frameStart,payloadLength:h.payloadLength,stateLength:h.stateLength,
       discriminator:h.discriminator,frequencyRaw:h.frequencyRaw,frequencyHz:h.frequencyHz,
