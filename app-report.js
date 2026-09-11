@@ -66,7 +66,10 @@ function exportResearchReport(){
       ratioKnown:x.ratioKnown??false,ratioWritable:x.ratioWritableShape??false,
       attackOffset:x.attackOffset??null,attackRaw:x.attackRaw??null,attackMs:x.attackMs??null,attackExact:x.attackExact??false,
       releaseOffset:x.releaseOffset??null,releaseRaw:x.releaseRaw??null,releaseMs:x.releaseMs??null,releaseExact:x.releaseExact??false,
-      timeWritable:x.timeWritableShape??false
+      timeWritable:x.timeWritableShape??false,
+      makeupOffset:x.makeupOffset??null,makeupRaw:x.makeupRaw??null,makeupDb:x.makeupDb??null,
+      kneeOffset:x.kneeOffset??null,kneeRaw:x.kneeRaw??null,kneeLabel:x.kneeLabel??null,kneeKnown:x.kneeKnown??false,
+      kneeGainWritable:x.kneeGainWritableShape??false
     })),
     ahfx:c.stage?.ahfx.map(f=>({
       slot:f.slot,frameStart:f.frameStart,payloadLength:f.payloadLength,engineId:f.engineId,
