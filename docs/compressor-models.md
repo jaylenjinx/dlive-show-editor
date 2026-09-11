@@ -185,3 +185,38 @@ Knee is one byte at `state +18`:
 Two independent duplicate pairs (`normal knee` / `soft knee` and `normal knee 2` / `soft knee 2`) reproduce exactly. Each Normal→Soft transition changes only `state +18` outside the scene label; the duplicate Normal scenes are byte-identical to one another, and the duplicate Soft scenes are byte-identical to one another.
 
 The editor exposes only these two directly verified choices and keeps the writer guarded to Manual RMS (`0x01`).
+
+## Manual RMS parallel compression — verified write
+
+Controlled Manual RMS scenes isolate a compact parallel block immediately before the common threshold field:
+
+```text
+state +3..4 = Parallel Wet level
+state +5..6 = Parallel Dry level
+state +7    = Parallel On/Off
+state +8..9 = common threshold
+```
+
+Wet and Dry use the same signed fixed-point dB encoding used elsewhere:
+
+```text
+0x8001 = -infinity
+otherwise dB = int16_be(raw) / 256
+```
+
+The controlled Wet and Dry series both cover the same anchors:
+
+| Level | Raw |
+|---:|---:|
+| `-∞` | `80 01` |
+| `-40 dB` | `D7 FD` |
+| `-20 dB` | `EB FD` |
+| `-10 dB` | `F5 FD` |
+| `-5 dB` | `FA FD` |
+| `0 dB` | `00 00` |
+
+Every adjacent Wet scene changes only `state +3..4`; every adjacent Dry scene changes only `state +5..6` outside scene-label bytes.
+
+Parallel enable is one byte at `state +7`: `00=Off`, `01=On`. Two duplicate On/Off pairs independently toggle only that byte.
+
+The editor therefore enables Manual RMS Parallel Wet/Dry writes over the directly tested finite range `-40…0 dB` plus the explicit `0x8001` `-∞` sentinel, and enables Parallel On/Off at `state +7`.
