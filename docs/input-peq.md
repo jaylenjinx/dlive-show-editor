@@ -1,15 +1,16 @@
 # Input PEQ
 
-**Status:** gain and frequency verified writable; Bell Width decoded with conservative canonical writer; state/filter-type bytes read-only.
+**Status:** gain and frequency verified writable; Bell Width decoded with conservative canonical writer; Band 1 and Band 4 filter type verified writable; final two state bytes remain read-only.
 
 Each input PEQ contains four 9-byte band records:
 
 ```text
-GG GG  FF FF  WW WW  SS SS SS
-│      │      │      └─ state/filter-type bytes
-│      │      └──────── Bell Width
-│      └─────────────── frequency
-└────────────────────── gain
+GG GG  FF FF  WW WW  TT  SS SS
+│      │      │      │   └─ remaining state bytes
+│      │      │      └──── filter type
+│      │      └─────────── Bell Width
+│      └────────────────── frequency
+└───────────────────────── gain
 ```
 
 ## Gain
@@ -52,6 +53,49 @@ Examples:
 
 The high byte maps to Allen & Heath's Bell Width index. The low byte carries additional internal precision. Untouched values are preserved exactly. When a user deliberately selects a new width, the current editor writes the canonical index in the high byte and `00` in the fractional byte.
 
-## Still unresolved
+## Filter type byte
 
-The final three bytes remain unmapped. Controlled Bell / shelf / HPF / LPF and PEQ In / Out scenes are the next useful experiment.
+A later controlled CH16 scene set isolates band offset `+6` as the filter-type enum.
+
+### Band 1
+
+| Scene | Raw type byte |
+|---|---:|
+| `EQ Band 1 HPF` | `04` |
+| `EQ Band 1 PEQ` | `00` |
+| `EQ Band 1 Lo-Shelf` | `01` |
+
+`HPF → PEQ` and `PEQ → Low Shelf` each change exactly this one PEQ byte outside the scene label.
+
+### Band 4
+
+| Scene | Raw type byte |
+|---|---:|
+| `EQ Band 4 LPF` | `03` |
+| `EQ Band 4 PEQ` | `00` |
+| `EQ Band 4 Hi-Shelf` | `02` |
+
+`LPF → PEQ` and `PEQ → High Shelf` each change exactly this one PEQ byte outside the scene label.
+
+The observed enum is therefore:
+
+```text
+00 = PEQ / Bell
+01 = Low Shelf
+02 = High Shelf
+03 = LPF
+04 = HPF
+```
+
+The editor deliberately limits choices by band to the combinations directly proven by the console UI and controlled scenes:
+
+```text
+Band 1: HPF / PEQ-Bell / Low Shelf
+Band 4: LPF / PEQ-Bell / High Shelf
+```
+
+No type writer is enabled for Bands 2 and 3.
+
+## Remaining state bytes
+
+Band offsets `+7..8` remain unresolved. They stayed unchanged across gain, frequency, Bell Width and edge-band filter-type experiments and are preserved exactly by the editor.
