@@ -2,13 +2,17 @@
 
 ## v2.2
 
+- Promoted Manual RMS sidechain **BPF frequency** at compressor state `+125..126` to restricted **Verified Write**. Controlled anchors `50 Hz=4197`, `100=5396`, `200=6596`, `500=7D62`, `1 kHz=8F62`, `2 kHz=A162`, `5 kHz=B92D`, `10 kHz=CB2D`, `12 kHz=CFEA` each isolate only these two bytes outside scene-label bytes.
+- Located compressor sidechain **Source** in the separate record `Compressor side chain source, Input Channel NN` with 3-byte state `01 TT II`, where `TT` is source type and `II` is zero-based source index.
+- Proved CH16 source mappings `Input 1=01 01 00`, `Input 16=01 01 0F`, `Mono Group 1=01 02 00`, `Stereo Group 1=01 03 00`, `Mono Aux 1=01 04 00`, `Stereo Aux 1=01 05 00`, `Main=01 08 00`, `Mono Matrix 1=01 0A 00`, `Stereo Matrix 1=01 0B 00`.
+- Confirmed `SC Self` on CH16 serialises identically to `SC Input 16` (`01 01 0F`), showing the archive stores the resolved concrete source rather than a distinct Self flag. Source writing is deliberately restricted to the exact tested type/index pairs.
 - Promoted Manual RMS compressor **sidechain Filter In/Out** at `state +123` to **Verified Write**. Two independent controlled `Filter on/off` pairs toggle only this byte, proving `00=In`, `01=Out/bypassed`.
 - Promoted Manual RMS sidechain **low-filter type** at `state +111` to **Verified Write**: `04=Lo-Cut`, `06=Low Shelf`. The controlled type pair changes only this byte.
 - Promoted Manual RMS sidechain **high-filter type** at `state +120` to **Verified Write**: `03=Hi-Cut`, `07=High Shelf`. The controlled type pair changes only this byte.
 - Isolated Manual RMS sidechain **low-filter frequency** at `state +107..108` with exact controlled anchors `20 Hz=29CB`, `100=5396`, `500=7D62`, `2 kHz=A162`, `5 kHz=B92E`; every adjacent scene changes only these two bytes.
 - Isolated Manual RMS sidechain **high-filter frequency** at `state +116..117` with exact anchors `120 Hz=5853`, `200=6596`, `500=7D62`, `1 kHz=8F62`, `5 kHz=B92D`, `10 kHz=CB2D`, `20 kHz=DD2E`; every adjacent scene changes only these two bytes.
 - Isolated the operator-labelled **notch / A&H BPF** switch at `state +124`: `00=Off`, `01=On`. The scene pair changes only this byte. The editor uses the conservative label `BPF / notch` because Allen & Heath documentation describes a BPF option while the controlled scene names call it notch.
-- Added guarded sidechain editing for Manual RMS. Frequency writes expose only exact controlled anchors because some round-number console labels land one code either side of a simple logarithmic floor/round rule. Sidechain **Source was not varied and remains unmapped/untouched**.
+- Added guarded sidechain editing for Manual RMS. Frequency writes expose only exact controlled anchors because some round-number console labels land one code either side of a simple logarithmic floor/round rule.
 - Renamed the working controlled archive to `ReverseEngineer.tar.gz` for ongoing reverse-engineering tests.
 - Promoted input HPF frequency and On/Off to **Verified Write** using a second real event show and an independent ConsoleFlip preview.
 - Resolved the HPF five-byte state map as `03 FF FF SS BB`: frequency is bytes 1–2, byte 3 is slope/filter type, and byte 4 is bypass (`00` On, `01` Off).
@@ -49,9 +53,9 @@
 - Decoded compressor model/engine byte `state +1` from controlled CH16 scenes: `00 Manual Peak`, `01 Manual RMS`, `02 Opto`, `03 16T`, `04 16VU`, `05 Ducker family`, `06 Peak Limiter 76`, `07 Mighty`, `08 Optronik`, `09 Bus`, `0A Compstortion`.
 - Confirmed `Ducker` and `Ducker Slow` both use model byte `0x05`; the Slow variant changes parameter/default bytes at `+10..13` and `+25..26` rather than using a separate model ID.
 - Kept compressor model selection read-only because console model changes also rewrite model-specific state; writing only `state +1` would create a hybrid compressor state.
-- Fixed the live site loader so compressor threshold/model/ratio/attack/release/knee/makeup/parallel/sidechain extension modules are loaded by `index.html`.
+- Fixed the live site loader so compressor threshold/model/ratio/attack/release/knee/makeup/parallel/sidechain/source extension modules are loaded by `index.html`.
 - Located six mono Aux send level fields in the 169-byte event configuration; kept them read-only/configuration-specific until the variable bus-layout rule is solved.
-- Added Channel State tooling, LPF tooling/docs, expanded PEQ type/bypass tooling/docs, compressor threshold/model/parallel/sidechain/ratio/time/knee/makeup tooling/docs, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research documentation.
+- Added Channel State tooling, LPF tooling/docs, expanded PEQ type/bypass tooling/docs, compressor threshold/model/parallel/sidechain/source/ratio/time/knee/makeup tooling/docs, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research documentation.
 
 ## v2.1.2
 
@@ -78,7 +82,6 @@
 - Added Bell Width decoding using the official A&H width-index table and canonical width writes.
 - Preserves unknown PEQ type/state bytes and untouched fractional width precision.
 - Added PEQ data to reverse-engineering JSON export.
-- Added controlled frequency/width research notes.
 
 ## v2
 
