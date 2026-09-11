@@ -14,7 +14,9 @@
 - Promoted input pan to **Verified Write** using controlled CH16 clones: `100L=00`, `50L=13`, near-centre clone=`24`, `50R=37`, `100R=4A`; original Scene 10 exact centre is `25`.
 - Established the generic pan locator as `blockStart + blockSize - 82`; controlled pan scenes changed only this one byte.
 - Added canonical pan percentage writes over `-100…+100` using the 0…74 raw coordinate while preserving exact centre as `0x25`.
-- Decoded input compressor On/Off at compressor state byte `+2` (`00` Off, `01` On), matching all 108 ConsoleFlip event-show cards; remains read-only pending isolated clones.
+- Promoted input compressor On/Off to **Verified Write** at compressor state byte `+2` (`00` Off, `01` On).
+- Used the event-show ConsoleFlip preview as an independent 108-channel cross-check, then confirmed the write boundary with controlled CH16 clones. The clean `Comp 2 On` / `Comp 2 Off` pair changes only state `+2` outside the scene label.
+- Added a strict compressor writer guard for the verified current-format shape (`stateLength=127`, processor discriminator `0x08`, existing enable `00/01`); compressor model and all dynamics parameters remain read-only.
 - Located six mono Aux send level fields in the 169-byte event configuration; kept them read-only/configuration-specific until the variable bus-layout rule is solved.
 - Added Channel State tooling, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research JSON exports.
 
