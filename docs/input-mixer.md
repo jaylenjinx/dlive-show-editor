@@ -1,6 +1,6 @@
 # Input Mixer channel state
 
-> Status: **verified write for input fader and pan; decoded/read-only for compressor and Aux evidence**. Validated across multiple real dLive 2.12 mixer configurations and independently cross-checked against ConsoleFlip-rendered channel state.
+> Status: **verified write for input fader, pan and compressor On/Off; decoded/read-only for Aux evidence and remaining compressor parameters**. Validated across multiple real dLive 2.12 mixer configurations and independently cross-checked against ConsoleFlip-rendered channel state.
 
 The labelled `Input Mixer` record contains a small header followed by 128 equal-size per-input blocks:
 
@@ -92,16 +92,35 @@ with input constrained to `-100…+100`, where negative is Left and positive is 
 
 Only the single pan byte is modified.
 
-## Input compressor enable — read only
+## Input compressor enable — verified write
 
-Inside `Compressor, Input Channel NN`:
+Inside `Compressor, Input Channel NN`, the On/Off state is:
 
 ```text
 state +2 = 00  -> Off
 state +2 = 01  -> On
 ```
 
-This matched all 108 visible ConsoleFlip channel cards in the event-show preview. Other compressor parameters remain under investigation.
+The real event-show ConsoleFlip preview first matched this byte on all 108 visible input cards. A later controlled CH16 show then provided two On/Off pairs:
+
+```text
+Comp On
+Comp Off
+Comp 2 On
+Comp 2 Off
+```
+
+The second pair is the decisive clean isolation: between `Comp 2 On` and `Comp 2 Off`, the only non-scene-label byte that changes in the complete StageBox scene is compressor state byte `+2`, toggling `01` to `00`.
+
+The current writer is deliberately guarded to the verified dLive 2.12 input-compressor shape:
+
+```text
+state length after label = 127 bytes
+state +0                = 0x08 processor discriminator
+state +2                = 0x00 or 0x01 before writing
+```
+
+Only state byte `+2` is changed. The compressor model byte at `+1` and every threshold/ratio/attack/release/knee/etc. parameter remain untouched and read-only.
 
 ## Event-show mono Aux send evidence
 
