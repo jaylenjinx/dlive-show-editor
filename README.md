@@ -27,8 +27,10 @@ For all 128 input channels:
 - Gain: signed `int16_be`, `dB = raw / 256`
 - Frequency: `raw = floor(4608 * log2(Hz / 4))`
 - Bell Width: A&H width index in the high byte; untouched fractional low-byte precision is preserved
+- Band 1 filter type at band byte `+6`: `04 HPF`, `00 PEQ/Bell`, `01 Low Shelf`
+- Band 4 filter type at band byte `+6`: `03 LPF`, `00 PEQ/Bell`, `02 High Shelf`
 
-The final three PEQ state/type bytes remain read-only.
+Controlled CH16 type scenes changed only the single `+6` type byte outside the scene label. The editor deliberately exposes only the combinations proven for each edge band. The final two PEQ state bytes (`+7..8`) remain read-only and are preserved exactly.
 
 ### Input HPF — v2.2
 
@@ -118,6 +120,10 @@ The editor writes only that enable byte, and only when the record matches the ve
 
 ## Decoded / read-only
 
+### PEQ remaining state
+
+PEQ band bytes `+7..8` remain unknown and are preserved exactly. Bands 2 and 3 filter type remain untouched because no alternate type scenes have been independently proven for those bands.
+
 ### LPF filter shape/state
 
 LPF bytes `state +1..+2` and `+5..+9` are preserved exactly. Real-event material shows legitimate variation in this region, so slope/Q/type semantics are not guessed.
@@ -143,6 +149,7 @@ The editor parses RackUltra record framing, engine IDs, preset labels and same-e
 The site has a built-in **Docs** section available without loading a show.
 
 - [Canonical parameter map](docs/parameter-map.md)
+- [Input PEQ](docs/input-peq.md)
 - [Input HPF](docs/input-hpf.md)
 - [Input LPF](docs/input-lpf.md)
 - [Input Mixer / channel state](docs/input-mixer.md)
@@ -150,7 +157,7 @@ The site has a built-in **Docs** section available without loading a show.
 - [Documentation index](docs/README.md)
 - [Consolidated field notes](KNOWN_FORMAT.md)
 
-The interactive parameter map is driven by `app-parameter-map.js`, focused add-on registries and the LPF module.
+The interactive parameter map is driven by `app-parameter-map.js` plus focused add-on registries for PEQ type, HPF and channel state.
 
 ## Safety model
 
