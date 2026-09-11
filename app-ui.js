@@ -64,16 +64,16 @@ window.addEventListener('hashchange',()=>{
   tab.onclick=()=>activateEditorTab(tab);
 
   const panel=document.createElement('div');panel.id='tabConsole';panel.className='tab-panel';
-  panel.innerHTML='<div class="notice safe"><strong>Visual editor:</strong> console-style Preamp, Gate, PEQ, Compressor, Delay and Routing views backed by controlled-diff verified byte writers. Configuration-specific or unverified controls remain disabled.</div><div id="consoleEditor"></div>';
+  panel.innerHTML='<div class="notice safe"><strong>Visual editor:</strong> console-style Preamp, Gate, PEQ, Compressor, Delay and Routing views backed by controlled-diff verified byte writers. Gate sidechain and model-specific compressor controls are enabled only where independently mapped; unsupported controls remain disabled.</div><div id="consoleEditor"></div>';
   const namesPanel=$('#tabNames');
   if(namesPanel)namesPanel.insertAdjacentElement('afterend',panel);else $('#editor')?.appendChild(panel);
 
-  for(const href of ['console-ui.css','console-ui-input.css'])if(!document.querySelector(`link[href="${href}"]`)){
+  for(const href of ['console-ui.css','console-ui-input.css','console-ui-batch3.css'])if(!document.querySelector(`link[href="${href}"]`)){
     const css=document.createElement('link');css.rel='stylesheet';css.href=href;document.head.appendChild(css);
   }
-  const consoleScripts=['app-input-processing.js','app-parameter-map-input-processing.js','app-console-ui-peq.js','app-console-ui-compressor.js','app-console-ui-input.js','app-console-ui-main.js'];
+  const consoleScripts=['app-input-processing.js','app-gate-sidechain.js','app-compressor-extra-models.js','app-rackultra-verified.js','app-parameter-map-input-processing.js','app-console-ui-peq.js','app-console-ui-compressor.js','app-console-ui-input.js','app-console-ui-reverse-batch3.js','app-console-ui-main.js'];
   const loadConsoleScript=index=>{
-    if(index>=consoleScripts.length){if(state.current?.stage&&typeof renderConsoleEditor==='function')renderConsoleEditor();return;}
+    if(index>=consoleScripts.length){if(state.current?.stage&&typeof renderConsoleEditor==='function')renderConsoleEditor();if(state.current?.stage&&typeof renderFx==='function')renderFx();return;}
     const src=consoleScripts[index];
     if(document.querySelector(`script[src="${src}"]`)){loadConsoleScript(index+1);return;}
     const script=document.createElement('script');script.src=src;script.async=false;
