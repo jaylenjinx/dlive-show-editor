@@ -113,11 +113,15 @@ The editor uses the canonical raw coordinate `0…74` with `37` as centre and wr
 Inside `Compressor, Input Channel NN`:
 
 ```text
-state +1    = compressor model / engine family
-state +2    = 00 Off / 01 On
-state +8..9 = common threshold on Manual RMS + Opto
-state +15   = Manual RMS ratio table/index
-state +51   = Bus model-specific threshold
+state +1      = compressor model / engine family
+state +2      = 00 Off / 01 On
+state +8..9   = common threshold on Manual RMS + Opto
+state +10..11 = Manual RMS attack
+state +12..13 = Manual RMS release
+state +15     = Manual RMS ratio table/index
+state +16..17 = Manual RMS makeup gain
+state +18     = Manual RMS knee
+state +51     = Bus model-specific threshold
 ```
 
 The model byte is decoded from controlled CH16 model scenes:
@@ -142,31 +146,15 @@ The event-show ConsoleFlip preview matched compressor enable across all 108 visi
 
 A controlled **Manual RMS** (`0x01`) threshold series and an independent **Opto** (`0x02`) threshold series both isolate `state +8..9` as signed fixed-point `/256 dB`. The common threshold writer is enabled for those two models over the directly verified range **-46…+18 dB**.
 
-The **Bus** model (`0x09`) uses a different user-facing threshold field. Controlled scenes leave `state +8..9` fixed and isolate one byte at `state +51`. After correcting the scene originally labelled `BUS 10` to the intended **BUS +9**, the anchors are exact:
+The **Bus** model (`0x09`) uses a different user-facing threshold field at `state +51`. Corrected controlled anchors are `-15→00`, `-9→18`, `0→3C`, `+9→60`, `+15→78`, giving `threshold_dB = raw/4 - 15`. Bus threshold is **Verified Write** over `-15…+15 dB`.
 
-```text
--15 dB -> 00
- -9 dB -> 18
-  0 dB -> 3C
- +9 dB -> 60
-+15 dB -> 78
-```
+Manual RMS ratio is isolated at `state +15`. The editor exposes only the directly tested table entries: `00=1:1`, `10=2:1`, `18=4:1`, `24=12:1`, `26=20:1`, `27=40:1`, `28=Infinity:1`.
 
-with `threshold_dB = raw / 4 - 15`. Bus threshold is therefore **Verified Write** over `-15…+15 dB`.
+Manual RMS attack and release use adjacent unsigned 16-bit big-endian fields at `+10..11` and `+12..13`. Both share the same logarithmic time coordinate; for example `50 ms=6D 5C`, `100 ms=74 5E`, `200 ms=7B 5F` on both controls. The editor writes only exact controlled anchors: attack from `30 µs` through `300 ms`, release from `50 ms` through `2 s`.
 
-Manual RMS ratio is isolated at `state +15`. The field is a discrete table/index, so the editor exposes only the directly tested choices:
+Manual RMS makeup gain is isolated at `state +16..17` and uses signed `/256 dB`. Controlled anchors are `0 dB=00 00`, `+6 dB=06 03`, `+12 dB=0C 03`, `+18 dB=12 00`; writes are enabled over the tested `0…+18 dB` range.
 
-```text
-00 = 1:1
-10 = 2:1
-18 = 4:1
-24 = 12:1
-26 = 20:1
-27 = 40:1
-28 = Infinity:1
-```
-
-Every adjacent ratio scene changes only that one byte outside scene-label bytes. Untested intermediate ratio table values are preserved rather than guessed.
+Manual RMS knee is a one-byte enum at `state +18`: `00=Normal`, `01=Soft`. Two duplicate Normal/Soft pairs reproduce exactly and change only this byte.
 
 ## Decoded / read-only
 
@@ -180,7 +168,7 @@ LPF bytes `state +1..+2` and `+5..+9` are preserved exactly. Real-event material
 
 ### Compressor model selection and remaining dynamics parameters
 
-Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Ratio writes are currently restricted to the seven controlled Manual RMS choices; attack, release, knee, makeup and other remaining dynamics parameters are still unmapped for writing.
+Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Manual RMS ratio/attack/release/knee/makeup writes are restricted to controlled values/ranges; other model-specific dynamics parameters remain read-only until independently isolated.
 
 ### Aux-send evidence
 
