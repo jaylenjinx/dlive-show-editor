@@ -30,6 +30,13 @@ function exportResearchReport(){
       bypassRaw:h.bypassRaw,active:h.active,bypassKnown:h.bypassKnown,
       rawHex:hexRange(h.raw)
     })):[],
+    inputLpf:c.stage&&typeof parseInputLpfs==='function'?parseInputLpfs(c.stage.datBytes).map(l=>({
+      channel:l.channel,frameStart:l.frameStart,payloadLength:l.payloadLength,stateLength:l.stateLength,
+      discriminator:l.discriminator,frequencyRaw:l.frequencyRaw,frequencyHz:l.frequencyHz,
+      bypassRaw:l.bypassRaw,active:l.active,bypassKnown:l.bypassKnown,
+      preservedAHex:hexRange(l.preservedA),preservedShapeHex:hexRange(l.preservedShape),
+      rawHex:hexRange(l.raw)
+    })):[],
     inputMixer:mixerState?{
       frameStart:mixerState.frameStart,payloadLength:mixerState.payloadLength,stateLength:mixerState.stateLength,
       headerHex:hexRange(mixerState.header),blockSize:mixerState.blockSize,
