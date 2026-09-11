@@ -55,6 +55,21 @@ HPF frequency uses the same logarithmic coordinate as PEQ and is writable from *
 
 ConsoleFlip independently rendered 108 input cards from the real event show; all 108 matched the native bypass state and rounded decoded frequency.
 
+### Input LPF — v2.2
+
+`Lowpass Filter Input Channel NN` uses an 11-byte state in the current reference:
+
+```text
+04 00 00 FF FF SS SS SS SS SS BB
+│        └─┬─┘                └─ bypass: 00 On, 01 Off
+│          └──────────────────── frequency
+└─────────────────────────────── LPF discriminator/type
+```
+
+Controlled CH16 clones at Off, 20 kHz, 10 kHz, 5 kHz, 1 kHz, 500 Hz, 200 Hz, 50 Hz and 20 Hz isolate the frequency field at `state +3..+4` and bypass at `state +10`. Frequency uses the same high-resolution logarithmic coordinate as PEQ/HPF; the observed 20 kHz endpoint is `0xDD2E` and is reproduced explicitly by the writer.
+
+The editor writes only frequency and bypass. The remaining state bytes are preserved because real-event material shows legitimate filter-shape/state variation there.
+
 ### Input fader — v2.2
 
 `Input Mixer` contains a 12-byte header followed by 128 equal-size input blocks. The block size changes with mixer configuration, but the fader remains fixed relative to the end of each block:
@@ -103,6 +118,10 @@ The editor writes only that enable byte, and only when the record matches the ve
 
 ## Decoded / read-only
 
+### LPF filter shape/state
+
+LPF bytes `state +1..+2` and `+5..+9` are preserved exactly. Real-event material shows legitimate variation in this region, so slope/Q/type semantics are not guessed.
+
 ### Compressor model and dynamics parameters
 
 The compressor model/type byte and threshold, ratio, attack, release, knee and other dynamics parameters are not yet mapped for writing.
@@ -125,12 +144,13 @@ The site has a built-in **Docs** section available without loading a show.
 
 - [Canonical parameter map](docs/parameter-map.md)
 - [Input HPF](docs/input-hpf.md)
+- [Input LPF](docs/input-lpf.md)
 - [Input Mixer / channel state](docs/input-mixer.md)
 - [Event show / ConsoleFlip cross-check](docs/event-show-consoleflip-crosscheck.md)
 - [Documentation index](docs/README.md)
 - [Consolidated field notes](KNOWN_FORMAT.md)
 
-The interactive parameter map is driven by `app-parameter-map.js` and focused add-on registries.
+The interactive parameter map is driven by `app-parameter-map.js`, focused add-on registries and the LPF module.
 
 ## Safety model
 
