@@ -27,9 +27,16 @@ PARAMETER_MAP.push(
     notes:'Only the three proven Band 4 choices are offered.'
   },
   {
+    id:'peq-bypass',area:'Input PEQ',record:'Parametric EQ, Input Channel NN',payload:'4 × 9-byte bands + one trailing byte',
+    field:'PEQ In/Out',offset:'single trailing byte after Band 4',datatype:'uint8',
+    transform:'0x00 In / active; 0x01 Out / bypassed',confidence:'verified',write:true,
+    evidence:'Controlled CH16 scenes 79–82. Both In/Out pairs toggle only this one post-header byte in the complete 412047-byte StageBox scene; duplicate pair reproduces 00↔01 exactly.',
+    notes:'Writer requires a one-byte tail already containing 00 or 01 and modifies only that byte.'
+  },
+  {
     id:'peq-state-remaining',area:'Input PEQ',record:'Parametric EQ, Input Channel NN',payload:'Each 9-byte band',
     field:'Remaining band state bytes',offset:'band + 7..8',datatype:'2 raw bytes',transform:'unknown',
-    confidence:'unknown',write:false,evidence:'Stable across gain, frequency, width and edge-band type experiments',
+    confidence:'unknown',write:false,evidence:'Stable across gain, frequency, width, edge-band type and PEQ In/Out experiments',
     notes:'Preserved exactly by every PEQ writer.'
   }
 );
