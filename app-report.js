@@ -56,7 +56,8 @@ function exportResearchReport(){
     }:null,
     inputCompressorState:compressorStates.map(x=>({
       channel:x.channel,frameStart:x.frameStart,payloadLength:x.payloadLength,stateLength:x.stateLength,
-      typeRaw:x.typeRaw,modelRaw:x.modelRaw,enableRaw:x.enableRaw,active:x.active,enableKnown:x.enableKnown,
+      typeRaw:x.typeRaw,modelRaw:x.modelRaw,modelLabel:x.modelLabel||null,
+      enableRaw:x.enableRaw,active:x.active,enableKnown:x.enableKnown,
       thresholdOffset:x.thresholdOffset??null,thresholdRaw:x.thresholdRaw??null,thresholdDb:x.thresholdDb??null,
       thresholdWritable:x.thresholdWritableShape??false
     })),
