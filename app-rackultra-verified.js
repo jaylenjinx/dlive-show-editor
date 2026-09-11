@@ -62,3 +62,23 @@ if(typeof PARAMETER_MAP!=='undefined'){
   ];
   for(const row of rows)if(!PARAMETER_MAP.some(x=>x.id===row.id))PARAMETER_MAP.push(row);
 }
+
+// Keep the existing RackUltra inspector and in-app docs aligned with the first
+// verified DSP writes without replacing the general read-only/raw inspector.
+const rackUltraNotice=$('#tabFx .notice');
+if(rackUltraNotice){
+  rackUltraNotice.className='notice safe';
+  rackUltraNotice.innerHTML='<strong>Partial verified write:</strong> RackUltra records remain generally decoded/read-only, but engine <code>1c03</code> (480 Large / Spaces) now has guarded Pre Delay and exact-anchor Decay Time writers. Other AHFX DSP bytes are preserved.';
+}
+if(typeof DOC_SECTIONS!=='undefined'){
+  const sec=DOC_SECTIONS.find(s=>s.id==='rackultra');
+  if(sec&&!sec.html.includes('480 Large verified writes')){
+    sec.eyebrow='Partial verified write';
+    sec.html+=`<h2>480 Large verified writes</h2><p>Controlled UFX1 scenes on engine <code>1c03</code> isolate two DSP fields in the 262-byte <code>AHFX Manager NN</code> payload.</p><pre><code>Pre Delay = state +30..31 = payload +46..47
+raw = 0x8000 + 16 × delay_ms
+0 ms = 80 00, 85 ms = 85 50, 170 ms = 8A A0
+
+Decay Time = state +58..59 = payload +74..75
+0.10 s = 74 5E, ~2.45 s = 94 B2, ~60 s = B5 07</code></pre><div class="docs-callout"><strong>Writer guards:</strong> Pre Delay is enabled only for engine <code>1c03</code> with the observed 262-byte payload and range 0–170 ms. Decay writes only the three exact controlled words. Every other AHFX DSP field remains read-only.</div>`;
+  }
+}
