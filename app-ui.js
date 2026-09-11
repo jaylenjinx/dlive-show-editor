@@ -71,9 +71,15 @@ window.addEventListener('hashchange',()=>{
   if(!document.querySelector('link[href="console-ui.css"]')){
     const css=document.createElement('link');css.rel='stylesheet';css.href='console-ui.css';document.head.appendChild(css);
   }
-  if(!document.querySelector('script[src="app-console-ui.js"]')){
-    const script=document.createElement('script');script.src='app-console-ui.js';script.async=false;
-    script.onload=()=>{if(state.current?.stage&&typeof renderConsoleEditor==='function')renderConsoleEditor();};
+  const consoleScripts=['app-console-ui-peq.js','app-console-ui-compressor.js','app-console-ui-main.js'];
+  const loadConsoleScript=index=>{
+    if(index>=consoleScripts.length){if(state.current?.stage&&typeof renderConsoleEditor==='function')renderConsoleEditor();return;}
+    const src=consoleScripts[index];
+    if(document.querySelector(`script[src="${src}"]`)){loadConsoleScript(index+1);return;}
+    const script=document.createElement('script');script.src=src;script.async=false;
+    script.onload=()=>loadConsoleScript(index+1);
+    script.onerror=()=>toast(`Failed to load ${src}.`,true);
     document.body.appendChild(script);
-  }
+  };
+  loadConsoleScript(0);
 })();
