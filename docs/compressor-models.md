@@ -115,8 +115,6 @@ Both controls use the **same logarithmic time coordinate**. Identical time value
 | `100 ms` | `74 5E` |
 | `200 ms` | `7B 5F` |
 
-That shared coordinate is strong independent structural evidence that these are time values rather than unrelated model-state words.
-
 ### Attack controlled anchors
 
 | Attack | Raw |
@@ -155,3 +153,35 @@ time_ms ≈ 10^((raw - 17874) / 5958)
 ```
 
 Because the console's displayed times are rounded, the editor does **not** use that approximation for writes. It exposes only the exact controlled anchors above. Attack/release writes remain guarded to Manual RMS (`0x01`) until other models are independently tested.
+
+## Manual RMS makeup gain — verified write
+
+Controlled Manual RMS scenes isolate makeup gain to the two bytes at `state +16..17`:
+
+| Scene | Raw | Decoded |
+|---|---:|---:|
+| `0db makeup` | `00 00` | 0.00 dB |
+| `6db makeup` | `06 03` | ≈ +6.01 dB |
+| `12db makeup` | `0C 03` | ≈ +12.01 dB |
+| `18db makeup` | `12 00` | +18.00 dB |
+
+The encoding is the familiar signed fixed-point dB format:
+
+```text
+makeup_dB = int16_be(raw) / 256
+```
+
+Every adjacent makeup scene changes only `state +16..17` outside the scene label. The editor therefore enables makeup gain writes on Manual RMS over the directly tested `0…+18 dB` range.
+
+## Manual RMS knee — verified write
+
+Knee is one byte at `state +18`:
+
+```text
+00 = Normal
+01 = Soft
+```
+
+Two independent duplicate pairs (`normal knee` / `soft knee` and `normal knee 2` / `soft knee 2`) reproduce exactly. Each Normal→Soft transition changes only `state +18` outside the scene label; the duplicate Normal scenes are byte-identical to one another, and the duplicate Soft scenes are byte-identical to one another.
+
+The editor exposes only these two directly verified choices and keeps the writer guarded to Manual RMS (`0x01`).
