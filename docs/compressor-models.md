@@ -223,7 +223,7 @@ The editor therefore enables Manual RMS Parallel Wet/Dry writes over the directl
 
 ## Manual RMS compressor sidechain filter — verified restricted write
 
-The renamed `ReverseEngineer` controlled show isolates most of the compressor sidechain controls. Sidechain **Source was not varied** and remains intentionally unmapped.
+The renamed `ReverseEngineer` controlled show now isolates the sidechain filter, BPF frequency and Source controls.
 
 ```text
 state +107..108 = sidechain low-filter frequency
@@ -231,10 +231,9 @@ state +111      = sidechain low-filter type
 state +116..117 = sidechain high-filter frequency
 state +120      = sidechain high-filter type
 state +123      = sidechain Filter In/Out
-state +124      = operator-labelled notch / A&H BPF option
+state +124      = BPF / scene-labelled notch On/Off
+state +125..126 = BPF frequency
 ```
-
-Allen & Heath documents the compressor sidechain with a 20 Hz–5 kHz Lo-Cut filter, a 120 Hz–20 kHz Hi-Cut filter, shelf options, and a BPF option. The controlled scene ranges independently match those published limits.
 
 ### Low filter frequency
 
@@ -300,6 +299,50 @@ state +124
 01 = On
 ```
 
-The controlled scenes were labelled `filter notch on` / `filter notch off`. Allen & Heath documentation describes a BPF option for this sidechain section, so the editor deliberately calls the field **BPF / notch** rather than asserting a stronger semantic interpretation from the binary alone.
+The controlled scenes were labelled `filter notch on` / `filter notch off`; the editor keeps the combined **BPF / notch** wording rather than over-interpreting the DSP semantics from the binary alone.
 
-The sidechain frequency words follow the same logarithmic family already seen elsewhere in the show file, but some round-number console labels land one code either side of a simple floor/round formula. The writer therefore exposes **only the exact controlled frequency anchors** above. Type and On/Off writes use only the directly proven enum values. All sidechain writers remain guarded to Manual RMS (`0x01`).
+### BPF frequency
+
+The previously preserved final two bytes are now isolated as the BPF frequency field:
+
+| Scene | Raw |
+|---:|---:|
+| `50 Hz` | `41 97` |
+| `100 Hz` | `53 96` |
+| `200 Hz` | `65 96` |
+| `500 Hz` | `7D 62` |
+| `1 kHz` | `8F 62` |
+| `2 kHz` | `A1 62` |
+| `5 kHz` | `B9 2D` |
+| `10 kHz` | `CB 2D` |
+| `12 kHz` | `CF EA` |
+
+Every adjacent BPF-frequency scene changes only `state +125..126` outside scene-label bytes. As with the other sidechain frequencies, the writer emits only exact observed raw words rather than extrapolating a continuous transform from rounded UI labels.
+
+### Sidechain Source — separate record
+
+Source does **not** live in the 127-byte compressor state. It uses a separate framed record:
+
+```text
+Compressor side chain source, Input Channel NN\0
+01 TT II
+```
+
+`TT` is the source type and `II` is the zero-based source index. The controlled CH16 scenes prove:
+
+| Selection | State |
+|---|---|
+| `Self` | `01 01 0F` |
+| `Input 1` | `01 01 00` |
+| `Input 16` | `01 01 0F` |
+| `Mono Group 1` | `01 02 00` |
+| `Stereo Group 1` | `01 03 00` |
+| `Mono Aux 1` | `01 04 00` |
+| `Stereo Aux 1` | `01 05 00` |
+| `Main` | `01 08 00` |
+| `Mono Matrix 1` | `01 0A 00` |
+| `Stereo Matrix 1` | `01 0B 00` |
+
+These type IDs match the independently proved strip-assignment IDs. `Self` and `Input 16` are byte-identical on CH16, so the show stores the concrete resolved input rather than a distinct Self flag.
+
+The Source writer is deliberately restricted to the exact tested type/index pairs above. The sidechain frequency writers similarly expose only exact controlled anchors. All compressor-state sidechain writers remain guarded to Manual RMS (`0x01`).
