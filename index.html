@@ -43,7 +43,7 @@
     <div id="emptyState" class="empty-state">
       <div class="empty-icon">DL2</div>
       <h1>Edit proven dLive structures, inspect the rest</h1>
-      <p>V2.2 includes verified input PEQ, HPF frequency/slope/bypass, fader, pan and compressor On/Off editing, alongside C-class layer editing, RackUltra inspection and mixer-config research tools.</p>
+      <p>V2.2 includes verified input PEQ, HPF, LPF, fader, pan and compressor On/Off editing, alongside C-class layer editing, RackUltra inspection and mixer-config research tools.</p>
       <button id="openBtn2" class="primary large">Choose show file</button>
     </div>
 
@@ -65,6 +65,7 @@
         <button class="tab active" data-tab="names">Names &amp; colours</button>
         <button class="tab" data-tab="peq">Input PEQ</button>
         <button class="tab" data-tab="hpf">Input HPF</button>
+        <button class="tab" data-tab="lpf">Input LPF</button>
         <button class="tab" data-tab="channelstate">Channel state</button>
         <button class="tab" data-tab="surface">Surface layout</button>
         <button class="tab" data-tab="fx">RackUltra</button>
@@ -86,6 +87,11 @@
       <div id="tabHpf" class="tab-panel">
         <div class="notice safe"><strong>Verified write:</strong> HPF frequency and bypass are cross-checked against ConsoleFlip, and controlled slope scenes isolate byte 3. The editor writes only frequency bytes 1–2, a verified slope/type value at byte 3, and bypass byte 4.</div>
         <div id="hpfEditor"></div>
+      </div>
+
+      <div id="tabLpf" class="tab-panel">
+        <div class="notice safe"><strong>Verified write:</strong> controlled CH16 LPF clones isolate the frequency field and bypass byte. The editor writes only state bytes 3–4 for 20 Hz–20 kHz frequency and byte 10 for On/Off; all filter-shape bytes are preserved.</div>
+        <div id="lpfEditor"></div>
       </div>
 
       <div id="tabChannelstate" class="tab-panel">
@@ -157,6 +163,7 @@
 <script src="app-docs-channel-state.js"></script>
 <script src="app-parameter-map-docs.js"></script>
 <script src="app-render-main.js"></script>
+<script src="app-lpf.js"></script>
 <script src="app-channel-state.js"></script>
 <script src="app-render-inspect.js"></script>
 <script src="app-ui.js"></script>
