@@ -1,16 +1,20 @@
 # Input PEQ
 
-**Status:** gain and frequency verified writable; Bell Width decoded with conservative canonical writer; Band 1 and Band 4 filter type verified writable; final two state bytes remain read-only.
+**Status:** gain and frequency verified writable; Bell Width decoded with conservative canonical writer; Band 1 and Band 4 filter type verified writable; PEQ In/Out verified writable; final two per-band state bytes remain read-only.
 
-Each input PEQ contains four 9-byte band records:
+Each input PEQ contains four 9-byte band records followed by one trailing global PEQ bypass byte:
 
 ```text
+4 × band:
 GG GG  FF FF  WW WW  TT  SS SS
 │      │      │      │   └─ remaining state bytes
 │      │      │      └──── filter type
 │      │      └─────────── Bell Width
 │      └────────────────── frequency
 └───────────────────────── gain
+
+then:
+BB  global PEQ bypass
 ```
 
 ## Gain
@@ -55,7 +59,7 @@ The high byte maps to Allen & Heath's Bell Width index. The low byte carries add
 
 ## Filter type byte
 
-A later controlled CH16 scene set isolates band offset `+6` as the filter-type enum.
+A controlled CH16 scene set isolates band offset `+6` as the filter-type enum.
 
 ### Band 1
 
@@ -77,7 +81,7 @@ A later controlled CH16 scene set isolates band offset `+6` as the filter-type e
 
 `LPF → PEQ` and `PEQ → High Shelf` each change exactly this one PEQ byte outside the scene label.
 
-The observed enum is therefore:
+The observed enum is:
 
 ```text
 00 = PEQ / Bell
@@ -96,6 +100,28 @@ Band 4: LPF / PEQ-Bell / High Shelf
 
 No type writer is enabled for Bands 2 and 3.
 
+## PEQ In / Out
+
+The one-byte tail after the fourth 9-byte band is the global PEQ bypass state:
+
+```text
+00 = PEQ In / active
+01 = PEQ Out / bypassed
+```
+
+Controlled CH16 scenes were labelled:
+
+```text
+EQ In
+EQ Out
+EQ In 2
+EQ Out 2
+```
+
+Both In/Out pairs reproduce the same `00 ↔ 01` toggle. In the clean duplicate `EQ In 2` / `EQ Out 2` pair, the complete StageBox scenes are both 412,047 bytes and, after the fixed 259-byte scene-name/header region, **exactly one byte differs**: the PEQ trailing byte. It changes from `00` to `01`.
+
+The editor therefore treats this trailing byte as **Verified Write**, but only when the parsed PEQ tail is exactly one byte long and already contains `00` or `01`.
+
 ## Remaining state bytes
 
-Band offsets `+7..8` remain unresolved. They stayed unchanged across gain, frequency, Bell Width and edge-band filter-type experiments and are preserved exactly by the editor.
+Band offsets `+7..8` remain unresolved. They stayed unchanged across gain, frequency, Bell Width, edge-band filter-type and PEQ In/Out experiments and are preserved exactly by the editor.
