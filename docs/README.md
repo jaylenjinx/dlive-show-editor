@@ -22,6 +22,7 @@ The current primary reference is **dLive firmware 2.12**. The project distinguis
 - [Input HPF](input-hpf.md)
 - [Input LPF](input-lpf.md)
 - [Input Mixer channel state](input-mixer.md)
+- [Input compressor models](compressor-models.md)
 - [RackUltra / AHFX](rackultra.md)
 - [Research method](research-method.md)
 - [Controlled PEQ gain experiment](controlled-peq-diff.md)
@@ -29,4 +30,4 @@ The current primary reference is **dLive firmware 2.12**. The project distinguis
 - [Jaylen Aug 15 / ConsoleFlip cross-check](event-show-consoleflip-crosscheck.md)
 - [ConsoleFlip public/static analysis](consoleflip-public-analysis.md)
 
-The longer consolidated field notes remain in [`KNOWN_FORMAT.md`](../KNOWN_FORMAT.md). The interactive site version of the parameter map is driven by [`app-parameter-map.js`](../app-parameter-map.js) plus focused add-on registries and the LPF module.
+The longer consolidated field notes remain in [`KNOWN_FORMAT.md`](../KNOWN_FORMAT.md). The interactive site version of the parameter map is driven by [`app-parameter-map.js`](../app-parameter-map.js) plus focused add-on registries and verified processing extensions.
