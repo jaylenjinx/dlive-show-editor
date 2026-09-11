@@ -1,8 +1,8 @@
 'use strict';
 
 // Cross-checked channel-state mappings from real dLive 2.12 shows, ConsoleFlip
-// previews and isolated one-parameter clones. Only the fader is promoted to
-// write support here; pan/compressor/routing remain read-only.
+// previews and isolated one-parameter clones. Fader and pan are verified writes;
+// compressor/routing remain read-only.
 
 const inputMixerEntry=PARAMETER_MAP.find(x=>x.id==='input-mixer-record');
 if(inputMixerEntry)Object.assign(inputMixerEntry,{
@@ -10,7 +10,7 @@ if(inputMixerEntry)Object.assign(inputMixerEntry,{
   field:'Per-input mixer state container',
   offset:'after 12-byte header; blockSize = (stateLength − 12) / 128',
   datatype:'128 repeated variable-size blocks',
-  transform:'block size is mixer-configuration dependent; observed current-format sizes include 169 and 224 bytes',
+  transform:'block size is mixer-configuration dependent; observed current-format sizes include 169, 208 and 224 bytes',
   confidence:'decoded',write:false,
   evidence:'Jaylen Aug 15 current scene + Hardcore Start current/controlled scenes; exact 128-block decomposition',
   notes:'Use block-relative/end-relative offsets rather than absolute offsets.'
@@ -45,10 +45,10 @@ PARAMETER_MAP.push(
   {
     id:'input-pan',area:'Channel state',record:'Input Mixer',payload:'per-input block; variable size',
     field:'Input pan',offset:'block + blockSize − 82',datatype:'uint8',
-    transform:'0 = 100% L, 37 (0x25) = C, 74 (0x4A) = 100% R; pan% = (raw − 37) / 37 × 100',
-    confidence:'decoded',write:false,
-    evidence:'Same end-relative offset across 169/224-byte blocks; ConsoleFlip pan dial angles match raw values in event preview',
-    notes:'Awaiting isolated L/C/R pan clones before write support.'
+    transform:'0x00 = 100% L; 0x25 = centre; 0x4A = 100% R; decode % = (raw − 37)/37 ×100; canonical write raw = 37 + trunc(%×37/100)',
+    confidence:'verified',write:true,
+    evidence:'Controlled CH16 pan clones changed only this byte: 100L=00, 50L=13, near-centre=24, 50R=37, 100R=4A; original Scene 10 centre=25; same end-relative offset also matches event-show ConsoleFlip pan controls',
+    notes:'The near-centre controlled clone landed at raw 0x24, one step left of canonical centre 0x25. Writer uses 0x25 for exact 0/C and quantises percentages onto the 0..74 raw range.'
   },
   {
     id:'input-comp-enable',area:'Input compressor',record:'Compressor, Input Channel NN',payload:'156-byte payload observed in current event reference',
