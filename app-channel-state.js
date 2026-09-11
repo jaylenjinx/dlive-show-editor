@@ -8,7 +8,8 @@
 // Controlled Hardcore Start clones:
 //   fader CH16 changed only blockSize-84..-83
 //   pan   CH16 changed only blockSize-82
-// This independently confirms both encodings and generic end-relative offsets.
+//   comp  CH16 changed only Compressor state+2 (00 Off / 01 On)
+// This independently confirms the narrow write boundaries used below.
 
 const FADER_MIN_VERIFIED_DB=-30;
 const FADER_MAX_VERIFIED_DB=10;
@@ -69,7 +70,12 @@ function parseInputCompressorStates(dat){
     const stateStart=pos+sig.length+1,stateLength=frameEnd-stateStart;
     if(stateLength<3)continue;
     const typeRaw=dat[stateStart],modelRaw=dat[stateStart+1],enableRaw=dat[stateStart+2];
-    out.push({channel,frameStart,payloadLength,stateStart,stateLength,typeRaw,modelRaw,enableRaw,active:enableRaw===1,enableKnown:enableRaw===0||enableRaw===1});
+    const enableKnown=enableRaw===0||enableRaw===1;
+    // Current dLive 2.12 input-compressor shape used by the controlled tests.
+    // Other compressor models remain readable but are blocked from writes if the
+    // record shape/discriminator does not match this verified form.
+    const writableShape=typeRaw===0x08&&stateLength===127&&enableKnown;
+    out.push({channel,frameStart,payloadLength,stateStart,stateLength,typeRaw,modelRaw,enableRaw,active:enableRaw===1,enableKnown,writableShape});
   }
   return out;
 }
@@ -118,12 +124,22 @@ function setInputPanPercent(channel,percent){
   markStageDirty();return true;
 }
 
+function setInputCompressorActive(channel,on){
+  const decoded=ensureChannelState();
+  const comp=decoded?.compressors?.find(c=>c.channel===Number(channel));
+  if(!comp?.writableShape)return false;
+  const raw=on?1:0;
+  state.current.stage.datBytes[comp.stateStart+2]=raw;
+  comp.enableRaw=raw;comp.active=!!on;comp.enableKnown=true;
+  markStageDirty();return true;
+}
+
 function renderChannelState(){
   const root=$('#channelStateEditor');if(!root)return;
   const banner=$('#tabChannelstate .notice');
   if(banner){
     banner.className='notice safe';
-    banner.innerHTML='<strong>Verified write:</strong> input fader and pan are isolated from controlled clones and survive different mixer configurations. Compressor and routing remain cross-checked read-only.';
+    banner.innerHTML='<strong>Verified write:</strong> input fader, pan and compressor On/Off are isolated with controlled scene clones. Routing/send fields remain read-only.';
   }
   root.innerHTML='';
   const decoded=ensureChannelState();
@@ -132,7 +148,7 @@ function renderChannelState(){
   const inputs=state.current.stage.managers.find(x=>x.key==='inputs');
 
   const toolbar=document.createElement('section');toolbar.className='panel peq-toolbar';
-  toolbar.innerHTML=`<div class="manager-head inline"><h2>Input channel</h2><span class="confidence ${mixer.writableShape?'verified':'decoded'}">${mixer.writableShape?'FADER + PAN VERIFIED WRITE':'READ ONLY'}</span></div>`;
+  toolbar.innerHTML=`<div class="manager-head inline"><h2>Input channel</h2><span class="confidence ${mixer.writableShape?'verified':'decoded'}">${mixer.writableShape?'FADER + PAN + COMP VERIFIED WRITE':'READ ONLY'}</span></div>`;
   const select=document.createElement('select');select.className='peq-channel-select';
   for(const ch of mixer.channels){
     const name=inputs?.items[ch.channel-1]?.name||'';
@@ -159,17 +175,25 @@ function renderChannelState(){
         <div><input data-k="pan" type="number" min="-100" max="100" step="1" value="${Math.round(ch.panPct)}"><b>%</b></div>
         <code>${hexByte(ch.panRaw)}</code>
       </div>
+      <div class="peq-field">
+        <span>Compressor <small>verified On/Off byte only; model/parameters preserved</small></span>
+        <select data-k="comp"><option value="1">On</option><option value="0">Off</option></select>
+        <code>${comp?hexByte(comp.enableRaw):'—'}</code>
+      </div>
       <div class="config-table">
         <div class="config-row"><strong>Fader decoded</strong><code>${faderRawHex(ch)}</code><span>${formatFaderDb(ch)}</span></div>
         <div class="config-row"><strong>Fader offset</strong><code>block + ${ch.blockSize-84}</code><span><code>blockSize − 84</code></span></div>
         <div class="config-row"><strong>Pan decoded</strong><code>${hexByte(ch.panRaw)}</code><span>${ch.panLabel}</span></div>
         <div class="config-row"><strong>Pan offset</strong><code>block + ${ch.blockSize-82}</code><span><code>blockSize − 82</code></span></div>
-        <div class="config-row"><strong>Compressor</strong><code>${comp?hexByte(comp.enableRaw):'—'}</code><span>${comp?(comp.enableKnown?(comp.active?'On':'Off'):'Unknown'):'Not found'}</span></div>
+        <div class="config-row"><strong>Compressor enable</strong><code>${comp?`state + 2 = ${hexByte(comp.enableRaw)}`:'—'}</code><span>${comp?(comp.enableKnown?(comp.active?'On':'Off'):'Unknown'):'Not found'}</span></div>
+        <div class="config-row"><strong>Compressor model</strong><code>${comp?hexByte(comp.modelRaw):'—'}</code><span>read-only / model semantics still under investigation</span></div>
       </div>`;
     details.appendChild(panel);
 
-    const faderInput=panel.querySelector('[data-k="fader"]'),infBtn=panel.querySelector('[data-k="inf"]'),panInput=panel.querySelector('[data-k="pan"]');
+    const faderInput=panel.querySelector('[data-k="fader"]'),infBtn=panel.querySelector('[data-k="inf"]'),panInput=panel.querySelector('[data-k="pan"]'),compSelect=panel.querySelector('[data-k="comp"]');
     if(!mixer.writableShape){faderInput.disabled=true;infBtn.disabled=true;panInput.disabled=true;}
+    if(comp){compSelect.value=comp.active?'1':'0';}
+    if(!comp?.writableShape){compSelect.disabled=true;}
     faderInput.onchange=()=>{
       if(setInputFaderDb(ch.channel,faderInput.value))renderChannelState();
       else toast('Fader write blocked by structure validation.',true);
@@ -182,17 +206,19 @@ function renderChannelState(){
       if(setInputPanPercent(ch.channel,panInput.value))renderChannelState();
       else toast('Pan write blocked by structure validation.',true);
     };
+    compSelect.onchange=()=>{
+      if(setInputCompressorActive(ch.channel,compSelect.value==='1'))renderChannelState();
+      else toast('Compressor write blocked by structure validation.',true);
+    };
 
     const evidence=document.createElement('section');evidence.className='panel';
     evidence.innerHTML=`
-      <h2>Input Mixer structure</h2>
-      <pre><code>12-byte mixer header
-+ 128 × ${mixer.blockSize}-byte input blocks
-
-faderOffset = blockStart + blockSize - 84
-panOffset   = blockStart + blockSize - 82</code></pre>
-      <p>Controlled fader scenes changed only the two fader bytes. Controlled pan scenes changed only the single pan byte and produced <code>00</code> (100L), <code>13</code> (50L), <code>24</code> (near-centre clone), <code>37</code> (50R) and <code>4A</code> (100R). The original Scene 10 centre is <code>25</code>, confirming the canonical centre code.</p>
-      <div class="notice safe"><strong>Verified fader + pan write:</strong> only the mapped bytes are modified. Compressor and routing remain read-only.</div>`;
+      <h2>Controlled verification</h2>
+      <pre><code>faderOffset = blockStart + blockSize - 84
+panOffset   = blockStart + blockSize - 82
+compressor  = Compressor record state + 2</code></pre>
+      <p>Controlled fader scenes changed only the two fader bytes. Controlled pan scenes changed only the single pan byte. The clean compressor pair <code>Comp 2 On</code>/<code>Comp 2 Off</code> changed only compressor state byte <code>+2</code> outside the scene label: <code>01</code> On and <code>00</code> Off.</p>
+      <div class="notice safe"><strong>Verified writes:</strong> fader, pan and compressor On/Off modify only their mapped fields. Compressor model and dynamics parameters, plus routing/send state, remain read-only.</div>`;
     details.appendChild(evidence);
   };
   select.onchange=draw;draw();
