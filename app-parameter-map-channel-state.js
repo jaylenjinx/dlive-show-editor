@@ -1,8 +1,8 @@
 'use strict';
 
-// Cross-checked channel-state mappings from two real dLive 2.12 shows plus
-// ConsoleFlip previews. Keep write=false until isolated one-parameter clones
-// demonstrate safe generation.
+// Cross-checked channel-state mappings from real dLive 2.12 shows, ConsoleFlip
+// previews and isolated one-parameter clones. Only the fader is promoted to
+// write support here; pan/compressor/routing remain read-only.
 
 const inputMixerEntry=PARAMETER_MAP.find(x=>x.id==='input-mixer-record');
 if(inputMixerEntry)Object.assign(inputMixerEntry,{
@@ -10,9 +10,9 @@ if(inputMixerEntry)Object.assign(inputMixerEntry,{
   field:'Per-input mixer state container',
   offset:'after 12-byte header; blockSize = (stateLength − 12) / 128',
   datatype:'128 repeated variable-size blocks',
-  transform:'block size is mixer-configuration dependent; observed 169 and 224 bytes',
+  transform:'block size is mixer-configuration dependent; observed current-format sizes include 169 and 224 bytes',
   confidence:'decoded',write:false,
-  evidence:'Jaylen Aug 15 current scene + Hardcore Start current scene; exact 128-block decomposition in both',
+  evidence:'Jaylen Aug 15 current scene + Hardcore Start current/controlled scenes; exact 128-block decomposition',
   notes:'Use block-relative/end-relative offsets rather than absolute offsets.'
 });
 
@@ -31,23 +31,23 @@ PARAMETER_MAP.push(
   {
     id:'input-mixer-header',area:'Channel state',record:'Input Mixer',payload:'12-byte header + 128 × blockSize',
     field:'Mixer header',offset:'state + 0..11',datatype:'12 raw bytes',transform:'configuration-dependent; not fully mapped',
-    confidence:'decoded',write:false,evidence:'Both real 2.12 shows use exactly 12 bytes before the 128 repeated input blocks',
+    confidence:'decoded',write:false,evidence:'Current-format shows use exactly 12 bytes before the 128 repeated input blocks',
     notes:'Header is preserved exactly.'
   },
   {
     id:'input-fader',area:'Channel state',record:'Input Mixer',payload:'per-input block; variable size',
     field:'Input fader level',offset:'block + blockSize − 84 .. −83',datatype:'int16 big-endian',
     transform:'raw == -32767 (0x8001) => −∞; otherwise dB = raw / 256',
-    confidence:'decoded',write:false,
-    evidence:'Event show: 169-byte blocks, offset +85; Hardcore Start: 224-byte blocks, offset +140; ConsoleFlip fader graphics match decoded values',
-    notes:'The end-relative location is stable across both observed mixer configurations. Awaiting isolated fader clones before writer promotion.'
+    confidence:'verified',write:true,
+    evidence:'Controlled Hardcore CH16 clones: −∞, −30, −20.3, −12.2, −5.9, ~0, +5, +10 dB changed only these two bytes; event show independently confirms the same end-relative field in 169-byte blocks',
+    notes:'Writer is currently constrained to the directly tested finite range −30…+10 dB plus the −∞ sentinel. Location is block-end-relative, so it survives different MixConfig block sizes.'
   },
   {
     id:'input-pan',area:'Channel state',record:'Input Mixer',payload:'per-input block; variable size',
     field:'Input pan',offset:'block + blockSize − 82',datatype:'uint8',
     transform:'0 = 100% L, 37 (0x25) = C, 74 (0x4A) = 100% R; pan% = (raw − 37) / 37 × 100',
     confidence:'decoded',write:false,
-    evidence:'Same end-relative offset across 169/224-byte blocks; ConsoleFlip pan dial angles match raw values exactly in event preview',
+    evidence:'Same end-relative offset across 169/224-byte blocks; ConsoleFlip pan dial angles match raw values in event preview',
     notes:'Awaiting isolated L/C/R pan clones before write support.'
   },
   {
