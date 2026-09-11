@@ -69,9 +69,9 @@ Controlled evidence covers gain `+1,+3,-3,-15,+15 dB`, frequency `100,200,500,1k
 Current-format record state after the label:
 
 ```text
-03 FF FF MM BB
+03 FF FF SS BB
 │  └─┬─┘ │  └─ bypass: 00 On, 01 Off
-│    │   └──── unknown mode/state byte — preserve
+│    │   └──── slope / filter-type enum
 │    └──────── frequency
 └───────────── HPF discriminator/type
 ```
@@ -80,10 +80,10 @@ Current-format record state after the label:
 |---|---:|---|---|---|---|
 | Discriminator/type | `+0` | `uint8` | observed `03` | Decoded/parser guard | No |
 | Frequency | `+1..2` | `uint16_be` | `raw = floor(4608 × log2(f/4))`; `f = 4 × 2^(raw/4608)` | **Verified write** | **Yes** |
-| Unknown mode/state | `+3` | `uint8` | unknown; usually `00`, real `01` observed | Unknown | No |
+| Slope / filter type | `+3` | `uint8 enum` | `05=6 dB BW`, `00=12 dB BW`, `01=18 dB BW`, `02=24 dB BW`, `03=18 dB Bessel`; `04` unmapped | **Verified write** | **Yes** |
 | Bypass | `+4` | `uint8` | `00` active/on, `01` bypassed/off | **Verified write** | **Yes** |
 
-Evidence: the `Jaylen Aug 15` event show contains active and bypassed HPFs across multiple frequencies. ConsoleFlip independently rendered 108 input cards; **108/108 matched** native On/Off state and rounded decoded frequency. The writer modifies only bytes `+1..2` and `+4`.
+Evidence: the `Jaylen Aug 15` event show contains active and bypassed HPFs across multiple frequencies. ConsoleFlip independently rendered 108 input cards; **108/108 matched** native On/Off state and rounded decoded frequency. A later controlled CH16 experiment changed only byte `+3` across the labelled slope scenes `6db BW`, `12db BW`, `18db BW`, `24db BW` and `18db Bessel`. The writer modifies only bytes `+1..2`, a known value at `+3`, and byte `+4`.
 
 See [`input-hpf.md`](input-hpf.md).
 
@@ -115,7 +115,7 @@ raw    = int16_be
 else dB = raw / 256
 ```
 
-**Decoded / read-only.** The end-relative offset holds in both mixer configurations and ConsoleFlip's rendered faders agree with the decoded values.
+**Verified write.** Controlled CH16 clones at `-∞`, `-30`, `-20.3`, `-12.2`, `-5.9`, approximately `0`, `+5` and `+10 dB` changed only these two bytes. The end-relative locator also matches the 169-byte event configuration. The editor currently writes the directly tested finite range `-30…+10 dB` plus `-∞`.
 
 ### Input pan
 
@@ -127,7 +127,7 @@ offset = blockStart + blockSize - 82
 pan_percent = (raw - 37) / 37 × 100
 ```
 
-**Decoded / read-only.** ConsoleFlip's dial angles agree with native values in the event show.
+**Decoded / read-only.** ConsoleFlip's dial angles agree with native values in the event show. Isolated pan clones are the next promotion test.
 
 ### Event-config mono Aux sends
 
