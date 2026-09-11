@@ -45,24 +45,37 @@ Verified type IDs include `00 Blank`, `01 Input`, `02 Mono Group`, `03 Stereo Gr
 
 ## Input PEQ
 
-Each input has four 9-byte bands:
+Each input PEQ contains four 9-byte band records followed by one trailing PEQ bypass byte:
 
 ```text
-GG GG  FF FF  WW WW  SS SS SS
-│      │      │      └─ filter/state/type — unknown
-│      │      └──────── Bell Width
-│      └─────────────── frequency
-└────────────────────── gain
+4 × band:
+GG GG  FF FF  WW WW  TT  SS SS
+│      │      │      │   └─ remaining state bytes — unknown/preserved
+│      │      │      └──── filter type
+│      │      └─────────── Bell Width
+│      └────────────────── frequency
+└───────────────────────── gain
+
+then:
+BB  global PEQ bypass
 ```
 
-| Field | Band offset | Type | Transform | Confidence | Write |
+| Field | Offset | Type | Transform | Confidence | Write |
 |---|---:|---|---|---|---|
-| Gain | `+0..1` | `int16_be` | `dB = raw / 256` | **Verified write** | **Yes** |
-| Frequency | `+2..3` | `uint16_be` | `raw = floor(4608 × log2(f/4))` | **Verified write** | **Yes** |
-| Bell Width | `+4..5` | `uint16_be` | high byte = A&H width index; low byte = internal fraction | **Partial write** | **Yes** |
-| Filter/state/type | `+6..8` | 3 raw bytes | unknown | Unknown | No |
+| Gain | band `+0..1` | `int16_be` | `dB = raw / 256` | **Verified write** | **Yes** |
+| Frequency | band `+2..3` | `uint16_be` | `raw = floor(4608 × log2(f/4))` | **Verified write** | **Yes** |
+| Bell Width | band `+4..5` | `uint16_be` | high byte = A&H width index; low byte = internal fraction | **Partial write** | **Yes** |
+| Filter type | band `+6` | `uint8 enum` | `00 Bell`, `01 Low Shelf`, `02 High Shelf`, `03 LPF`, `04 HPF` | **Verified write for Bands 1 & 4** | **Yes, restricted** |
+| Remaining band state | band `+7..8` | 2 raw bytes | unknown | Unknown | No |
+| PEQ In/Out | trailing byte after Band 4 | `uint8` | `00` In/active, `01` Out/bypassed | **Verified write** | **Yes** |
 
 Controlled evidence covers gain `+1,+3,-3,-15,+15 dB`, frequency `100,200,500,1k,5k,10k Hz`, and Bell Width from `1.5` through `1/9`.
+
+Band-type controlled scenes isolate only byte `+6`: Band 1 proves `04=HPF`, `00=PEQ/Bell`, `01=Low Shelf`; Band 4 proves `03=LPF`, `00=PEQ/Bell`, `02=High Shelf`. The editor exposes only those directly proven choices for those bands. Bands 2–3 type remains untouched.
+
+PEQ bypass is independently isolated by controlled CH16 scenes `EQ In`, `EQ Out`, `EQ In 2`, `EQ Out 2`. The duplicate pair changes exactly one byte after the fixed scene-name/header region in the complete 412,047-byte StageBox scene: the single PEQ tail byte toggles `00 ↔ 01`.
+
+See [`input-peq.md`](input-peq.md).
 
 ## Input HPF
 
