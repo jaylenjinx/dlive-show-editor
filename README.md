@@ -67,19 +67,28 @@ otherwise dB   = int16_be(raw) / 256
 
 Controlled CH16 clones at `-∞`, `-30`, `-20.3`, `-12.2`, `-5.9`, approximately `0`, `+5` and `+10 dB` changed only those two bytes. The editor currently writes the directly tested finite range **-30…+10 dB** plus `-∞`.
 
-## Decoded / read-only
+### Input pan — v2.2
 
-### Input pan
-
-Pan is at `blockStart + blockSize - 82` and currently decodes as:
+Pan is one byte at:
 
 ```text
-0x00 = hard L
-0x25 = centre
-0x4A = hard R
+panOffset = blockStart + blockSize - 82
 ```
 
-ConsoleFlip's rendered event-show controls agree with the mapping. Pan remains read-only until isolated one-parameter clones verify the write boundary.
+Controlled CH16 clones changed only that byte:
+
+```text
+00 = 100% L
+13 = 50% L
+24 = near-centre controlled clone
+25 = exact centre (independently present in Scene 10)
+37 = 50% R
+4A = 100% R
+```
+
+The editor uses the canonical raw coordinate `0…74` with `37` as centre and writes percentage requests using `raw = 37 + trunc(percent * 37 / 100)`. Only the pan byte is modified.
+
+## Decoded / read-only
 
 ### Input compressor On/Off
 
