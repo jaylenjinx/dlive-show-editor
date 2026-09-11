@@ -8,10 +8,12 @@
 - Promoted HPF slope/filter type to **Verified Write** using controlled CH16 clones: `05=6 dB BW`, `00=12 dB BW`, `01=18 dB BW`, `02=24 dB BW`, `03=18 dB Bessel`; `04` remains unmapped and is preserved.
 - Identified `Input Mixer` as a 12-byte header followed by 128 equal per-input blocks; current-format block size is mixer-configuration dependent.
 - Promoted input fader to **Verified Write** using controlled CH16 clones at `-∞`, `-30`, `-20.3`, `-12.2`, `-5.9`, approximately `0`, `+5` and `+10 dB`.
-- Established the generic fader locator as `blockStart + blockSize - 84`; the same end-relative field survives 169-byte and 224-byte channel blocks.
+- Established the generic fader locator as `blockStart + blockSize - 84`; the same end-relative field survives different channel-block sizes.
 - Verified fader encoding as signed 16-bit big-endian `/256 dB`, with `0x8001` representing `-∞`.
 - Added guarded fader editing for the directly tested finite range `-30…+10 dB` plus `-∞`; only the two fader bytes are modified.
-- Decoded input pan at `blockSize - 82`: `0x00` hard L, `0x25` centre, `0x4A` hard R; remains read-only pending isolated pan clones.
+- Promoted input pan to **Verified Write** using controlled CH16 clones: `100L=00`, `50L=13`, near-centre clone=`24`, `50R=37`, `100R=4A`; original Scene 10 exact centre is `25`.
+- Established the generic pan locator as `blockStart + blockSize - 82`; controlled pan scenes changed only this one byte.
+- Added canonical pan percentage writes over `-100…+100` using the 0…74 raw coordinate while preserving exact centre as `0x25`.
 - Decoded input compressor On/Off at compressor state byte `+2` (`00` Off, `01` On), matching all 108 ConsoleFlip event-show cards; remains read-only pending isolated clones.
 - Located six mono Aux send level fields in the 169-byte event configuration; kept them read-only/configuration-specific until the variable bus-layout rule is solved.
 - Added Channel State tooling, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research JSON exports.
