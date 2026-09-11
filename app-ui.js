@@ -52,9 +52,9 @@ window.addEventListener('hashchange',()=>{
   if(location.hash.startsWith('#docs-')){setPrimaryView('docs'); if(typeof renderDocs==='function')renderDocs();}
 });
 
-// Add the optional console-style visual editing surface without replacing the
-// existing research-oriented PEQ and Channel State tabs. The visual layer uses
-// only the guarded writers already defined by the reverse-engineering modules.
+// Add the console-style visual editing surface without replacing the existing
+// research-oriented PEQ / Channel State tabs. All writes still go through the
+// guarded reverse-engineered setters.
 (function installConsoleUi(){
   if($('#tabConsole'))return;
   const tab=document.createElement('button');
@@ -64,14 +64,14 @@ window.addEventListener('hashchange',()=>{
   tab.onclick=()=>activateEditorTab(tab);
 
   const panel=document.createElement('div');panel.id='tabConsole';panel.className='tab-panel';
-  panel.innerHTML='<div class="notice safe"><strong>Visual editor:</strong> console-style PEQ and compressor views backed by the same verified byte writers as the research tabs. Unsupported model-specific controls stay read-only.</div><div id="consoleEditor"></div>';
+  panel.innerHTML='<div class="notice safe"><strong>Visual editor:</strong> console-style Preamp, Gate, PEQ, Compressor, Delay and Routing views backed by controlled-diff verified byte writers. Configuration-specific or unverified controls remain disabled.</div><div id="consoleEditor"></div>';
   const namesPanel=$('#tabNames');
   if(namesPanel)namesPanel.insertAdjacentElement('afterend',panel);else $('#editor')?.appendChild(panel);
 
-  if(!document.querySelector('link[href="console-ui.css"]')){
-    const css=document.createElement('link');css.rel='stylesheet';css.href='console-ui.css';document.head.appendChild(css);
+  for(const href of ['console-ui.css','console-ui-input.css'])if(!document.querySelector(`link[href="${href}"]`)){
+    const css=document.createElement('link');css.rel='stylesheet';css.href=href;document.head.appendChild(css);
   }
-  const consoleScripts=['app-console-ui-peq.js','app-console-ui-compressor.js','app-console-ui-main.js'];
+  const consoleScripts=['app-input-processing.js','app-parameter-map-input-processing.js','app-console-ui-peq.js','app-console-ui-compressor.js','app-console-ui-input.js','app-console-ui-main.js'];
   const loadConsoleScript=index=>{
     if(index>=consoleScripts.length){if(state.current?.stage&&typeof renderConsoleEditor==='function')renderConsoleEditor();return;}
     const src=consoleScripts[index];
