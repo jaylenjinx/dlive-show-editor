@@ -1,6 +1,6 @@
 # Input Mixer channel state
 
-> Status: **verified write for input fader, pan, compressor On/Off and compressor threshold on the controlled model 0x01; decoded/read-only for Aux evidence and remaining compressor parameters**. Validated across multiple real dLive 2.12 mixer configurations and independently cross-checked against ConsoleFlip-rendered channel state.
+> Status: **verified write for input fader, pan, compressor On/Off and Manual RMS compressor threshold; decoded/read-only for compressor model selection, Aux evidence and remaining compressor parameters**. Validated across multiple real dLive 2.12 mixer configurations and independently cross-checked against ConsoleFlip-rendered channel state.
 
 The labelled `Input Mixer` record contains a small header followed by 128 equal-size per-input blocks:
 
@@ -120,11 +120,35 @@ state +0                = 0x08 processor discriminator
 state +2                = 0x00 or 0x01 before writing
 ```
 
-Only state byte `+2` is changed for On/Off. The compressor model byte at `+1` is preserved.
+Only state byte `+2` is changed for On/Off.
 
-## Input compressor threshold — verified write for model 0x01
+## Compressor model enum — decoded / read-only
 
-The controlled CH16 threshold scenes isolate a two-byte field at:
+Controlled CH16 model scenes map `state +1`:
+
+| Raw | Model |
+|---:|---|
+| `00` | Manual Peak |
+| `01` | Manual RMS |
+| `02` | Opto |
+| `03` | 16T |
+| `04` | 16VU |
+| `05` | Ducker family |
+| `06` | Peak Limiter 76 |
+| `07` | Mighty |
+| `08` | Optronik |
+| `09` | Bus |
+| `0A` | Compstortion |
+
+`Ducker` and `Ducker Slow` both use `state +1 = 0x05`. Their records instead differ at state `+10..13` and `+25..26`, so Slow is represented as a parameter/default variant of the same engine family.
+
+Model selection remains read-only because switching models on the console rewrites additional model-specific state. Writing only `state +1` would create a hybrid state that the console did not generate.
+
+See [`compressor-models.md`](compressor-models.md).
+
+## Input compressor threshold — verified write for Manual RMS
+
+The controlled CH16 threshold scenes used **Manual RMS** (`state +1 = 0x01`) and isolate a two-byte field at:
 
 ```text
 state +8..+9 = int16_be
@@ -153,16 +177,16 @@ raw = round(threshold_dB * 256)
 
 with the directly observed range constrained to `-46…+18 dB`.
 
-The supplied threshold experiment used compressor model byte `0x01`. The editor therefore enables threshold writing only when all of these are true:
+The editor enables threshold writing only when all of these are true:
 
 ```text
 state length = 127 bytes
 state +0     = 0x08
-state +1     = 0x01   verified compressor model for this experiment
+state +1     = 0x01   Manual RMS / verified threshold model
 state +2     = 0x00 or 0x01
 ```
 
-Other compressor models remain threshold read-only until independently tested.
+The all-model scene set contains plausible threshold defaults at the same `+8..+9` location for other engines (including `0`, `-6`, `-7`, and `-14 dB` examples), supporting a shared threshold location. Other models nevertheless remain threshold read-only until independently tested.
 
 ## Event-show mono Aux send evidence
 
