@@ -1,8 +1,8 @@
 'use strict';
 
 // Cross-checked channel-state mappings from real dLive 2.12 shows, ConsoleFlip
-// previews and isolated one-parameter clones. Fader and pan are verified writes;
-// compressor/routing remain read-only.
+// previews and isolated one-parameter clones. Fader, pan and compressor enable
+// are verified writes; routing and the remaining compressor parameters are read-only.
 
 const inputMixerEntry=PARAMETER_MAP.find(x=>x.id==='input-mixer-record');
 if(inputMixerEntry)Object.assign(inputMixerEntry,{
@@ -23,8 +23,8 @@ if(compressorEntry)Object.assign(compressorEntry,{
   datatype:'mixed; enable uint8',
   transform:'enable: 0x00 Off, 0x01 On',
   confidence:'decoded',write:false,
-  evidence:'108/108 ConsoleFlip event-show channel cards: state +2 separates Comp On/Off exactly',
-  notes:'Enable is decoded but writer remains disabled pending isolated compressor On/Off clones. Other compressor fields remain unmapped.'
+  evidence:'108/108 ConsoleFlip event-show channel cards identify state +2 as enable; controlled clones independently isolate the same byte',
+  notes:'Container remains read-only as a whole; only the separately mapped enable byte is writable.'
 });
 
 PARAMETER_MAP.push(
@@ -51,14 +51,14 @@ PARAMETER_MAP.push(
     notes:'The near-centre controlled clone landed at raw 0x24, one step left of canonical centre 0x25. Writer uses 0x25 for exact 0/C and quantises percentages onto the 0..74 raw range.'
   },
   {
-    id:'input-comp-enable',area:'Input compressor',record:'Compressor, Input Channel NN',payload:'156-byte payload observed in current event reference',
+    id:'input-comp-enable',area:'Input compressor',record:'Compressor, Input Channel NN',payload:'current-format state length 127 bytes after label',
     field:'Compressor On/Off',offset:'state + 2',datatype:'uint8',transform:'0x00 Off; 0x01 On',
-    confidence:'decoded',write:false,
-    evidence:'108/108 ConsoleFlip event-show channel cards matched native byte; active examples include CH14, CH16 and CH18',
-    notes:'Read-only until isolated On/Off scenes prove there is no coupled state elsewhere.'
+    confidence:'verified',write:true,
+    evidence:'108/108 ConsoleFlip event-show channel cards matched native byte; controlled CH16 scenes independently confirm it. Clean Comp 2 On/Off pair changes only state +2 outside the scene label.',
+    notes:'Writer is guarded to the verified current-format compressor shape: state length 127, processor discriminator 0x08, and existing enable value 00/01. Model and all dynamics parameters are preserved.'
   },
   {
-    id:'input-comp-model',area:'Input compressor',record:'Compressor, Input Channel NN',payload:'156-byte payload observed in current event reference',
+    id:'input-comp-model',area:'Input compressor',record:'Compressor, Input Channel NN',payload:'156-byte payload observed in current reference channels 01–99',
     field:'Compressor model/type candidate',offset:'state + 1',datatype:'uint8',transform:'observed multiple values (for example 01, 04, 06)',
     confidence:'located',write:false,
     evidence:'Model byte differs across real channels while state +2 independently tracks enable',
