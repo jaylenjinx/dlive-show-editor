@@ -108,18 +108,20 @@ Controlled CH16 clones changed only that byte:
 
 The editor uses the canonical raw coordinate `0…74` with `37` as centre and writes percentage requests using `raw = 37 + trunc(percent * 37 / 100)`. Only the pan byte is modified.
 
-### Input compressor On/Off — v2.2
+### Input compressor — v2.2
 
 Inside `Compressor, Input Channel NN`:
 
 ```text
-state +2 = 00  -> Off
-state +2 = 01  -> On
+state +2    = 00 Off / 01 On
+state +8..9 = threshold, signed int16_be / 256 dB
 ```
 
-The event-show ConsoleFlip preview matched this byte across all 108 visible input cards. Controlled CH16 clones then isolated the byte directly: the clean `Comp 2 On` / `Comp 2 Off` pair changes only `state +2` outside the scene label.
+The event-show ConsoleFlip preview matched the enable byte across all 108 visible input cards. Controlled CH16 clones then isolated On/Off directly with the clean `Comp 2 On` / `Comp 2 Off` pair.
 
-The editor writes only that enable byte, and only when the record matches the verified current-format input-compressor shape. Compressor model and all dynamics parameters remain read-only.
+A separate controlled threshold series used `-46, -30, -20, -10, 0, +10, +18 dB`. Every adjacent pair changed only `state +8..9` outside the scene-label bytes. Examples: `D2 00 = -46.00 dB`, `E1 FD ≈ -30.01 dB`, `00 03 ≈ +0.01 dB`, `12 00 = +18.00 dB`.
+
+The threshold writer is deliberately guarded to the exact compressor model used by the experiment (`state +1 = 0x01`), plus the verified current-format processor discriminator/state length. Other compressor models remain threshold read-only until separately tested.
 
 ## Decoded / read-only
 
@@ -131,9 +133,9 @@ PEQ band bytes `+7..8` remain unknown and are preserved exactly. Bands 2 and 3 f
 
 LPF bytes `state +1..+2` and `+5..+9` are preserved exactly. Real-event material shows legitimate variation in this region, so slope/Q/type semantics are not guessed.
 
-### Compressor model and dynamics parameters
+### Compressor model and remaining dynamics parameters
 
-The compressor model/type byte and threshold, ratio, attack, release, knee and other dynamics parameters are not yet mapped for writing.
+The compressor model/type byte and ratio, attack, release, knee, makeup and other remaining dynamics parameters are not yet mapped for writing. Threshold is writable only for the independently tested model byte `0x01`.
 
 ### Aux-send evidence
 
@@ -160,7 +162,7 @@ The site has a built-in **Docs** section available without loading a show.
 - [Documentation index](docs/README.md)
 - [Consolidated field notes](KNOWN_FORMAT.md)
 
-The interactive parameter map is driven by `app-parameter-map.js` plus focused add-on registries for PEQ type/bypass, HPF and channel state.
+The interactive parameter map is driven by `app-parameter-map.js` plus focused add-on registries and verified channel-state extensions.
 
 ## Safety model
 
