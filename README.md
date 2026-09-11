@@ -32,47 +32,46 @@ The final three PEQ state/type bytes remain read-only.
 
 ### Input HPF — v2.2
 
-A second real event show and an independent ConsoleFlip preview resolve the current five-byte HPF state:
+Real-event evidence plus controlled scene clones resolve the current five-byte HPF state:
 
 ```text
-03 FF FF MM BB
+03 FF FF SS BB
 │  └─┬─┘ │  └─ bypass: 00 On, 01 Off
-│    │   └──── unknown mode/state — preserved
+│    │   └──── slope / filter-type enum
 │    └──────── frequency
 └───────────── HPF discriminator/type
 ```
 
-HPF frequency uses the same logarithmic coordinate as PEQ and is writable from **20–2000 Hz**. The editor changes only frequency bytes `+1..2` and bypass byte `+4`.
+HPF frequency uses the same logarithmic coordinate as PEQ and is writable from **20–2000 Hz**. Controlled CH16 clones isolated the slope/type byte:
+
+```text
+05 = 6 dB BW
+00 = 12 dB BW
+01 = 18 dB BW
+02 = 24 dB BW
+03 = 18 dB Bessel
+04 = unmapped / preserved
+```
 
 ConsoleFlip independently rendered 108 input cards from the real event show; all 108 matched the native bypass state and rounded decoded frequency.
 
-## Decoded / read-only
+### Input fader — v2.2
 
-### Input Mixer channel state — v2.2
-
-Two different real dLive 2.12 mixer configurations reveal:
+`Input Mixer` contains a 12-byte header followed by 128 equal-size input blocks. The block size changes with mixer configuration, but the fader remains fixed relative to the end of each block:
 
 ```text
-Input Mixer\0
-12-byte mixer header
-128 × blockSize-byte input blocks
-```
-
-Observed channel-block sizes are 169 and 224 bytes, but these fields remain stable relative to each block end:
-
-```text
-fader offset = blockSize - 84
-pan offset   = blockSize - 82
-```
-
-Fader:
-
-```text
+faderOffset = blockStart + blockSize - 84
 raw == 0x8001  -> -infinity
 otherwise dB   = int16_be(raw) / 256
 ```
 
-Pan:
+Controlled CH16 clones at `-∞`, `-30`, `-20.3`, `-12.2`, `-5.9`, approximately `0`, `+5` and `+10 dB` changed only those two bytes. The editor currently writes the directly tested finite range **-30…+10 dB** plus `-∞`.
+
+## Decoded / read-only
+
+### Input pan
+
+Pan is at `blockStart + blockSize - 82` and currently decodes as:
 
 ```text
 0x00 = hard L
@@ -80,7 +79,7 @@ Pan:
 0x4A = hard R
 ```
 
-Both mappings agree with ConsoleFlip's rendered event-show controls. They remain read-only until isolated one-parameter clones prove the write boundary.
+ConsoleFlip's rendered event-show controls agree with the mapping. Pan remains read-only until isolated one-parameter clones verify the write boundary.
 
 ### Input compressor On/Off
 
