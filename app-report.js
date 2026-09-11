@@ -3,6 +3,7 @@ function exportResearchReport(){
   const c=state.current;
   const mixerState=c.stage?parseInputMixerChannelState(c.stage.datBytes):null;
   const compressorStates=c.stage?parseInputCompressorStates(c.stage.datBytes):[];
+  const compressorSources=c.stage&&typeof parseInputCompressorSidechainSources==='function'?parseInputCompressorSidechainSources(c.stage.datBytes):[];
   const report={
     format:'dlive-show-editor-research-v2.2',
     generatedAt:new Date().toISOString(),
@@ -81,9 +82,14 @@ function exportResearchReport(){
         highTypeOffset:x.scHiTypeOffset??null,highTypeRaw:x.scHiTypeRaw??null,highTypeLabel:x.scHiTypeLabel??null,highTypeKnown:x.scHiTypeKnown??false,
         filterOffset:x.scFilterOffset??null,filterRaw:x.scFilterRaw??null,filterActive:x.scFilterActive??false,filterKnown:x.scFilterKnown??false,
         middleOffset:x.scMiddleOffset??null,middleRaw:x.scMiddleRaw??null,middleActive:x.scMiddleActive??false,middleKnown:x.scMiddleKnown??false,
-        writable:x.scWritableShape??false,
-        source:'unmapped / not varied in controlled test'
+        bpfFrequencyOffset:x.scBpfFreqOffset??null,bpfFrequencyRaw:x.scBpfFreqRaw??null,bpfFrequencyHz:x.scBpfFreqHz??null,bpfFrequencyExact:x.scBpfFreqExact??false,
+        writable:x.scWritableShape??false,bpfWritable:x.scBpfWritableShape??false
       }
+    })),
+    inputCompressorSidechainSource:compressorSources.map(x=>({
+      channel:x.channel,frameStart:x.frameStart,payloadLength:x.payloadLength,stateLength:x.stateLength,
+      discriminator:x.discriminator,typeRaw:x.typeRaw,typeLabel:x.typeLabel,indexRaw:x.indexRaw,
+      testedSelection:x.currentTested?.label||null,writable:x.writableShape,rawHex:hexRange(x.raw)
     })),
     ahfx:c.stage?.ahfx.map(f=>({
       slot:f.slot,frameStart:f.frameStart,payloadLength:f.payloadLength,engineId:f.engineId,
