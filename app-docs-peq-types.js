@@ -2,16 +2,20 @@
 
 const peqDocs=DOC_SECTIONS.find(s=>s.id==='peq');
 if(peqDocs){
-  peqDocs.eyebrow='Gain/frequency/type verified';
+  peqDocs.eyebrow='Gain/frequency/type/bypass verified';
   peqDocs.html=`
     <h1>Input PEQ record</h1>
-    <p>Each input PEQ contains four 9-byte band records. Controlled dLive 2.12 scene clones now resolve gain, frequency, Bell Width and the edge-band filter-type byte.</p>
-    <pre><code>GG GG  FF FF  WW WW  TT  SS SS
+    <p>Each input PEQ contains four 9-byte band records followed by one trailing PEQ bypass byte. Controlled dLive 2.12 scene clones now resolve gain, frequency, Bell Width, edge-band filter type and global PEQ In/Out.</p>
+    <pre><code>4 × band:
+GG GG  FF FF  WW WW  TT  SS SS
 │      │      │      │   └─ remaining state — unknown / preserved
 │      │      │      └──── filter type byte
 │      │      └─────────── Bell Width
 │      └────────────────── frequency
-└───────────────────────── gain</code></pre>
+└───────────────────────── gain
+
+then:
+BB  global PEQ bypass</code></pre>
 
     <h2>Gain</h2>
     <pre><code>gain_dB = int16_be(raw) / 256
@@ -36,11 +40,17 @@ f   = 4 × 2^(raw / 4608)</code></pre>
       <tr><td>4</td><td>PEQ / Bell</td><td><code>00</code></td></tr>
       <tr><td>4</td><td>High Shelf</td><td><code>02</code></td></tr>
     </tbody></table>
-    <p>The enum therefore has the observed global sequence <code>00 Bell</code>, <code>01 Low Shelf</code>, <code>02 High Shelf</code>, <code>03 LPF</code>, <code>04 HPF</code>. The editor does not expose unsupported combinations: Band 1 is restricted to HPF/Bell/Low Shelf and Band 4 to LPF/Bell/High Shelf.</p>
+    <p>The observed global sequence is <code>00 Bell</code>, <code>01 Low Shelf</code>, <code>02 High Shelf</code>, <code>03 LPF</code>, <code>04 HPF</code>. The editor exposes only the combinations directly proven for Bands 1 and 4.</p>
+
+    <h2>PEQ In / Out — verified write</h2>
+    <pre><code>single trailing byte after Band 4
+00 = PEQ In / active
+01 = PEQ Out / bypassed</code></pre>
+    <p>Controlled CH16 scenes <code>EQ In</code>, <code>EQ Out</code>, <code>EQ In 2</code> and <code>EQ Out 2</code> reproduce the same toggle. In the clean duplicate pair, the trailing PEQ byte is the only byte that changes after the fixed scene-name header in the complete 412,047-byte StageBox scene.</p>
 
     <h2>Remaining state</h2>
     <p>Band offsets <code>+7..8</code> remain unknown and are preserved exactly. Bands 2 and 3 have no type writer because no controlled type variants were supplied for those bands.</p>
 
-    <div class="docs-callout"><strong>Write boundary:</strong> gain <code>+0..1</code>, frequency <code>+2..3</code>, Bell Width <code>+4..5</code>, and the proven Band 1/4 type byte <code>+6</code>. Bytes <code>+7..8</code> remain untouched.</div>
+    <div class="docs-callout"><strong>Write boundary:</strong> band gain <code>+0..1</code>, frequency <code>+2..3</code>, Bell Width <code>+4..5</code>, proven Band 1/4 type byte <code>+6</code>, plus the single trailing PEQ bypass byte. Band bytes <code>+7..8</code> remain untouched.</div>
   `;
 }
