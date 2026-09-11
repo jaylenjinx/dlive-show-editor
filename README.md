@@ -131,6 +131,7 @@ state +116..117 = Manual RMS sidechain high-filter frequency
 state +120      = Manual RMS sidechain high-filter type
 state +123      = Manual RMS sidechain Filter In/Out
 state +124      = Manual RMS sidechain BPF / scene-labelled notch
+state +125..126 = Manual RMS sidechain BPF frequency
 ```
 
 The model byte is decoded from controlled CH16 model scenes:
@@ -167,7 +168,9 @@ Manual RMS makeup gain is isolated at `state +16..17` and uses signed `/256 dB`.
 
 Manual RMS knee is a one-byte enum at `state +18`: `00=Normal`, `01=Soft`. Two duplicate Normal/Soft pairs reproduce exactly and change only this byte.
 
-The `ReverseEngineer` controlled show isolates the Manual RMS compressor sidechain filter. Low-filter frequency is at `+107..108` with tested anchors **20 Hz, 100 Hz, 500 Hz, 2 kHz, 5 kHz**; low type at `+111` is `04=Lo-Cut`, `06=Low Shelf`. High-filter frequency is at `+116..117` with anchors **120 Hz, 200 Hz, 500 Hz, 1 kHz, 5 kHz, 10 kHz, 20 kHz**; high type at `+120` is `03=Hi-Cut`, `07=High Shelf`. Filter In/Out is `+123` (`00=In`, `01=Out`) and the operator-labelled notch / A&H BPF option is `+124` (`00=Off`, `01=On`). Each controlled comparison changes only its target byte(s), and the tested frequency ranges match Allen & Heath's published sidechain filter ranges. Frequency writes are deliberately restricted to exact controlled anchors. **Sidechain Source was not included and remains unmapped.**
+The `ReverseEngineer` controlled show isolates the Manual RMS compressor sidechain filter. Low-filter frequency is at `+107..108` with tested anchors **20 Hz, 100 Hz, 500 Hz, 2 kHz, 5 kHz**; low type at `+111` is `04=Lo-Cut`, `06=Low Shelf`. High-filter frequency is at `+116..117` with anchors **120 Hz, 200 Hz, 500 Hz, 1 kHz, 5 kHz, 10 kHz, 20 kHz**; high type at `+120` is `03=Hi-Cut`, `07=High Shelf`. Filter In/Out is `+123` (`00=In`, `01=Out`) and BPF/notch On/Off is `+124` (`00=Off`, `01=On`). BPF frequency is now isolated at `+125..126` with exact anchors **50 Hz, 100 Hz, 200 Hz, 500 Hz, 1 kHz, 2 kHz, 5 kHz, 10 kHz, 12 kHz**. Frequency writers are deliberately restricted to exact controlled anchors.
+
+Sidechain Source is stored separately from the compressor DSP state in `Compressor side chain source, Input Channel NN` as `01 TT II`, where `TT` is source type and `II` is zero-based source index. Tested type IDs match the strip-assignment IDs (`01 Input`, `02/03 Groups`, `04/05 Auxes`, `08 Main`, `0A/0B Matrices`). On CH16, `Self` and `Input 16` both serialise as `01 01 0F`, proving the archive stores the resolved concrete source rather than a distinct Self mode. The writer currently exposes only exact tested type/index pairs.
 
 ## Decoded / read-only
 
@@ -181,7 +184,7 @@ LPF bytes `state +1..+2` and `+5..+9` are preserved exactly. Real-event material
 
 ### Compressor model selection and remaining dynamics parameters
 
-Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Manual RMS parallel/sidechain/ratio/attack/release/knee/makeup writes are restricted to controlled values/ranges. Sidechain Source and other model-specific parameters remain read-only until independently isolated.
+Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Manual RMS parallel/sidechain/source/ratio/attack/release/knee/makeup writes are restricted to controlled values/ranges; other model-specific parameters remain read-only until independently isolated.
 
 ### Aux-send evidence
 
