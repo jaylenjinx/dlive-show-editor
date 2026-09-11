@@ -6,6 +6,10 @@
 - Resolved the HPF five-byte state map as `03 FF FF SS BB`: frequency is bytes 1–2, byte 3 is slope/filter type, and byte 4 is bypass (`00` On, `01` Off).
 - Verified HPF state and rounded frequency against all 108 input cards rendered by ConsoleFlip for the event show.
 - Promoted HPF slope/filter type to **Verified Write** using controlled CH16 clones: `05=6 dB BW`, `00=12 dB BW`, `01=18 dB BW`, `02=24 dB BW`, `03=18 dB Bessel`; `04` remains unmapped and is preserved.
+- Promoted input LPF frequency and On/Off to **Verified Write** using controlled CH16 clones labelled Off, 20 kHz, 10 kHz, 5 kHz, 1 kHz, 500 Hz, 200 Hz, 50 Hz and 20 Hz.
+- Identified LPF frequency at state `+3..+4` and bypass at `+10`; `LPF Off` versus `LPF On 20khz` changes only the bypass byte outside the scene label, while adjacent frequency scenes change only the frequency bytes.
+- Confirmed LPF uses the same high-resolution logarithmic frequency coordinate as PEQ/HPF across the controlled interior values; the observed 20 kHz endpoint is `0xDD2E` and is emitted explicitly by the writer.
+- Kept LPF bytes `+1..+2` and `+5..+9` read-only/preserved because real-event material shows legitimate filter-shape/state variation there.
 - Identified `Input Mixer` as a 12-byte header followed by 128 equal per-input blocks; current-format block size is mixer-configuration dependent.
 - Promoted input fader to **Verified Write** using controlled CH16 clones at `-∞`, `-30`, `-20.3`, `-12.2`, `-5.9`, approximately `0`, `+5` and `+10 dB`.
 - Established the generic fader locator as `blockStart + blockSize - 84`; the same end-relative field survives different channel-block sizes.
@@ -18,7 +22,7 @@
 - Used the event-show ConsoleFlip preview as an independent 108-channel cross-check, then confirmed the write boundary with controlled CH16 clones. The clean `Comp 2 On` / `Comp 2 Off` pair changes only state `+2` outside the scene label.
 - Added a strict compressor writer guard for the verified current-format shape (`stateLength=127`, processor discriminator `0x08`, existing enable `00/01`); compressor model and all dynamics parameters remain read-only.
 - Located six mono Aux send level fields in the 169-byte event configuration; kept them read-only/configuration-specific until the variable bus-layout rule is solved.
-- Added Channel State tooling, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research JSON exports.
+- Added Channel State tooling, LPF tooling/docs, Input Mixer docs, event/ConsoleFlip cross-check notes and expanded v2.2 research documentation.
 
 ## v2.1.2
 
