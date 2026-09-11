@@ -113,15 +113,34 @@ The editor uses the canonical raw coordinate `0…74` with `37` as centre and wr
 Inside `Compressor, Input Channel NN`:
 
 ```text
+state +1    = compressor model / engine family
 state +2    = 00 Off / 01 On
 state +8..9 = threshold, signed int16_be / 256 dB
 ```
 
+The model byte is now decoded from controlled CH16 model scenes:
+
+```text
+00 Manual Peak
+01 Manual RMS
+02 Opto
+03 16T
+04 16VU
+05 Ducker family
+06 Peak Limiter 76
+07 Mighty
+08 Optronik
+09 Bus
+0A Compstortion
+```
+
+`Ducker` and `Ducker Slow` both use model byte `05`; the Slow variant is represented by different parameter/default state rather than a separate model ID.
+
 The event-show ConsoleFlip preview matched the enable byte across all 108 visible input cards. Controlled CH16 clones then isolated On/Off directly with the clean `Comp 2 On` / `Comp 2 Off` pair.
 
-A separate controlled threshold series used `-46, -30, -20, -10, 0, +10, +18 dB`. Every adjacent pair changed only `state +8..9` outside the scene-label bytes. Examples: `D2 00 = -46.00 dB`, `E1 FD ≈ -30.01 dB`, `00 03 ≈ +0.01 dB`, `12 00 = +18.00 dB`.
+A separate **Manual RMS** (`state +1 = 0x01`) threshold series used `-46, -30, -20, -10, 0, +10, +18 dB`. Every adjacent pair changed only `state +8..9` outside the scene-label bytes. Examples: `D2 00 = -46.00 dB`, `E1 FD ≈ -30.01 dB`, `00 03 ≈ +0.01 dB`, `12 00 = +18.00 dB`.
 
-The threshold writer is deliberately guarded to the exact compressor model used by the experiment (`state +1 = 0x01`), plus the verified current-format processor discriminator/state length. Other compressor models remain threshold read-only until separately tested.
+The threshold writer is deliberately guarded to Manual RMS plus the verified current-format processor discriminator/state length. The model scenes show plausible threshold values at the same offset across the other model families, but threshold writes remain read-only for those models until an additional controlled threshold series proves the shared write boundary.
 
 ## Decoded / read-only
 
@@ -133,9 +152,9 @@ PEQ band bytes `+7..8` remain unknown and are preserved exactly. Bands 2 and 3 f
 
 LPF bytes `state +1..+2` and `+5..+9` are preserved exactly. Real-event material shows legitimate variation in this region, so slope/Q/type semantics are not guessed.
 
-### Compressor model and remaining dynamics parameters
+### Compressor model selection and remaining dynamics parameters
 
-The compressor model/type byte and ratio, attack, release, knee, makeup and other remaining dynamics parameters are not yet mapped for writing. Threshold is writable only for the independently tested model byte `0x01`.
+Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Ratio, attack, release, knee, makeup and other remaining dynamics parameters are still unmapped for writing. Threshold is writable only for the independently tested Manual RMS model.
 
 ### Aux-send evidence
 
@@ -158,11 +177,12 @@ The site has a built-in **Docs** section available without loading a show.
 - [Input HPF](docs/input-hpf.md)
 - [Input LPF](docs/input-lpf.md)
 - [Input Mixer / channel state](docs/input-mixer.md)
+- [Compressor models](docs/compressor-models.md)
 - [Event show / ConsoleFlip cross-check](docs/event-show-consoleflip-crosscheck.md)
 - [Documentation index](docs/README.md)
 - [Consolidated field notes](KNOWN_FORMAT.md)
 
-The interactive parameter map is driven by `app-parameter-map.js` plus focused add-on registries and verified channel-state extensions.
+The interactive parameter map is driven by `app-parameter-map.js` plus focused add-on registries and verified processing extensions.
 
 ## Safety model
 
