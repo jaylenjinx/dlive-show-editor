@@ -1,10 +1,17 @@
 'use strict';
 
-// Read-only current-format dLive 2.12 channel-state decoder.
-// Input Mixer layout has been validated across two different real mixer configs:
+// dLive 2.12 channel-state decoder/editor.
+// Input Mixer layout has been validated across multiple real mixer configs:
 //   12-byte mixer header + 128 equal-size per-input blocks.
-// Fader and pan are located relative to the END of each variable-size block,
-// which makes the mapping survive the two observed block sizes (169 and 224).
+// The fader is fixed relative to the END of each variable-size block.
+//
+// Controlled Hardcore Start clones changed CH16 only at blockSize-84..-83:
+//   -inf, -30, -20.3, -12.2, -5.9, ~0, +5, +10 dB.
+// This independently confirms the fader encoding and generic end-relative offset.
+
+const FADER_MIN_VERIFIED_DB=-30;
+const FADER_MAX_VERIFIED_DB=10;
+const FADER_NEG_INF_RAW=-32767; // 0x8001
 
 function parseInputMixerChannelState(dat){
   const sig=asciiBytes('Input Mixer'),pos=indexOfBytes(dat,sig);
@@ -17,23 +24,25 @@ function parseInputMixerChannelState(dat){
   const blockSize=bodyLength/128;
   if(blockSize<88)return null;
   const blocksStart=stateStart+headerLength;
+  const header=dat.slice(stateStart,stateStart+headerLength);
+  const writableShape=header[0]===3;
   const channels=[];
   for(let i=0;i<128;i++){
     const blockStart=blocksStart+i*blockSize;
     const faderOffset=blockStart+blockSize-84;
     const panOffset=blockStart+blockSize-82;
     const faderRaw=readI16BE(dat,faderOffset);
-    const faderDb=faderRaw===-32767?null:faderRaw/256;
+    const faderDb=faderRaw===FADER_NEG_INF_RAW?null:faderRaw/256;
     const panRaw=dat[panOffset];
     const panPct=((panRaw-37)/37)*100;
     channels.push({
       channel:i+1,blockStart,blockSize,
-      faderOffset,faderRaw,faderDb,faderInfinite:faderRaw===-32767,
+      faderOffset,faderRaw,faderDb,faderInfinite:faderRaw===FADER_NEG_INF_RAW,
       panOffset,panRaw,panPct,
       panLabel:panRaw===37?'C':panRaw<37?`${Math.round(Math.abs(panPct))}% L`:`${Math.round(Math.abs(panPct))}% R`,
     });
   }
-  return {frameStart,pos,payloadLength,stateStart,stateLength,headerLength,header:dat.slice(stateStart,stateStart+headerLength),blockSize,blocksStart,channels};
+  return {frameStart,pos,payloadLength,stateStart,stateLength,headerLength,header,blockSize,blocksStart,writableShape,channels};
 }
 
 function parseInputCompressorStates(dat){
@@ -59,17 +68,42 @@ function ensureChannelState(){
 }
 
 function formatFaderDb(ch){ return ch.faderInfinite?'−∞':`${ch.faderDb.toFixed(2)} dB`; }
+function faderRawHex(ch){
+  const v=ch.faderRaw<0?ch.faderRaw+65536:ch.faderRaw;
+  return `${hexByte(v>>8)} ${hexByte(v&255)}`;
+}
+
+function setInputFaderDb(channel,db){
+  const mixer=ensureChannelState()?.mixer;
+  const ch=mixer?.channels?.[Number(channel)-1];
+  if(!mixer?.writableShape||!ch)return false;
+  let value=Number(db);if(!Number.isFinite(value))return false;
+  value=Math.max(FADER_MIN_VERIFIED_DB,Math.min(FADER_MAX_VERIFIED_DB,value));
+  const raw=Math.round(value*256);
+  writeI16BE(state.current.stage.datBytes,ch.faderOffset,raw);
+  ch.faderRaw=raw;ch.faderDb=raw/256;ch.faderInfinite=false;
+  markStageDirty();return true;
+}
+
+function setInputFaderInfinite(channel){
+  const mixer=ensureChannelState()?.mixer;
+  const ch=mixer?.channels?.[Number(channel)-1];
+  if(!mixer?.writableShape||!ch)return false;
+  writeI16BE(state.current.stage.datBytes,ch.faderOffset,FADER_NEG_INF_RAW);
+  ch.faderRaw=FADER_NEG_INF_RAW;ch.faderDb=null;ch.faderInfinite=true;
+  markStageDirty();return true;
+}
 
 function renderChannelState(){
   const root=$('#channelStateEditor');if(!root)return;
   root.innerHTML='';
   const decoded=ensureChannelState();
-  if(!decoded?.mixer){root.innerHTML='<div class="notice warn">This scene does not match the two currently validated Input Mixer shapes.</div>';return;}
+  if(!decoded?.mixer){root.innerHTML='<div class="notice warn">This scene does not match the validated Input Mixer framing.</div>';return;}
   const mixer=decoded.mixer;
   const inputs=state.current.stage.managers.find(x=>x.key==='inputs');
 
   const toolbar=document.createElement('section');toolbar.className='panel peq-toolbar';
-  toolbar.innerHTML='<div class="manager-head inline"><h2>Input channel</h2><span class="confidence decoded">CROSS-CHECKED READ</span></div>';
+  toolbar.innerHTML=`<div class="manager-head inline"><h2>Input channel</h2><span class="confidence ${mixer.writableShape?'verified':'decoded'}">${mixer.writableShape?'FADER VERIFIED WRITE':'READ ONLY'}</span></div>`;
   const select=document.createElement('select');select.className='peq-channel-select';
   for(const ch of mixer.channels){
     const name=inputs?.items[ch.channel-1]?.name||'';
@@ -86,8 +120,13 @@ function renderChannelState(){
     const panel=document.createElement('section');panel.className='panel';
     panel.innerHTML=`
       <div class="manager-head inline"><h2>CH ${ch.channel} mixer state</h2><code>block 0x${ch.blockStart.toString(16)} · ${ch.blockSize} bytes</code></div>
+      <div class="peq-field">
+        <span>Fader <small>verified writer: −30…+10 dB, plus −∞</small></span>
+        <div><input data-k="fader" type="number" min="${FADER_MIN_VERIFIED_DB}" max="${FADER_MAX_VERIFIED_DB}" step="0.1" value="${ch.faderInfinite?'':ch.faderDb.toFixed(2)}" placeholder="−∞"><b>dB</b> <button data-k="inf" type="button">Set −∞</button></div>
+        <code>${faderRawHex(ch)}</code>
+      </div>
       <div class="config-table">
-        <div class="config-row"><strong>Fader</strong><code>${ch.faderInfinite?'80 01':`${hexByte((ch.faderRaw<0?ch.faderRaw+65536:ch.faderRaw)>>8)} ${hexByte((ch.faderRaw<0?ch.faderRaw+65536:ch.faderRaw)&255)}`}</code><span>${formatFaderDb(ch)}</span></div>
+        <div class="config-row"><strong>Fader decoded</strong><code>${faderRawHex(ch)}</code><span>${formatFaderDb(ch)}</span></div>
         <div class="config-row"><strong>Fader offset</strong><code>block + ${ch.blockSize-84}</code><span><code>blockSize − 84</code></span></div>
         <div class="config-row"><strong>Pan</strong><code>${hexByte(ch.panRaw)}</code><span>${ch.panLabel}</span></div>
         <div class="config-row"><strong>Pan offset</strong><code>block + ${ch.blockSize-82}</code><span><code>blockSize − 82</code></span></div>
@@ -95,13 +134,26 @@ function renderChannelState(){
       </div>`;
     details.appendChild(panel);
 
+    const faderInput=panel.querySelector('[data-k="fader"]'),infBtn=panel.querySelector('[data-k="inf"]');
+    if(!mixer.writableShape){faderInput.disabled=true;infBtn.disabled=true;}
+    faderInput.onchange=()=>{
+      if(setInputFaderDb(ch.channel,faderInput.value))renderChannelState();
+      else toast('Fader write blocked by structure validation.',true);
+    };
+    infBtn.onclick=()=>{
+      if(setInputFaderInfinite(ch.channel))renderChannelState();
+      else toast('Fader write blocked by structure validation.',true);
+    };
+
     const evidence=document.createElement('section');evidence.className='panel';
     evidence.innerHTML=`
       <h2>Input Mixer structure</h2>
       <pre><code>12-byte mixer header
-+ 128 × ${mixer.blockSize}-byte input blocks</code></pre>
-      <p>Two real dLive 2.12 shows use different block sizes (169 and 224 bytes), but fader and pan remain at <code>blockSize − 84</code> and <code>blockSize − 82</code>. ConsoleFlip's rendered fader and pan controls independently agree with these decoded values.</p>
-      <div class="notice warn"><strong>Read-only:</strong> unlike HPF, fader/pan have not yet been isolated with one-parameter scene clones. Their values are decoded and independently cross-checked, but the editor does not write them yet.</div>`;
++ 128 × ${mixer.blockSize}-byte input blocks
+
+faderOffset = blockStart + blockSize - 84</code></pre>
+      <p>The real event show uses 169-byte blocks; Hardcore Start uses 224-byte blocks. The controlled CH16 scenes at −∞, −30, −20.3, −12.2, −5.9, approximately 0, +5 and +10 dB changed only the two bytes at <code>blockSize − 84</code>. Normal values are signed 8.8 fixed-point dB; <code>80 01</code> is the −∞ sentinel.</p>
+      <div class="notice safe"><strong>Verified fader write:</strong> only the two fader bytes are modified. Pan, compressor and routing remain read-only.</div>`;
     details.appendChild(evidence);
   };
   select.onchange=draw;draw();
