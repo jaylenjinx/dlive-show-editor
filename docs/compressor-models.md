@@ -1,6 +1,6 @@
 # Input compressor models
 
-> Status: **decoded / read-only for model selection**. Primary target: dLive 2.12.
+> Status: **decoded / read-only for model selection; verified restricted writes for selected model parameters**. Primary target: dLive 2.12.
 
 Controlled CH16 scenes map the compressor model/engine byte at `state +1` inside `Compressor, Input Channel NN`.
 
@@ -97,3 +97,61 @@ Controlled Manual RMS (`0x01`) scenes isolate compressor ratio to one byte at `s
 | `∞:1` | `28` |
 
 This is a discrete ratio table/index rather than a simple linear numeric encoding. The editor therefore exposes only these seven directly tested choices and does not guess intermediate raw table entries. Ratio writes remain guarded to Manual RMS until other compressor models are independently tested.
+
+## Manual RMS attack and release — verified restricted write
+
+Controlled Manual RMS scenes isolate two adjacent 16-bit big-endian fields:
+
+```text
+state +10..11 = attack
+state +12..13 = release
+```
+
+Both controls use the **same logarithmic time coordinate**. Identical time values produce identical stored words on attack and release:
+
+| Time | Raw |
+|---:|---:|
+| `50 ms` | `6D 5C` |
+| `100 ms` | `74 5E` |
+| `200 ms` | `7B 5F` |
+
+That shared coordinate is strong independent structural evidence that these are time values rather than unrelated model-state words.
+
+### Attack controlled anchors
+
+| Attack | Raw |
+|---:|---:|
+| `30 µs` | `22 61` |
+| `100 µs` | `2E 8C` |
+| `200 µs` | `35 8E` |
+| `500 µs` | `3E D0` |
+| `1 ms` | `45 D2` |
+| `2 ms` | `4C D3` |
+| `5 ms` | `56 16` |
+| `10 ms` | `5D 18` |
+| `20 ms` | `64 19` |
+| `50 ms` | `6D 5C` |
+| `100 ms` | `74 5E` |
+| `200 ms` | `7B 5F` |
+| `300 ms` | `7F 79` |
+
+### Release controlled anchors
+
+| Release | Raw |
+|---:|---:|
+| `50 ms` | `6D 5C` |
+| `100 ms` | `74 5E` |
+| `200 ms` | `7B 5F` |
+| `500 ms` | `84 A2` |
+| `1 s` | `8B A3` |
+| `2 s` | `92 A5` |
+
+For every adjacent attack scene, the only post-scene-label bytes that change in the complete StageBox scene are `state +10..11`. For every adjacent release scene, only `state +12..13` changes.
+
+The coordinate is logarithmic; a useful display-only approximation is:
+
+```text
+time_ms ≈ 10^((raw - 17874) / 5958)
+```
+
+Because the console's displayed times are rounded, the editor does **not** use that approximation for writes. It exposes only the exact controlled anchors above. Attack/release writes remain guarded to Manual RMS (`0x01`) until other models are independently tested.
