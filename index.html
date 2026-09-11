@@ -43,7 +43,7 @@
     <div id="emptyState" class="empty-state">
       <div class="empty-icon">DL2</div>
       <h1>Edit proven dLive structures, inspect the rest</h1>
-      <p>V2.2 adds verified input HPF editing and a cross-checked channel-state inspector for fader, pan and compressor, alongside PEQ editing, C-class layer editing, RackUltra inspection and mixer-config research tools.</p>
+      <p>V2.2 includes verified input PEQ, HPF frequency/slope/bypass and input-fader editing, alongside C-class layer editing, RackUltra inspection and mixer-config research tools.</p>
       <button id="openBtn2" class="primary large">Choose show file</button>
     </div>
 
@@ -84,12 +84,12 @@
       </div>
 
       <div id="tabHpf" class="tab-panel">
-        <div class="notice safe"><strong>Verified write:</strong> input HPF frequency and bypass state are cross-checked against ConsoleFlip across 108 real event-channel cards. The editor changes only frequency bytes 1–2 and bypass byte 4; unknown byte 3 is preserved exactly.</div>
+        <div class="notice safe"><strong>Verified write:</strong> HPF frequency and bypass are cross-checked against ConsoleFlip, and controlled slope scenes isolate byte 3. The editor writes only frequency bytes 1–2, a verified slope/type value at byte 3, and bypass byte 4.</div>
         <div id="hpfEditor"></div>
       </div>
 
       <div id="tabChannelstate" class="tab-panel">
-        <div class="notice warn"><strong>Cross-checked read-only:</strong> the current <code>Input Mixer</code> record is decoded into 128 variable-size channel blocks. Fader and pan survive two different real mixer configurations using offsets relative to each block end; compressor On/Off is independently matched to ConsoleFlip.</div>
+        <div class="notice warn"><strong>Mixed confidence:</strong> input fader is now Verified Write using a block-end-relative locator across two mixer configurations. Pan and compressor On/Off remain read-only pending isolated controlled scenes.</div>
         <div id="channelStateEditor"></div>
       </div>
 
