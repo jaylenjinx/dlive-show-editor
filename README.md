@@ -88,9 +88,7 @@ Controlled CH16 clones changed only that byte:
 
 The editor uses the canonical raw coordinate `0…74` with `37` as centre and writes percentage requests using `raw = 37 + trunc(percent * 37 / 100)`. Only the pan byte is modified.
 
-## Decoded / read-only
-
-### Input compressor On/Off
+### Input compressor On/Off — v2.2
 
 Inside `Compressor, Input Channel NN`:
 
@@ -99,7 +97,15 @@ state +2 = 00  -> Off
 state +2 = 01  -> On
 ```
 
-This matches all 108 visible ConsoleFlip channel cards in the event-show preview. Other compressor parameters remain under investigation.
+The event-show ConsoleFlip preview matched this byte across all 108 visible input cards. Controlled CH16 clones then isolated the byte directly: the clean `Comp 2 On` / `Comp 2 Off` pair changes only `state +2` outside the scene label.
+
+The editor writes only that enable byte, and only when the record matches the verified current-format input-compressor shape. Compressor model and all dynamics parameters remain read-only.
+
+## Decoded / read-only
+
+### Compressor model and dynamics parameters
+
+The compressor model/type byte and threshold, ratio, attack, release, knee and other dynamics parameters are not yet mapped for writing.
 
 ### Aux-send evidence
 
