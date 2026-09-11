@@ -49,3 +49,9 @@ if(location.hash.startsWith('#docs-'))setPrimaryView('docs');
 window.addEventListener('hashchange',()=>{
   if(location.hash.startsWith('#docs-')){setPrimaryView('docs'); if(typeof renderDocs==='function')renderDocs();}
 });
+
+// Load the independently verified compressor-threshold extension after the
+// core channel-state module has established its parser and UI hooks.
+const compThresholdScript=document.createElement('script');
+compThresholdScript.src='app-compressor-threshold.js';
+document.body.appendChild(compThresholdScript);
