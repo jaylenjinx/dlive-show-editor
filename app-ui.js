@@ -38,10 +38,12 @@ $('#csvInput').onchange=async e=>{
 };
 $('#showUnused').onchange=renderManagers;
 $('#applyAllBtn').onclick=()=>applyCurrentToAllScenes().catch(e=>toast(e.message,true));
-$$('.tab').forEach(b=>b.onclick=()=>{
+
+function activateEditorTab(button){
   $$('.tab').forEach(x=>x.classList.remove('active'));$$('.tab-panel').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active');const id=`#tab${b.dataset.tab[0].toUpperCase()+b.dataset.tab.slice(1)}`;$(id).classList.add('active');
-});
+  button.classList.add('active');const id=`#tab${button.dataset.tab[0].toUpperCase()+button.dataset.tab.slice(1)}`;$(id)?.classList.add('active');
+}
+$$('.tab').forEach(b=>b.onclick=()=>activateEditorTab(b));
 
 $('#editorNavBtn').onclick=()=>setPrimaryView('editor');
 $('#docsNavBtn').onclick=()=>setPrimaryView('docs');
@@ -50,8 +52,34 @@ window.addEventListener('hashchange',()=>{
   if(location.hash.startsWith('#docs-')){setPrimaryView('docs'); if(typeof renderDocs==='function')renderDocs();}
 });
 
-// Load the independently verified compressor-threshold extension after the
-// core channel-state module has established its parser and UI hooks.
-const compThresholdScript=document.createElement('script');
-compThresholdScript.src='app-compressor-threshold.js';
-document.body.appendChild(compThresholdScript);
+// Add the console-style visual editing surface without replacing the existing
+// research-oriented PEQ / Channel State tabs. All writes still go through the
+// guarded reverse-engineered setters.
+(function installConsoleUi(){
+  if($('#tabConsole'))return;
+  const tab=document.createElement('button');
+  tab.className='tab';tab.type='button';tab.dataset.tab='console';tab.textContent='Console UI';
+  const namesTab=document.querySelector('.tab[data-tab="names"]');
+  if(namesTab)namesTab.insertAdjacentElement('afterend',tab);else document.querySelector('.tabs')?.appendChild(tab);
+  tab.onclick=()=>activateEditorTab(tab);
+
+  const panel=document.createElement('div');panel.id='tabConsole';panel.className='tab-panel';
+  panel.innerHTML='<div class="notice safe"><strong>Visual editor:</strong> console-style Preamp, Gate, PEQ, Compressor, Delay and Routing views backed by controlled-diff verified byte writers. Gate sidechain and model-specific compressor controls are enabled only where independently mapped; unsupported controls remain disabled.</div><div id="consoleEditor"></div>';
+  const namesPanel=$('#tabNames');
+  if(namesPanel)namesPanel.insertAdjacentElement('afterend',panel);else $('#editor')?.appendChild(panel);
+
+  for(const href of ['console-ui.css','console-ui-input.css','console-ui-batch3.css'])if(!document.querySelector(`link[href="${href}"]`)){
+    const css=document.createElement('link');css.rel='stylesheet';css.href=href;document.head.appendChild(css);
+  }
+  const consoleScripts=['app-input-processing.js','app-gate-sidechain.js','app-compressor-extra-models.js','app-rackultra-verified.js','app-rackultra-spaces-extra.js','app-rackultra-spaces-medium.js','app-parameter-map-input-processing.js','app-console-ui-peq.js','app-console-ui-compressor.js','app-console-ui-input.js','app-console-ui-reverse-batch3.js','app-console-ui-main.js'];
+  const loadConsoleScript=index=>{
+    if(index>=consoleScripts.length){if(state.current?.stage&&typeof renderConsoleEditor==='function')renderConsoleEditor();if(state.current?.stage&&typeof renderFx==='function')renderFx();return;}
+    const src=consoleScripts[index];
+    if(document.querySelector(`script[src="${src}"]`)){loadConsoleScript(index+1);return;}
+    const script=document.createElement('script');script.src=src;script.async=false;
+    script.onload=()=>loadConsoleScript(index+1);
+    script.onerror=()=>toast(`Failed to load ${src}.`,true);
+    document.body.appendChild(script);
+  };
+  loadConsoleScript(0);
+})();
