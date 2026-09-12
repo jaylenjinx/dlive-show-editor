@@ -1,6 +1,6 @@
 # RackUltra / AHFX records
 
-**Status:** decoded generally; **verified restricted writes for a growing subset of 480 Large / Spaces (`1c03`) controls**.
+**Status:** decoded generally; **verified restricted writes for growing subsets of Spaces / 480 Large (`1c03`) and Spaces / 480 Medium (`1c04`)**.
 
 Eight records are anchored by:
 
@@ -10,7 +10,7 @@ AHFX Manager 01
 AHFX Manager 08
 ```
 
-In the current 2.12 reference show, each AHFX payload is 262 bytes. Including the 2-byte length prefix, a record occupies 264 bytes.
+In the current 2.12 reference shows, each AHFX payload is 262 bytes. Including the 2-byte length prefix, a record occupies 264 bytes.
 
 ## Observed engine IDs
 
@@ -116,7 +116,7 @@ The editor permits continuous integer writes only inside the directly observed r
 
 ### EL / LL / SL
 
-The scene set isolates three distinct 16-bit controls but does not establish their full UI label semantics. The editor therefore keeps the scene abbreviations and exposes only exact qualitative anchors.
+The original batch isolated three distinct 16-bit controls. They are unnumbered faders on the console, so the editor treats their labels as control names rather than physical units.
 
 | Control | Offset | Low | Mid / Medium | High |
 |---|---:|---:|---:|---:|
@@ -135,8 +135,74 @@ All four controls use `10` for enabled and `00` for disabled:
 | Echo 2 On/Off | `state +133` |
 | Size Link On/Off | `state +147` |
 
+## 480 Medium / Spaces (`1c04`) — verified writes
+
+`ReverseEngineer2.tar.gz` starts with a clean `CTL 1` / `CTL 2` pair; the two StageBox scenes differ only in one scene-name byte. UFX1 is engine `1c04` with the same 262-byte AHFX payload shape.
+
+### LL / EL / SL fader positions
+
+The new file confirms that LL, EL and SL are **unnumbered faders** and supplies five physical-position anchors for each. Percentages in the editor mean fader position only.
+
+| Control | Offset | Min | 25% | 50% | 75% | Max |
+|---|---:|---:|---:|---:|---:|---:|
+| LL | `state +70..71` | `6C00` | `7123` | `7582` | `79E1` | `8000` |
+| EL | `state +68..69` | `6C00` | `7193` | `760E` | `7AA5` | `8000` |
+| SL | `state +94..95` | `6C00` | `730D` | `7A97` | `817A` | `8A00` |
+
+The curves are not treated as linear; only the five exact positions are writable.
+
+### Echo 1 / Echo 2 Time
+
+Echo 1 Time is `state +96..97`; Echo 2 Time is `state +108..109`.
+
+Both independently prove:
+
+```text
+raw = 0x8000 + 16 * time_ms
+```
+
+Echo 1 anchors: `0, 50, 100, 150, 200 ms`; Echo 2 anchors: `0, 100, 200 ms`. The editor therefore allows continuous integer writes only inside `0…200 ms`.
+
+### Echo 1 / Echo 2 Feedback
+
+Echo 1 Feedback is `state +98..99` with exact anchors `−40, −20, −10, 0, +10 dB`.
+
+Echo 2 Feedback is `state +110..111` with exact anchors `−40, −10, +10 dB`.
+
+The stored words closely resemble an offset-binary `/256 dB` coordinate around `0x8000`, but common values carry small low-byte quantisation offsets. Feedback therefore remains exact-anchor-only.
+
+The engine contains four additional echoes; Echoes 3–6 remain read-only until their own controlled sweeps are supplied.
+
+### Damping LF / HF
+
+Damping LF frequency is `state +46..47` with exact anchors `20, 50, 100, 200, 500, 1000 Hz`.
+
+Damping HF type is `state +93`:
+
+```text
+10 = 6 dB
+20 = 12 dB
+30 = Shelf
+```
+
+Damping HF frequency is `state +64..65` with exact anchors from `40 Hz` through `20 kHz`.
+
+Damping HF shelf gain is `state +66..67` with exact anchors `0, −6, −12, −15 dB`.
+
+### Output HF
+
+Output HF type is `state +83` using the same enum:
+
+```text
+10 = 6 dB
+20 = 12 dB
+30 = Shelf
+```
+
+Output HF shelf gain is `state +86..87` with exact anchors `0, −6, −12, −15 dB`.
+
 ## Guard policy
 
 All RackUltra writes are guarded to the exact engine ID and observed payload shape. Values are continuous only when the controlled scenes establish an exact transform over a bounded range; otherwise the editor offers exact observed anchors/enums only. Every unmapped DSP byte and every other RackUltra engine remains preserved and read-only.
 
-See [`reverse-engineer-batch4.md`](reverse-engineer-batch4.md) for the scene-by-scene batch-4 evidence.
+See [`reverse-engineer-batch4.md`](reverse-engineer-batch4.md) for the 480 Large batch-4 evidence and [`reverse-engineer-batch5.md`](reverse-engineer-batch5.md) for the new 480 Medium / Echo evidence.
