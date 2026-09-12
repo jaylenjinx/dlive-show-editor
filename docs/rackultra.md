@@ -1,6 +1,6 @@
 # RackUltra / AHFX records
 
-**Status:** decoded generally; **verified restricted write for 480 Large / Spaces Pre Delay and Decay Time**.
+**Status:** decoded generally; **verified restricted writes for a growing subset of 480 Large / Spaces (`1c03`) controls**.
 
 Eight records are anchored by:
 
@@ -30,8 +30,6 @@ In the current 2.12 reference show, each AHFX payload is 262 bytes. Including th
 The editor exposes record offset, size, engine ID, stored preset label and same-engine byte differences for every RackUltra record. DSP writes remain disabled by default unless a field has an independently controlled mapping.
 
 ## 480 Large / Spaces (`1c03`) — verified writes
-
-Controlled UFX1 scenes isolate two DSP parameters.
 
 ### Pre Delay
 
@@ -68,4 +66,77 @@ Controlled anchors:
 
 The raw coordinate follows the same logarithmic-time family seen elsewhere in dLive processing, but only these three exact words are writable for now. Intermediate decay values are not guessed.
 
-All other RackUltra DSP bytes and other engine families remain decoded/read-only until their own controlled parameter sweeps are available.
+### Space / model selector
+
+`state +29` / payload `+45` is a one-byte enum:
+
+| Raw | Model |
+|---:|---|
+| `10` | Large Hall |
+| `20` | Medium Hall |
+| `30` | Small Hall |
+| `40` | Room |
+| `60` | Classic Large |
+| `50` | Classic Medium |
+| `70` | Classic Small |
+| `80` | Classic Room |
+
+### Low Cut and High Cut
+
+Low Cut is `state +76..77` / payload `+92..93`:
+
+- `20 Hz = 29 CB`
+- `500 Hz = 7D 62`
+- `1 kHz = 8F 63`
+
+High Cut is `state +78..79` / payload `+94..95`:
+
+- `1 kHz = 8F 63`
+- `10 kHz = CB 2D`
+- `20 kHz = DD 2E`
+
+These fields use the familiar dLive logarithmic-frequency coordinate family, but exact scene-proven words are used for writes because displayed frequency labels are rounded.
+
+### Width, Length, DS and Spread
+
+Four independent sweeps prove the same linear coordinate:
+
+```text
+raw = 0x8000 + 16 * value
+```
+
+| Control | Offset | Verified range / anchors |
+|---|---:|---|
+| DS | `state +42..43` | 0, 50, 100 |
+| Width | `state +60..61` | 1, 15, 30 |
+| Length | `state +62..63` | 1, 20, 35 |
+| Spread | `state +122..123` | 0, 50, 100 |
+
+The editor permits continuous integer writes only inside the directly observed ranges.
+
+### EL / LL / SL
+
+The scene set isolates three distinct 16-bit controls but does not establish their full UI label semantics. The editor therefore keeps the scene abbreviations and exposes only exact qualitative anchors.
+
+| Control | Offset | Low | Mid / Medium | High |
+|---|---:|---:|---:|---:|
+| EL | `state +68..69` | `6C00` | `7646` | `8000` |
+| LL | `state +70..71` | `6C00` | `767E` | `8000` |
+| SL | `state +94..95` | `6C00` | `7B69` | `8A00` |
+
+### Size Link and Echo toggles
+
+All four controls use `10` for enabled and `00` for disabled:
+
+| Control | Offset |
+|---|---:|
+| Echo section In/Out | `state +125` |
+| Echo 1 On/Off | `state +127` |
+| Echo 2 On/Off | `state +133` |
+| Size Link On/Off | `state +147` |
+
+## Guard policy
+
+All RackUltra writes are guarded to the exact engine ID and observed payload shape. Values are continuous only when the controlled scenes establish an exact transform over a bounded range; otherwise the editor offers exact observed anchors/enums only. Every unmapped DSP byte and every other RackUltra engine remains preserved and read-only.
+
+See [`reverse-engineer-batch4.md`](reverse-engineer-batch4.md) for the scene-by-scene batch-4 evidence.
