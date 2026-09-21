@@ -9,6 +9,7 @@ const PEQ_WIDTH_TABLE = [
 ];
 
 // Controlled CH16 edge-band type scenes prove byte +6 of each 9-byte band.
+// Bands 2-3 are fixed Bell (00): Director 2.12 offers no type control and every observed scene stores 00.
 // Restrict writes to the combinations actually exposed and independently tested.
 const PEQ_BAND_TYPE_OPTIONS = {
   1:[
@@ -162,11 +163,11 @@ function renderPeq(){
       const typeOptions=peqTypeOptions(b.band);
       card.innerHTML=`
         <div class="manager-head inline"><h2>Band ${b.band}</h2><code>+0x${(b.offset-p.frameStart).toString(16)}</code></div>
-        ${typeOptions.length?'<label class="peq-field"><span>Filter type <small>verified edge-band enum</small></span><select data-k="type"></select><code>'+hexByte(b.typeRaw)+'</code></label>':''}
+        ${typeOptions.length?'<label class="peq-field"><span>Filter type <small>verified edge-band enum</small></span><select data-k="type"></select><code>'+hexByte(b.typeRaw)+'</code></label>':`<div class="peq-field readonly"><span>Filter type <small>Bands 2–3 have no type control in Director 2.12</small></span><span>${b.typeRaw===0?'Bell (fixed)':'Unknown (preserved)'}</span><code>${hexByte(b.typeRaw)}</code></div>`}
         <label class="peq-field"><span>Gain <small>signed 8.8 fixed point</small></span><div><input data-k="gain" type="number" min="-15" max="15" step="0.1" value="${b.gainDb.toFixed(3)}"><b>dB</b></div><code>${hexByte((b.gainRaw<0?b.gainRaw+65536:b.gainRaw)>>8)} ${hexByte((b.gainRaw<0?b.gainRaw+65536:b.gainRaw)&255)}</code></label>
         <label class="peq-field"><span>Frequency <small>exact log mapping</small></span><div><input data-k="freq" type="number" min="20" max="20000" step="1" value="${Math.round(b.frequencyHz)}"><b>Hz</b></div><code>${hexByte(b.frequencyRaw>>8)} ${hexByte(b.frequencyRaw&255)}</code></label>
         <label class="peq-field"><span>Bell width <small>A&amp;H octave-width scale</small></span><select data-k="width"></select><code>${hexByte(b.widthRaw>>8)} ${hexByte(b.widthRaw&255)}${b.widthFraction?` · frac ${b.widthFraction}/256`:''}</code></label>
-        <div class="peq-field readonly"><span>${typeOptions.length?'Remaining state bytes':'State/type bytes'}</span><code>${typeOptions.length?hexRange(b.remainingStateBytes):hexRange(b.stateBytes)}</code><span class="confidence unknown">READ ONLY</span></div>`;
+        <div class="peq-field readonly"><span>Remaining state bytes</span><code>${hexRange(b.remainingStateBytes)}</code><span class="confidence unknown">READ ONLY</span></div>`;
       const w=card.querySelector('[data-k="width"]');
       PEQ_WIDTH_TABLE.forEach((name,i)=>{const o=document.createElement('option');o.value=i;o.textContent=name;o.selected=i===b.widthIndex;w.appendChild(o);});
       const typeSelect=card.querySelector('[data-k="type"]');

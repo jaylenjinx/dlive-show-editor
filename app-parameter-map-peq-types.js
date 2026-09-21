@@ -8,7 +8,7 @@ if(peqStateEntry)Object.assign(peqStateEntry,{
   transform:'band +6 type enum: 00 PEQ/Bell, 01 Low Shelf, 02 High Shelf, 03 LPF, 04 HPF; +7..8 remain unknown',
   confidence:'partial',write:true,
   evidence:'Controlled CH16 edge-band clones: Band1 HPF=04, PEQ=00, Low Shelf=01; Band4 LPF=03, PEQ=00, High Shelf=02. Each adjacent type scene changes only byte +6 outside the scene label.',
-  notes:'Writer is deliberately context-restricted: Band 1 offers HPF / PEQ / Low Shelf; Band 4 offers LPF / PEQ / High Shelf. Bands 2–3 type remains untouched. Bytes +7..8 are always preserved.'
+  notes:'Writer is deliberately context-restricted: Band 1 offers HPF / PEQ / Low Shelf; Band 4 offers LPF / PEQ / High Shelf. Bands 2–3 are fixed Bell (00) with no type control in Director 2.12 (ReverseEngineer8). Bytes +7..8 are always preserved.'
 });
 
 PARAMETER_MAP.push(

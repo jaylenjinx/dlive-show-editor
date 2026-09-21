@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **PEQ Bands 2 and 3** (`ReverseEngineer8`, 46 automated Director scenes on input 13): gain, frequency and Bell Width are independently swept on both bands across full range. Every frequency matches the existing log writer, and every width matches the width-index table.
+- Bands 2–3 are fixed Bell: Director 2.12 has no type control for them, and the type byte is `00` in every observed scene. The editor now labels it that way instead of showing an unknown byte. Remaining bytes `+7..8` never changed and stay preserved.
+- `dlive_re.py` accepts a folder of `Scene N.dat` files, such as Director's live `TLDV2.12/TLDData/Director/Scenes/StageBox` folder, so batches can be checked without exporting a show.
+
 ## v2.2
 
 - Promoted Manual RMS sidechain **BPF frequency** at compressor state `+125..126` to restricted **Verified Write**. Controlled anchors `50 Hz=4197`, `100=5396`, `200=6596`, `500=7D62`, `1 kHz=8F62`, `2 kHz=A162`, `5 kHz=B92D`, `10 kHz=CB2D`, `12 kHz=CFEA` each isolate only these two bytes outside scene-label bytes.

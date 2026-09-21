@@ -1,5 +1,6 @@
 import importlib.util
 import pathlib
+import tempfile
 import unittest
 import sys
 
@@ -20,5 +21,14 @@ class CheckerTests(unittest.TestCase):
     def test_changed_runs(self):
         a=bytes.fromhex('0001020304');b=bytes.fromhex('0001FFFE04')
         self.assertEqual([(r.start,r.end) for r in dl.changed_runs(a,b)],[(2,3)])
+
+    def test_load_scene_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for n,name in ((7,b'CTL 1'),(8,b'CTL 2')):
+                (pathlib.Path(tmp)/f'Scene {n}.dat').write_bytes(b'\x00\x01'+name+b'\x00'+bytes(16))
+            (pathlib.Path(tmp)/'SceneUpdateFilters.dat').write_bytes(b'x')
+            scenes=dl.load_show(tmp)
+            self.assertEqual(sorted(scenes),[7,8])
+            self.assertEqual(scenes[8].name,'CTL 2')
 
 if __name__=='__main__': unittest.main()
