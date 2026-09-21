@@ -31,4 +31,15 @@ class CheckerTests(unittest.TestCase):
             self.assertEqual(sorted(scenes),[7,8])
             self.assertEqual(scenes[8].name,'CTL 2')
 
+    def test_input_mixer_send_layout(self):
+        header=bytes.fromhex('03 04 09 04 04 06 06 02 02 00 01 01')
+        entries,section,size=dl.input_mixer_layout(header)
+        self.assertEqual(size,208)
+        where={n:o for n,o,w in entries}
+        self.assertEqual((where['FX 1'],where['Aux 1'],where['St FX 1'],where['St Aux 1'],where['Mtx 1'],where['St Mtx 1'],where['UFX 1']),
+                         (13,29,53,73,103,111,168))
+        self.assertEqual(section+3,208-84)  # verified fader offset
+        # legacy (version 2) blocks have no UFX sends
+        self.assertEqual(dl.input_mixer_layout(bytes.fromhex('02 04 04 08 00 08 08 04 04 01 01 01'))[2],195)
+
 if __name__=='__main__': unittest.main()

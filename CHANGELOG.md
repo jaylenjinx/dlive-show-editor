@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Input sends and group assigns** (`ReverseEngineer9`, 79 automated Director scenes on input 13): solved the general Input Mixer bus layout.
+  - Block order: group assign bytes, then mono FX, mono Aux, stereo FX, stereo Aux, mono Matrix, stereo Matrix sends (`[on, pre, level]` / `[on, pre, level, pan]`), a 47-byte channel section, then 8 UFX sends.
+  - `blockSize = groups + 4 × mono + 5 × stereo + 47 (+40 UFX)` holds for every block in five mixer configurations, including legacy pre-UFX blocks.
+- New `app-input-sends.js`: Channel state tab gains writable send level (−39…+10 dB, −∞), On, Pre/Post and group assigns. Writes are guarded on the header reproducing the block size and the verified fader offset.
+- `dlive_re.py` now reads the 26 KB Input Mixer record and labels per-channel send, assign, fader and pan fields.
+
+## Unreleased
+
 - **PEQ Bands 2 and 3** (`ReverseEngineer8`, 46 automated Director scenes on input 13): gain, frequency and Bell Width are independently swept on both bands across full range. Every frequency matches the existing log writer, and every width matches the width-index table.
 - Bands 2–3 are fixed Bell: Director 2.12 has no type control for them, and the type byte is `00` in every observed scene. The editor now labels it that way instead of showing an unknown byte. Remaining bytes `+7..8` never changed and stay preserved.
 - `dlive_re.py` accepts a folder of `Scene N.dat` files, such as Director's live `TLDV2.12/TLDData/Director/Scenes/StageBox` folder, so batches can be checked without exporting a show.

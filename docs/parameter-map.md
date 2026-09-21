@@ -170,9 +170,16 @@ canonical raw = 37 + trunc(pan_percent × 37 / 100)
 
 **Verified write.** Controlled CH16 pan clones changed only this byte: `100L=00`, `50L=13`, labelled near-centre `=24`, `50R=37`, `100R=4A`. The original Scene 10 centre is `25`, establishing the exact centre code. The writer uses `25` for exact centre and quantises percentages across the 0…74 coordinate.
 
-### Event-config mono Aux sends
+### Input sends and group assigns
 
-In the 169-byte event block, six mono Aux level fields are observed at `+12,+16,+20,+24,+28,+32`, each as `int16_be / 256 dB` with `0x8001 = -infinity`. These offsets are **configuration-specific evidence only** and are not writable until the variable bus-layout rule is solved.
+The per-input block is laid out from the mixer header as follows:
+
+- group assign bytes
+- mono FX, mono Aux, stereo FX, stereo Aux, mono Matrix, stereo Matrix sends (`[on, pre, level]` / `[on, pre, level, pan]`)
+- a 47-byte channel section
+- 8 UFX sends (header version ≥ 3)
+
+Level is `int16_be / 256 dB` with `8001 = −∞`. On/Pre/assign are `00/01`. **Verified write** for level (−39…+10 dB, −∞), On, Pre/Post and group assign; stereo send pan is decoded read only. See [input-mixer.md](input-mixer.md).
 
 See [`input-mixer.md`](input-mixer.md).
 
