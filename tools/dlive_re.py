@@ -249,10 +249,13 @@ def known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> di
                 (66,67):("Spaces damping HF shelf gain","offset_db_8000_256"),(68,69):("Spaces EL position","position_anchor"),
                 (70,71):("Spaces LL position","position_anchor"),(83,83):("Spaces output HF type","enum"),
                 (86,87):("Spaces output HF shelf gain","offset_db_8000_256"),(93,93):("Spaces damping HF type","enum"),
-                (94,95):("Spaces SL position","position_anchor"),(96,97):("Spaces Echo 1 Time","linear_8000_16"),
-                (98,99):("Spaces Echo 1 Feedback","offset_db_8000_256"),(108,109):("Spaces Echo 2 Time","linear_8000_16"),
-                (110,111):("Spaces Echo 2 Feedback","offset_db_8000_256"),
+                (94,95):("Spaces SL position","position_anchor"),
             })
+            # Six echo taps, record order L1,L2,L3,R1,R2,R3 (ReverseEngineer6); Echo 1/2 = L1/R1.
+            for n, tap, k in ((1,"L1",0),(2,"R1",3),(3,"L2",1),(4,"R2",4),(5,"L3",2),(6,"R3",5)):
+                common[(96+4*k, 97+4*k)] = (f"Spaces Echo {n} ({tap}) Time", "linear_8000_16")
+                common[(98+4*k, 99+4*k)] = (f"Spaces Echo {n} ({tap}) Gain", "offset_db_8000_256")
+                common[(127+2*k, 127+2*k)] = (f"Spaces Echo {n} ({tap}) On/Off", "toggle_10_on")
         for (a,b),val in common.items():
             if a <= rel_start and rel_end <= b:
                 return {"name":val[0],"encoding":val[1],"engine":eng,"field_start":a,"field_end":b}

@@ -57,7 +57,7 @@ Echo 2 feedback is `state +110..111`:
 
 These clearly resemble an offset-binary `/256 dB` coordinate around `0x8000`, but the low-byte quantisation around common values means the writer remains on exact controlled anchors rather than synthesising intermediate words.
 
-The operator reports four additional echoes in this engine. Echoes 3–6 remain unmapped pending their controlled sweeps.
+The operator reports four additional echoes in this engine. They are mapped in [ReverseEngineer6](reverse-engineer-batch6.md), which also shows that Echo 1/2 are the L1/R1 taps and that this control is labelled Gain in Director.
 
 ## Damping controls
 
@@ -130,4 +130,4 @@ Output HF shelf gain is `state +86..87`:
 
 ## Writer policy
 
-Every writer in this batch is guarded to engine `1c04` and a 262-byte AHFX payload. Continuous writes are enabled only for Echo 1/2 Time, where both echo blocks independently prove the same exact transform. Fader positions, feedback, frequency and shelf controls use exact scene-proven anchors. Echoes 3–6 and every other unmapped `1c04` DSP byte remain preserved and read-only.
+Every writer in this batch is guarded to engine `1c04` and a 262-byte AHFX payload. Continuous writes are enabled only for Echo 1/2 Time, where both echo blocks independently prove the same exact transform. Fader positions, feedback, frequency and shelf controls use exact scene-proven anchors. Every other unmapped `1c04` DSP byte remains preserved and read-only (Echoes 3–6 were added in batch 6).

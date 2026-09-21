@@ -24,6 +24,7 @@ The current primary reference is **dLive firmware 2.12**. The project distinguis
 - [Input Mixer channel state](input-mixer.md)
 - [Input compressor models](compressor-models.md)
 - [RackUltra / AHFX](rackultra.md)
+- [ReverseEngineer6 — Spaces echo taps](reverse-engineer-batch6.md)
 - [Research method](research-method.md)
 - [Controlled PEQ gain experiment](controlled-peq-diff.md)
 - [Controlled PEQ frequency/width experiment](controlled-peq-frequency-width.md)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """macOS automation runner for building controlled dLive Director scene sweeps.
 
-The live runner is intentionally opt-in: \`run\` is a dry-run unless --arm is
+The live runner is intentionally opt-in: `run` is a dry-run unless --arm is
 supplied. It uses only the Python standard library and native macOS APIs.
 
 Typical workflow:
@@ -36,6 +36,9 @@ PROFILE_VERSION = 1
 SWEEP_VERSION = 1
 FAILSAFE_EDGE_PX = 6
 
+# CGEventFlags masks for modifier clicks.
+MODIFIER_FLAGS = {"shift": 0x20000, "ctrl": 0x40000, "control": 0x40000, "alt": 0x80000, "option": 0x80000, "cmd": 0x100000, "command": 0x100000}
+
 DEFAULT_SCENE_WORKFLOW = [
     {"click": "scene_manager"},
     {"sleep": 0.45},
@@ -53,8 +56,9 @@ DEFAULT_SCENE_WORKFLOW = [
     {"sleep": 0.30},
 ]
 
+# Director opens a numeric entry box on ctrl-click; a plain click does not accept typing.
 DEFAULT_SET_WORKFLOW = [
-    {"click_control": True},
+    {"click_control": True, "modifiers": ["ctrl"]},
     {"hotkey": ["cmd", "a"]},
     {"type": "{entry}"},
     {"key": "enter"},
@@ -270,6 +274,7 @@ class MacAutomation:
         self.app.CGEventCreateMouseEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint32, self._CGPoint, ctypes.c_uint32]
         self.app.CGEventCreateMouseEvent.restype = ctypes.c_void_p
         self.app.CGEventPost.argtypes = [ctypes.c_uint32, ctypes.c_void_p]
+        self.app.CGEventSetFlags.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
         self.cf.CFRelease.argtypes = [ctypes.c_void_p]
         self.app.AXIsProcessTrusted.restype = ctypes.c_bool
         if hasattr(self.app, "CGPreflightScreenCaptureAccess"):
@@ -300,14 +305,27 @@ class MacAutomation:
         if x <= FAILSAFE_EDGE_PX and y <= FAILSAFE_EDGE_PX:
             raise KeyboardInterrupt("Failsafe triggered: pointer moved to the top-left corner.")
 
-    def click(self, point: list[float] | tuple[float, float], clicks: int = 1) -> None:
+    def click(self, point: list[float] | tuple[float, float], clicks: int = 1, modifiers: Iterable[str] = ()) -> None:
         self._check_failsafe()
         p = self._CGPoint(float(point[0]), float(point[1]))
+        flags = 0
+        for mod in modifiers:
+            if mod.lower() not in MODIFIER_FLAGS:
+                raise ConfigError(f"Unknown click modifier: {mod}")
+            flags |= MODIFIER_FLAGS[mod.lower()]
+        # Move first: Director ignores some clicks that arrive without a preceding pointer move.
+        event = self.app.CGEventCreateMouseEvent(None, 5, p, 0)  # mouseMoved
+        if event:
+            self.app.CGEventPost(0, event)
+            self.cf.CFRelease(event)
+            time.sleep(0.05)
         for _ in range(max(1, int(clicks))):
             for event_type in (1, 2):  # leftMouseDown, leftMouseUp
                 event = self.app.CGEventCreateMouseEvent(None, event_type, p, 0)
                 if not event:
                     raise RuntimeError("CGEventCreateMouseEvent failed")
+                if flags:
+                    self.app.CGEventSetFlags(event, flags)
                 self.app.CGEventPost(0, event)  # kCGHIDEventTap
                 self.cf.CFRelease(event)
                 time.sleep(0.025)
@@ -543,11 +561,13 @@ def _expand_action(action: dict[str, Any], profile: dict[str, Any], item: SweepI
     ctx = {"scene": item.scene, "value": item.value, "entry": item.entry or "", "control": item.control or "", "index": item.index, "scene_slot": scene_slot}
     if "click" in action:
         point = _resolve_point(profile, str(action["click"]), item, scene_slot)
-        return f"click {action['click']} @ ({point[0]:.1f},{point[1]:.1f})"
+        mods = "+".join(action.get("modifiers", ()))
+        return f"{mods + '-' if mods else ''}click {action['click']} @ ({point[0]:.1f},{point[1]:.1f})"
     if action.get("click_control"):
         point = _resolve_point(profile, "control", item, scene_slot)
         clicks = int(profile["controls"][item.control]["clicks"])
-        return f"click control {item.control} x{clicks} @ ({point[0]:.1f},{point[1]:.1f})"
+        mods = "+".join(action.get("modifiers", ()))
+        return f"{mods + '-' if mods else ''}click control {item.control} x{clicks} @ ({point[0]:.1f},{point[1]:.1f})"
     if action.get("click_scene_row"):
         mode=str(profile.get("scene",{}).get("row_mode","coordinate"))
         if mode=="selected" and scene_slot>0:
@@ -585,10 +605,10 @@ def build_plan(sweep: dict[str, Any], profile: dict[str, Any]) -> list[dict[str,
 def _run_action(mac: MacAutomation, action: dict[str, Any], profile: dict[str, Any], item: SweepItem, scene_slot: int) -> None:
     ctx = {"scene": item.scene, "value": item.value, "entry": item.entry or "", "control": item.control or "", "index": item.index, "scene_slot": scene_slot}
     if "click" in action:
-        mac.click(_resolve_point(profile, str(action["click"]), item, scene_slot), int(action.get("clicks", 1)))
+        mac.click(_resolve_point(profile, str(action["click"]), item, scene_slot), int(action.get("clicks", 1)), action.get("modifiers", ()))
     elif action.get("click_control"):
         cfg = profile["controls"][item.control]
-        mac.click(cfg["point"], int(cfg.get("clicks", 1)))
+        mac.click(cfg["point"], int(cfg.get("clicks", 1)), action.get("modifiers", ()))
     elif action.get("click_scene_row"):
         mode=str(profile.get("scene",{}).get("row_mode","coordinate"))
         if mode=="selected" and scene_slot>0:

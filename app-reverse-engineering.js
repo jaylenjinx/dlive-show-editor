@@ -66,7 +66,7 @@ function reKnownField(record,a,b,dat){
   if(label.startsWith('AHFX Manager')){
     const eng=reEngineId(record,dat),fields=eng==='1c03'?
       [[29,29,'Spaces model'],[30,31,'Spaces Pre Delay'],[42,43,'Spaces DS'],[58,59,'Spaces Decay'],[60,61,'Spaces Width'],[62,63,'Spaces Length'],[68,69,'Spaces EL'],[70,71,'Spaces LL'],[76,77,'Spaces Low Cut'],[78,79,'Spaces High Cut'],[94,95,'Spaces SL'],[122,123,'Spaces Spread'],[125,125,'Spaces Echo section'],[127,127,'Spaces Echo 1'],[133,133,'Spaces Echo 2'],[147,147,'Spaces Size Link']]:eng==='1c04'?
-      [[46,47,'Spaces damping LF frequency'],[64,65,'Spaces damping HF frequency'],[66,67,'Spaces damping HF shelf gain'],[68,69,'Spaces EL position'],[70,71,'Spaces LL position'],[83,83,'Spaces output HF type'],[86,87,'Spaces output HF shelf gain'],[93,93,'Spaces damping HF type'],[94,95,'Spaces SL position'],[96,97,'Spaces Echo 1 Time'],[98,99,'Spaces Echo 1 Feedback'],[108,109,'Spaces Echo 2 Time'],[110,111,'Spaces Echo 2 Feedback']]:[];
+      [[46,47,'Spaces damping LF frequency'],[64,65,'Spaces damping HF frequency'],[66,67,'Spaces damping HF shelf gain'],[68,69,'Spaces EL position'],[70,71,'Spaces LL position'],[83,83,'Spaces output HF type'],[86,87,'Spaces output HF shelf gain'],[93,93,'Spaces damping HF type'],[94,95,'Spaces SL position'],...[[1,'L1',0],[2,'R1',3],[3,'L2',1],[4,'R2',4],[5,'L3',2],[6,'R3',5]].flatMap(([n,tap,k])=>[[96+4*k,97+4*k,`Spaces Echo ${n} (${tap}) Time`],[98+4*k,99+4*k,`Spaces Echo ${n} (${tap}) Gain`],[127+2*k,127+2*k,`Spaces Echo ${n} (${tap}) On/Off`]])]:[];
     for(const [x,y,name] of fields){const k=match(x,y,name);if(k)return Object.assign(k,{engine:eng});}
   }
   return null;

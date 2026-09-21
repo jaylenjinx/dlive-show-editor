@@ -21,4 +21,15 @@ class CheckerTests(unittest.TestCase):
         a=bytes.fromhex('0001020304');b=bytes.fromhex('0001FFFE04')
         self.assertEqual([(r.start,r.end) for r in dl.changed_runs(a,b)],[(2,3)])
 
+    def test_spaces_medium_echo_taps(self):
+        # Minimal AHFX record: engine id 1c04 lives at state +3..4.
+        data=bytes(5)+bytes(300)
+        data=data[:3]+bytes.fromhex('1c04')+data[5:]
+        rec=dl.Record(0,0,262,'AHFX Manager 01',0,len(data))
+        expect={(96,97):'Echo 1 (L1) Time',(100,101):'Echo 3 (L2) Time',(104,105):'Echo 5 (L3) Time',
+                (108,109):'Echo 2 (R1) Time',(112,113):'Echo 4 (R2) Time',(118,119):'Echo 6 (R3) Gain',
+                (127,127):'Echo 1 (L1) On/Off',(137,137):'Echo 6 (R3) On/Off'}
+        for (a,b),name in expect.items():
+            self.assertEqual(dl.known_field(rec,a,b,data)['name'],'Spaces '+name)
+
 if __name__=='__main__': unittest.main()
