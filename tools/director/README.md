@@ -74,7 +74,7 @@ The wizard asks you to hover over:
 8. the button/tab that returns to the RackUltra processing page;
 9. every parameter field referenced by the sweep.
 
-Calibration **does not click anything**. It only records the pointer position when you press Enter in Terminal.
+Calibration **does not click anything**. For each point, press Enter in Terminal and then move the pointer onto the requested Director control during the 3-second countdown; the pointer position is captured automatically.
 
 Do not move or resize Director after calibration.
 
