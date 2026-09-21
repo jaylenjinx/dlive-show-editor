@@ -26,6 +26,24 @@ const AHFX_MEDIUM_DAMP_HF_SHELF=new Map([[0,0x8000],[-6,0x79FD],[-12,0x73FD],[-1
 const AHFX_MEDIUM_OUT_HF_TYPE=new Map([[0x10,'6 dB'],[0x20,'12 dB'],[0x30,'Shelf']]);
 const AHFX_MEDIUM_OUT_HF_SHELF=new Map([[0,0x8000],[-6,0x7A00],[-12,0x7400],[-15,0x7100]]);
 
+// ReverseEngineer7: remaining HOME/SPACE/TEXTURE/EQ controls. Offsets match the 1c03 Spaces layout.
+// Linear fields store raw = 0x8000 + 16 × displayed value, proven at every sweep point.
+const AHFX_MEDIUM_LINEAR=[
+  ['predelay','Pre Delay',30,0,170,'ms'],['density','Density',32,0,100,'%'],['impact','Impact',34,0,100,'%'],
+  ['diffE','Diffusion Early',36,0,8,''],['diffM','Diffusion Mid',38,0,8,''],['diffL','Diffusion Late',40,0,8,''],
+  ['direct','Direct Send',42,0,100,'%'],['width','Width',60,1,30,''],['length','Length',62,1,35,''],
+  ['modRate','Modulation Rate',72,0,100,'%'],['modDepth','Modulation Depth',74,0,100,'%'],['spread','Stereo Spread',122,0,100,'%'],
+];
+// Exact typed anchors; round labels do not always land on a simple rounding rule.
+const AHFX_MEDIUM_ANCHORS=[
+  ['decay','Decay Time',58,new Map([[0.1,0x745E],[0.5,0x84A2],[1,0x8BA3],[2,0x92A5],[5,0x9BE8],[10,0xA2E9]]),v=>`${v} s`],
+  ['outLf','Output LF Cut',76,new Map([[20,0x29CB],[50,0x4196],[100,0x5396],[200,0x6596],[500,0x7D62],[1000,0x8F62]]),v=>formatHz(v)],
+  ['outHf','Output HF Cut',78,new Map([[1000,0x8F63],[2000,0xA162],[5000,0xB92D],[10000,0xCB2D],[20000,0xDD2D]]),v=>formatHz(v)],
+  ['hfTone','Colour HF Tone',50,new Map([[2000,0xA162],[5000,0xB92D],[10000,0xCB2D],[20000,0xDD2D]]),v=>formatHz(v)],
+  ['colFreq','Colour Cut/Boost frequency',54,new Map([[500,0x7D62],[1000,0x8F62],[2000,0xA162],[5000,0xB92D],[10000,0xCB2D],[20000,0xDD2D]]),v=>formatHz(v)],
+  ['colGain','Colour Cut/Boost gain',56,new Map([[-15,0x7100],[-10,0x75FD],[-6,0x79FD],[-3,0x7CFD],[0,0x8003],[3,0x8303],[6,0x8600]]),v=>`${v>0?'+':''}${v} dB`],
+];
+
 function ahfxMediumCtx(slot){
   const stage=state.current?.stage,fx=stage?.ahfx?.find(x=>x.slot===Number(slot));
   if(!stage||!fx||fx.engineId!==AHFX_SPACES_MEDIUM_ENGINE||fx.payloadLength!==262)return null;
@@ -52,6 +70,11 @@ function ahfxMediumWriteEchoTime(slot,echo,ms){
 function ahfxMediumWriteEchoFeedback(slot,echo,db){
   const ctx=ahfxMediumCtx(slot),spec=AHFX_MEDIUM_ECHO[echo],raw=spec?.feedback.get(Number(db));
   if(!ctx||raw==null)return false;return ahfxMediumWrite16(ctx,spec.feedbackOff,raw);
+}
+function ahfxMediumWriteLinear(slot,key,value){
+  const ctx=ahfxMediumCtx(slot),spec=AHFX_MEDIUM_LINEAR.find(x=>x[0]===key);let v=Number(value);
+  if(!ctx||!spec||!Number.isFinite(v))return false;v=Math.max(spec[3],Math.min(spec[4],Math.round(v)));
+  return ahfxMediumWrite16(ctx,spec[2],0x8000+16*v);
 }
 function ahfxMediumWriteMapped16(slot,off,map,value){
   const ctx=ahfxMediumCtx(slot),raw=map.get(Number(value));if(!ctx||raw==null)return false;return ahfxMediumWrite16(ctx,off,raw);
@@ -81,6 +104,8 @@ function injectRackUltraMediumControls(){
       <div class="peq-field"><span>Damping HF shelf gain <small>exact anchors</small></span><select data-k="dampHfShelf">${ahfxMediumOptions(AHFX_MEDIUM_DAMP_HF_SHELF,v=>`${v} dB`)}</select><code>${ahfxMediumHex16(read16(66))}</code></div>
       <div class="peq-field"><span>Output HF type</span><select data-k="outHfType">${[...AHFX_MEDIUM_OUT_HF_TYPE].map(([raw,label])=>`<option value="${raw}">${escapeHtml(label)}</option>`).join('')}</select><code>${hexByte(read8(83))}</code></div>
       <div class="peq-field"><span>Output HF shelf gain <small>exact anchors</small></span><select data-k="outHfShelf">${ahfxMediumOptions(AHFX_MEDIUM_OUT_HF_SHELF,v=>`${v} dB`)}</select><code>${ahfxMediumHex16(read16(86))}</code></div>
+      ${AHFX_MEDIUM_LINEAR.map(([key,label,off,min,max,unit])=>`<div class="peq-field"><span>${label} <small>continuous verified ${min}…${max}${unit?' '+unit:''}</small></span><div><input data-k="${key}" type="number" min="${min}" max="${max}" step="1"><b>${unit}</b></div><code>${ahfxMediumHex16(read16(off))}</code></div>`).join('')}
+      ${AHFX_MEDIUM_ANCHORS.map(([key,label,off,map,fmt])=>`<div class="peq-field"><span>${label} <small>exact controlled anchors</small></span><select data-k="${key}">${ahfxMediumOptions(map,fmt)}</select><code>${ahfxMediumHex16(read16(off))}</code></div>`).join('')}
       <div class="console-note">LL, EL and SL are unnumbered console faders. Percentages here mean physical fader position only, not dB or another DSP unit. Echo 1–6 map to the Director Echoes page taps L1, R1, L2, R2, L3, R3.</div>`;
     card.appendChild(p);
 
@@ -98,6 +123,12 @@ function injectRackUltraMediumControls(){
       if(AHFX_MEDIUM_ECHO_ON.has(onRaw))on.value=String(onRaw);else{const o=document.createElement('option');o.value='';o.textContent=`Current raw ${hexByte(onRaw)}`;o.selected=true;on.prepend(o);}
       on.onchange=()=>{if(on.value!==''&&ahfxMediumWriteEnum8(fx.slot,spec.onOff,AHFX_MEDIUM_ECHO_ON,on.value))renderFx();else if(on.value!=='')toast(`RackUltra ${echo.toUpperCase()} On/Off write blocked.`,true);};
     }
+    for(const [key,,off,min,max] of AHFX_MEDIUM_LINEAR){
+      const input=p.querySelector(`[data-k="${key}"]`),raw=read16(off),v=(raw-0x8000)/16;
+      if(Number.isInteger(v)&&v>=min&&v<=max)input.value=String(v);else{input.disabled=true;input.title=`Current raw ${ahfxMediumHex16(raw)} is outside the controlled ${min}–${max} range.`;}
+      input.onchange=()=>{if(ahfxMediumWriteLinear(fx.slot,key,input.value))renderFx();else toast(`RackUltra ${key} write blocked.`,true);};
+    }
+    for(const [key,,off,map] of AHFX_MEDIUM_ANCHORS){const sel=p.querySelector(`[data-k="${key}"]`);ahfxMediumSetExact(sel,map,read16(off));sel.onchange=()=>{if(sel.value!==''&&ahfxMediumWriteMapped16(fx.slot,off,map,sel.value))renderFx();else if(sel.value!=='')toast(`RackUltra ${key} write blocked.`,true);};}
     const mapped=[
       ['dampLf',46,AHFX_MEDIUM_DAMP_LF],['dampHfFreq',64,AHFX_MEDIUM_DAMP_HF_FREQ],['dampHfShelf',66,AHFX_MEDIUM_DAMP_HF_SHELF],['outHfShelf',86,AHFX_MEDIUM_OUT_HF_SHELF]
     ];
@@ -129,14 +160,16 @@ if(typeof PARAMETER_MAP!=='undefined'){
     rows.push([`echo${n}-feedback`,`Echo ${n} (${spec.tap}) Gain`,`state +${spec.feedbackOff}..${spec.feedbackOff+1}`,'exact anchors −40,−20,−10,0,+10 dB']);
     rows.push([`echo${n}-on`,`Echo ${n} (${spec.tap}) On/Off`,`state +${spec.onOff}`,'10=On;00=Off']);
   }
+  for(const [key,label,off,min,max,unit] of AHFX_MEDIUM_LINEAR)rows.push([key,label,`state +${off}..${off+1}`,`raw=0x8000+16×value; verified ${min}…${max}${unit?' '+unit:''}`]);
+  for(const [key,label,off,map,fmt] of AHFX_MEDIUM_ANCHORS)rows.push([key,label,`state +${off}..${off+1}`,`exact anchors ${[...map.keys()].map(fmt).join(', ')}`]);
   for(const [id,field,offset,transform] of rows)if(!PARAMETER_MAP.some(x=>x.id===`ahfx-spaces-medium-${id}`))PARAMETER_MAP.push({
     id:`ahfx-spaces-medium-${id}`,area:'RackUltra',record:'AHFX Manager NN',payload:'262-byte AHFX payload; engine 1c04',field,offset,datatype:'engine-specific controlled field',transform,confidence:'verified',write:true,
-    evidence:id.startsWith('echo')?'ReverseEngineer6 Director-automated UFX1 sweeps (all six taps) plus ReverseEngineer2 Echo 1/2; adjacent pairs change only the target AHFX field outside the scene name.':'ReverseEngineer2 controlled UFX1 scenes; adjacent pairs change only the target AHFX field outside the scene-name byte.',notes:'Guarded to engine 1c04. Exact anchors/ranges only.'
+    evidence:AHFX_MEDIUM_LINEAR.some(x=>x[0]===id)||AHFX_MEDIUM_ANCHORS.some(x=>x[0]===id)?'ReverseEngineer7 Director-automated UFX1 sweeps (scenes 203–296); each adjacent pair changes only the target AHFX field outside the scene name.':id.startsWith('echo')?'ReverseEngineer6 Director-automated UFX1 sweeps (all six taps) plus ReverseEngineer2 Echo 1/2; adjacent pairs change only the target AHFX field outside the scene name.':'ReverseEngineer2 controlled UFX1 scenes; adjacent pairs change only the target AHFX field outside the scene-name byte.',notes:'Guarded to engine 1c04. Exact anchors/ranges only.'
   });
 }
 
 const rackUltraMediumNotice=$('#tabFx .notice');
 if(rackUltraMediumNotice){
   rackUltraMediumNotice.className='notice safe';
-  rackUltraMediumNotice.innerHTML='<strong>Partial verified write:</strong> RackUltra engines <code>1c03</code> and <code>1c04</code> now have guarded controlled fields. On <code>1c04</code>, Echo 1–6 time, gain and On/Off, damping/output HF controls, Damping LF and LL/EL/SL position anchors are writable. Unmapped DSP bytes remain read-only.';
+  rackUltraMediumNotice.innerHTML='<strong>Partial verified write:</strong> RackUltra engines <code>1c03</code> and <code>1c04</code> now have guarded controlled fields. On <code>1c04</code>, Echo 1–6, Pre Delay, Decay, Size, Diffusion, Modulation, Direct Send, Spread, Colour and Output EQ controls, damping controls and LL/EL/SL position anchors are writable. Reflection model and the remaining unmapped DSP bytes stay read-only.';
 }

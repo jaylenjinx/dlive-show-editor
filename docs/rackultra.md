@@ -172,6 +172,10 @@ On/Off: `10 = On`, `00 = Off`.
 
 See [ReverseEngineer6](reverse-engineer-batch6.md) for the evidence.
 
+### Remaining 480 Medium controls
+
+Pre Delay, Density, Impact, Diffusion Early/Mid/Late, Direct Send, Width, Length, Modulation Rate/Depth and Stereo Spread are linear `raw = 0x8000 + 16 × value` words. Decay Time is the `time_log` coordinate. Output LF/HF Cut and Colour HF Tone/frequency use the PEQ log-frequency coordinate, and Colour gain is offset dB. Offsets, ranges and anchors are in [ReverseEngineer7](reverse-engineer-batch7.md).
+
 ### Damping LF / HF
 
 Damping LF frequency is `state +46..47` with exact anchors `20, 50, 100, 200, 500, 1000 Hz`.

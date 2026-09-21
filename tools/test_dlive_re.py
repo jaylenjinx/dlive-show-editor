@@ -32,4 +32,13 @@ class CheckerTests(unittest.TestCase):
         for (a,b),name in expect.items():
             self.assertEqual(dl.known_field(rec,a,b,data)['name'],'Spaces '+name)
 
+    def test_spaces_medium_remaining_controls(self):
+        data=bytes(3)+bytes.fromhex('1c04')+bytes(300)
+        rec=dl.Record(0,0,262,'AHFX Manager 01',0,len(data))
+        self.assertEqual(dl.known_field(rec,30,31,data)['name'],'Spaces Pre Delay')
+        self.assertEqual(dl.known_field(rec,37,37,data)['name'],'Spaces Diffusion Early')
+        self.assertEqual(dl.known_field(rec,58,59,data)['encoding'],'time_log')
+        self.assertAlmostEqual(dl.decode_raw(bytes.fromhex('8BA3'),'time_log'),1000,delta=1)
+        self.assertEqual(dl.encode_scene_value({'encoding':'linear_8000_16'},'PREDLY 170',2),bytes.fromhex('8AA0'))
+
 if __name__=='__main__': unittest.main()
