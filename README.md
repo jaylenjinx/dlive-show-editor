@@ -212,6 +212,27 @@ It unpacks nested StageBox scenes, compares adjacent scene IDs, reports changes 
 
 The browser editor also has a **Parameter checker** tab that runs the adjacent-scene analysis locally and can export the report as JSON. See [tools/README.md](tools/README.md) for the workflow and scene-naming conventions.
 
+## Automated Director scene generation
+
+For controlled reverse-engineering batches, the repo also includes a macOS dLive Director automation runner:
+
+```bash
+python tools/director_automation.py doctor
+python tools/director_automation.py calibrate tools/director/echo3-6.toml ~/Desktop/director-profile.json
+
+# dry-run
+python tools/director_automation.py run tools/director/echo3-6.toml ~/Desktop/director-profile.json
+
+# live automation
+python tools/director_automation.py run tools/director/echo3-6.toml ~/Desktop/director-profile.json --arm
+```
+
+The runner records a calibration profile for your Director window, creates the requested parameter scenes, stores machine-readable scene names, captures optional screenshots, and can resume from a specific expanded item. Live mode requires explicit arming plus an `OFFLINE` confirmation and includes a top-left pointer failsafe.
+
+Use this only with an offline/Preview-mode Director instance, not a Director session controlling live audio. After exporting the generated show, feed it into `tools/dlive_re.py` for binary validation and candidate-field discovery.
+
+A ready-made Echo 3–6 Time/Feedback sweep is in [tools/director/echo3-6.toml](tools/director/echo3-6.toml). Full setup instructions are in [tools/director/README.md](tools/director/README.md).
+
 ## Documentation
 
 The site has a built-in **Docs** section available without loading a show.
