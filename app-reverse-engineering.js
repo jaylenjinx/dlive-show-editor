@@ -1,8 +1,8 @@
 'use strict';
 
-// Show-wide controlled-scene parameter checker. This is deliberately read-only:
-// it unpacks StageBox scenes in memory, compares recognised framed record states,
-// and labels changed offsets against the verified mappings used by the editor.
+// Show-wide controlled-scene parameter checker. Read-only: it unpacks StageBox
+// scenes in memory, compares recognised framed record states, and labels offsets
+// against the verified mappings already used by the editor.
 const RE_PREFIXES=[
   'AHFX Manager','Parametric EQ','Graphic EQ','Compressor,','SCF Compressor','Compressor side chain source',
   'Gate,','SCF Gate','Gate side chain source','Delay,','Input Mixer','Highpass Filter','Lowpass Filter',
@@ -14,7 +14,7 @@ let reLastReport=null;
 function reSceneName(dat){return extractShowName(dat);}
 function reReadU16(dat,o){return ((dat[o]<<8)|dat[o+1])>>>0;}
 function reHex(bytes){return [...bytes].map(hexByte).join(' ');}
-function reOffset(a,b){return a===b?\`+\${a}\`:\`+\${a}..\${b}\`;}
+function reOffset(a,b){return a===b?'+'+a:'+'+a+'..'+b;}
 function reFindAll(dat,text){
   const sig=asciiBytes(text),out=[];let pos=0;
   while(pos<=dat.length-sig.length){const p=indexOfBytes(dat,sig,pos);if(p<0)break;out.push(p);pos=p+1;}
@@ -40,17 +40,16 @@ function reChangedRuns(a,b){
   if(a.length!==b.length)runs.push([n,Math.max(a.length,b.length)-1]);
   return runs;
 }
-function reEngineId(record,dat){return record.label.startsWith('AHFX Manager')&&record.stateLength>=5?\`\${hexByte(dat[record.stateStart+3])}\${hexByte(dat[record.stateStart+4])}\`:null;}
+function reEngineId(record,dat){return record.label.startsWith('AHFX Manager')&&record.stateLength>=5?hexByte(dat[record.stateStart+3])+hexByte(dat[record.stateStart+4]):null;}
 function reKnownField(record,a,b,dat){
-  const label=record.label.trim();
-  const match=(x,y,name)=>x<=a&&b<=y?{name,start:x,end:y}:null;
+  const label=record.label.trim(),match=(x,y,name)=>x<=a&&b<=y?{name,start:x,end:y}:null;
   if(label.startsWith('Highpass Filter Input Channel'))return match(1,2,'HPF frequency')||match(3,3,'HPF slope/type')||match(4,4,'HPF In/Out');
   if(label.startsWith('Lowpass Filter Input Channel'))return match(3,4,'LPF frequency')||match(10,10,'LPF In/Out');
   if(label.startsWith('Parametric EQ, Input Channel')){
     if(a===37&&b===37)return {name:'PEQ In/Out',start:37,end:37};
     for(let band=1;band<=4;band++){
       const q=1+(band-1)*9;
-      const k=match(q,q+1,\`PEQ band \${band} gain\`)||match(q+2,q+3,\`PEQ band \${band} frequency\`)||match(q+4,q+5,\`PEQ band \${band} width\`)||match(q+6,q+6,\`PEQ band \${band} type\`);
+      const k=match(q,q+1,'PEQ band '+band+' gain')||match(q+2,q+3,'PEQ band '+band+' frequency')||match(q+4,q+5,'PEQ band '+band+' width')||match(q+6,q+6,'PEQ band '+band+' type');
       if(k)return k;
     }
   }
@@ -68,13 +67,13 @@ function reKnownField(record,a,b,dat){
     const eng=reEngineId(record,dat),fields=eng==='1c03'?
       [[29,29,'Spaces model'],[30,31,'Spaces Pre Delay'],[42,43,'Spaces DS'],[58,59,'Spaces Decay'],[60,61,'Spaces Width'],[62,63,'Spaces Length'],[68,69,'Spaces EL'],[70,71,'Spaces LL'],[76,77,'Spaces Low Cut'],[78,79,'Spaces High Cut'],[94,95,'Spaces SL'],[122,123,'Spaces Spread'],[125,125,'Spaces Echo section'],[127,127,'Spaces Echo 1'],[133,133,'Spaces Echo 2'],[147,147,'Spaces Size Link']]:eng==='1c04'?
       [[46,47,'Spaces damping LF frequency'],[64,65,'Spaces damping HF frequency'],[66,67,'Spaces damping HF shelf gain'],[68,69,'Spaces EL position'],[70,71,'Spaces LL position'],[83,83,'Spaces output HF type'],[86,87,'Spaces output HF shelf gain'],[93,93,'Spaces damping HF type'],[94,95,'Spaces SL position'],[96,97,'Spaces Echo 1 Time'],[98,99,'Spaces Echo 1 Feedback'],[108,109,'Spaces Echo 2 Time'],[110,111,'Spaces Echo 2 Feedback']]:[];
-    for(const [x,y,name] of fields){const k=match(x,y,name);if(k)return {...k,engine:eng};}
+    for(const [x,y,name] of fields){const k=match(x,y,name);if(k)return Object.assign(k,{engine:eng});}
   }
   return null;
 }
 async function reLoadStage(scene){
   if(reStageCache.has(scene.number))return reStageCache.get(scene.number);
-  const outer=state.outerEntries?.find(e=>e.name===scene.stagePath);if(!outer)return null;
+  const outer=state.outerEntries&&state.outerEntries.find(e=>e.name===scene.stagePath);if(!outer)return null;
   const p=await unpackNested(outer,/StageBoxScene\d+\.dat$/);if(!p)return null;
   const item={number:scene.number,name:reSceneName(p.datBytes),dat:p.datBytes,records:reScanRecordsFast(p.datBytes)};
   reStageCache.set(scene.number,item);return item;
@@ -86,12 +85,12 @@ function reNumericLabel(name){
   return {value,unit,prefix:prefix.toUpperCase().replace(/\s+/g,' ')};
 }
 function rePairDiff(a,b){
-  const byKey=new Map(b.records.map(r=>[\`\${r.frameStart}:\${r.label}\`,r])),changes=[];
-  for(const ra of a.records){const rb=byKey.get(\`\${ra.frameStart}:\${ra.label}\`);if(!rb||ra.stateLength!==rb.stateLength)continue;
+  const byKey=new Map(b.records.map(r=>[r.frameStart+':'+r.label,r])),changes=[];
+  for(const ra of a.records){const rb=byKey.get(ra.frameStart+':'+ra.label);if(!rb||ra.stateLength!==rb.stateLength)continue;
     const sa=a.dat.slice(ra.stateStart,ra.frameEnd),sb=b.dat.slice(rb.stateStart,rb.frameEnd);
     for(const [x,y] of reChangedRuns(sa,sb)){
-      const known=reKnownField(ra,x,y,a.dat),fs=known?.start??x,fe=known?.end??y;
-      changes.push({record:ra.label.trim(),offset:reOffset(fs,fe),changedOffset:reOffset(x,y),start:fs,end:fe,before:reHex(sa.slice(fs,fe+1)),after:reHex(sb.slice(fs,fe+1)),known:known?.name||null,engine:known?.engine||reEngineId(ra,a.dat)});
+      const known=reKnownField(ra,x,y,a.dat),fs=known?known.start:x,fe=known?known.end:y;
+      changes.push({record:ra.label.trim(),offset:reOffset(fs,fe),changedOffset:reOffset(x,y),start:fs,end:fe,before:reHex(sa.slice(fs,fe+1)),after:reHex(sb.slice(fs,fe+1)),known:known?known.name:null,engine:known&&known.engine?known.engine:reEngineId(ra,a.dat)});
     }
   }
   return {sceneA:{number:a.number,name:a.name},sceneB:{number:b.number,name:b.name},changes};
@@ -107,29 +106,29 @@ function reCandidates(pairs){
   for(const g of groups.values())if(g.points.size>=3){const pts=[...g.points.entries()].sort((a,b)=>a[0]-b[0]);let candidate='non-linear / table';
     if(pts.every(([x,y])=>Math.abs((0x8000+16*x)-y)<0.51))candidate='raw = 0x8000 + 16 × value';
     else if(g.unit==='hz'&&pts.every(([x,y])=>Math.abs(Math.floor(4608*Math.log2(x/4))-y)<=1))candidate='dLive logarithmic frequency coordinate';
-    out.push({...g,points:pts.map(([value,raw])=>({value,raw:\`0x\${raw.toString(16).toUpperCase().padStart(4,'0')}\`})),candidate});
+    out.push({record:g.record,offset:g.offset,prefix:g.prefix,unit:g.unit,points:pts.map(([value,raw])=>({value,raw:'0x'+raw.toString(16).toUpperCase().padStart(4,'0')})),candidate});
   }
   return out;
 }
 async function analyseReverseEngineeringShow(){
-  const root=$('#reverseEngineeringResults'),status=$('#reverseEngineeringStatus');if(!root||!state.scenes?.length)return;
+  const root=$('#reverseEngineeringResults'),status=$('#reverseEngineeringStatus');if(!root||!state.scenes||!state.scenes.length)return;
   const btn=$('#reAnalyseBtn');btn.disabled=true;root.innerHTML='';status.textContent='Loading StageBox scenes…';reStageCache.clear();
   try{
-    const maxGap=Math.max(1,Math.min(20,Number($('#reMaxGap')?.value||1))),scenes=state.scenes.filter(s=>s.stagePath&&s.number!==65535).sort((a,b)=>a.number-b.number),loaded=[];
-    for(let i=0;i<scenes.length;i++){const x=await reLoadStage(scenes[i]);if(x)loaded.push(x);if(i%8===0)status.textContent=\`Loading StageBox scenes… \${i+1}/\${scenes.length}\`;}
+    const maxGap=Math.max(1,Math.min(20,Number($('#reMaxGap')&&$('#reMaxGap').value||1))),scenes=state.scenes.filter(s=>s.stagePath&&s.number!==65535).sort((a,b)=>a.number-b.number),loaded=[];
+    for(let i=0;i<scenes.length;i++){const x=await reLoadStage(scenes[i]);if(x)loaded.push(x);if(i%8===0)status.textContent='Loading StageBox scenes… '+(i+1)+'/'+scenes.length;}
     const pairs=[];for(let i=0;i+1<loaded.length;i++){const a=loaded[i],b=loaded[i+1];if(b.number-a.number>maxGap)continue;const d=rePairDiff(a,b);if(d.changes.length)pairs.push(d);}
     const candidates=reCandidates(pairs),known=pairs.reduce((n,p)=>n+p.changes.filter(c=>c.known).length,0),unknown=pairs.reduce((n,p)=>n+p.changes.filter(c=>!c.known).length,0);
     reLastReport={file:state.fileName,maxGap,sceneCount:loaded.length,pairs,candidates,summary:{knownChanges:known,unknownChanges:unknown}};
-    status.textContent=\`\${loaded.length} StageBox scenes · \${pairs.length} adjacent pairs with processing changes · \${known} known · \${unknown} candidate changes\`;
+    status.textContent=loaded.length+' StageBox scenes · '+pairs.length+' adjacent pairs with processing changes · '+known+' known · '+unknown+' candidate changes';
     const table=document.createElement('section');table.className='panel';table.innerHTML='<h2>Adjacent scene parameter changes</h2><div class="config-table"></div>';const body=table.querySelector('.config-table');
-    for(const p of pairs)for(const c of p.changes){const row=document.createElement('div');row.className='config-row';row.innerHTML=\`<strong>\${escapeHtml(\`\${p.sceneA.number} \${p.sceneA.name} → \${p.sceneB.number} \${p.sceneB.name}\`)}</strong><code>\${escapeHtml(c.record)} · state \${c.offset}<br>\${c.before} → \${c.after}</code><span>\${c.known?\`<span class="confidence verified">KNOWN</span> \${escapeHtml(c.known)}\`:\`<span class="confidence unknown">CANDIDATE</span>\`}\${c.engine?\` · engine \${escapeHtml(c.engine)}\`:''}</span>\`;body.appendChild(row);}
+    for(const p of pairs)for(const c of p.changes){const row=document.createElement('div');row.className='config-row';const title=p.sceneA.number+' '+p.sceneA.name+' → '+p.sceneB.number+' '+p.sceneB.name;const tag=c.known?'<span class="confidence verified">KNOWN</span> '+escapeHtml(c.known):'<span class="confidence unknown">CANDIDATE</span>';row.innerHTML='<strong>'+escapeHtml(title)+'</strong><code>'+escapeHtml(c.record)+' · state '+c.offset+'<br>'+c.before+' → '+c.after+'</code><span>'+tag+(c.engine?' · engine '+escapeHtml(c.engine):'')+'</span>';body.appendChild(row);}
     root.appendChild(table);
-    if(candidates.length){const sec=document.createElement('section');sec.className='panel';sec.innerHTML='<h2>Candidate transforms</h2><div class="config-table"></div>';const b=sec.querySelector('.config-table');for(const c of candidates){const row=document.createElement('div');row.className='config-row';row.innerHTML=\`<strong>\${escapeHtml(c.prefix||c.record)}</strong><code>\${escapeHtml(c.record)} · \${c.offset}</code><span>\${escapeHtml(c.candidate)}</span>\`;b.appendChild(row);}root.appendChild(sec);}
-  }catch(e){console.error(e);status.textContent='Analysis failed.';root.innerHTML=\`<div class="notice warn">\${escapeHtml(e.message||String(e))}</div>\`;}finally{btn.disabled=false;}
+    if(candidates.length){const sec=document.createElement('section');sec.className='panel';sec.innerHTML='<h2>Candidate transforms</h2><div class="config-table"></div>';const b=sec.querySelector('.config-table');for(const c of candidates){const row=document.createElement('div');row.className='config-row';row.innerHTML='<strong>'+escapeHtml(c.prefix||c.record)+'</strong><code>'+escapeHtml(c.record)+' · '+c.offset+'</code><span>'+escapeHtml(c.candidate)+'</span>';b.appendChild(row);}root.appendChild(sec);}
+  }catch(e){console.error(e);status.textContent='Analysis failed.';root.innerHTML='<div class="notice warn">'+escapeHtml(e.message||String(e))+'</div>';}finally{btn.disabled=false;}
 }
 function downloadReverseEngineeringJson(){
   if(!reLastReport){toast('Run the parameter analysis first.',true);return;}
-  const blob=new Blob([JSON.stringify(reLastReport,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=\`\${(state.fileName||'dlive').replace(/\.tar\.gz$/i,'')}-parameter-check.json\`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  const blob=new Blob([JSON.stringify(reLastReport,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(state.fileName||'dlive').replace(/\.tar\.gz$/i,'')+'-parameter-check.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
 }
-$('#reAnalyseBtn')?.addEventListener('click',()=>analyseReverseEngineeringShow());
-$('#reDownloadBtn')?.addEventListener('click',downloadReverseEngineeringJson);
+$('#reAnalyseBtn')&&$('#reAnalyseBtn').addEventListener('click',()=>analyseReverseEngineeringShow());
+$('#reDownloadBtn')&&$('#reDownloadBtn').addEventListener('click',downloadReverseEngineeringJson);
