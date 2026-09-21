@@ -198,6 +198,20 @@ The editor parses RackUltra record framing, engine IDs, preset labels and same-e
 
 `MixConfig.dat`, generic framed-record discovery and unknown processing/routing records are exposed for research without unsafe writes.
 
+## Automated parameter checking
+
+The repo now includes a read-only controlled-scene checker at `tools/dlive_re.py`:
+
+```bash
+python tools/dlive_re.py discover ReverseEngineer3.tar.gz
+python tools/dlive_re.py validate ReverseEngineer3.tar.gz --strict
+python tools/dlive_re.py diff ReverseEngineer3.tar.gz 31 32
+```
+
+It unpacks nested StageBox scenes, compares adjacent scene IDs, reports changes as record-relative `state +N` offsets, matches changes against the verified field map, suggests transforms from 3+ numeric scene names, and performs exact writer checks where the scene label and encoding are sufficient. All three commands support `--json`.
+
+The browser editor also has a **Parameter checker** tab that runs the adjacent-scene analysis locally and can export the report as JSON. See [tools/README.md](tools/README.md) for the workflow and scene-naming conventions.
+
 ## Documentation
 
 The site has a built-in **Docs** section available without loading a show.
