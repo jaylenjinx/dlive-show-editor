@@ -358,11 +358,14 @@ class MacAutomation:
         return proc.returncode == 0 and path.exists()
 
 
-def capture_point(mac: MacAutomation, prompt: str) -> list[float]:
+def capture_point(mac: MacAutomation, prompt: str, move_seconds: int = 3) -> list[float]:
     print("\n" + prompt)
-    print("Move the pointer to the requested Director control, then press Enter here.")
-    input("Ready> ")
+    input(f"Press Enter, then you have {move_seconds} seconds to move the pointer onto that Director control> ")
+    for n in range(move_seconds, 0, -1):
+        print(f"Capturing in {n}…", end="\r", flush=True)
+        time.sleep(1)
     x, y = mac.mouse_position()
+    print(" " * 40, end="\r")
     print(f"Captured: x={x:.1f}, y={y:.1f}")
     return [round(x, 1), round(y, 1)]
 
