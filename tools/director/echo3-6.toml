@@ -1,0 +1,47 @@
+version = 1
+name = "480 Medium Echo 3-6"
+application_name = "dLive Director"
+control_scenes = ["CTL 1", "CTL 2"]
+start_row_offset = 0
+
+[[sweeps]]
+control = "echo3.time"
+scene = "E3 TIME {value}"
+entry = "{value}"
+values = [0, 100, 200]
+
+[[sweeps]]
+control = "echo3.feedback"
+scene = "E3 FB {value}"
+entry = "{value}"
+values = [-40, -10, 10]
+
+[[sweeps]]
+control = "echo4.time"
+scene = "E4 TIME {value}"
+values = [0, 100, 200]
+
+[[sweeps]]
+control = "echo4.feedback"
+scene = "E4 FB {value}"
+values = [-40, -10, 10]
+
+[[sweeps]]
+control = "echo5.time"
+scene = "E5 TIME {value}"
+values = [0, 100, 200]
+
+[[sweeps]]
+control = "echo5.feedback"
+scene = "E5 FB {value}"
+values = [-40, -10, 10]
+
+[[sweeps]]
+control = "echo6.time"
+scene = "E6 TIME {value}"
+values = [0, 100, 200]
+
+[[sweeps]]
+control = "echo6.feedback"
+scene = "E6 FB {value}"
+values = [-40, -10, 10]

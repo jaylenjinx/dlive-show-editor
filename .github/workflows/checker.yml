@@ -26,8 +26,14 @@ jobs:
         with:
           node-version: '22'
       - name: Python unit tests
-        run: python -m unittest tools/test_dlive_re.py
+        run: python -m unittest tools/test_dlive_re.py tools/test_director_automation.py
+      - name: Python syntax
+        run: python -m py_compile tools/dlive_re.py tools/director_automation.py
       - name: Browser checker syntax
         run: node --check app-reverse-engineering.js
-      - name: CLI help smoke
+      - name: Parameter checker CLI help
         run: python tools/dlive_re.py --help
+      - name: Director automation dry-run smoke
+        run: |
+          python tools/director_automation.py list tools/director/echo3-6.toml
+          python tools/director_automation.py --help
