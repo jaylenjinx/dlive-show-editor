@@ -1,0 +1,33 @@
+name: Parameter checker tests
+
+on:
+  push:
+    paths:
+      - 'tools/**'
+      - 'app-reverse-engineering.js'
+      - 'index.html'
+      - '.github/workflows/checker.yml'
+  pull_request:
+    paths:
+      - 'tools/**'
+      - 'app-reverse-engineering.js'
+      - 'index.html'
+      - '.github/workflows/checker.yml'
+
+jobs:
+  checker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Python unit tests
+        run: python -m unittest tools/test_dlive_re.py
+      - name: Browser checker syntax
+        run: node --check app-reverse-engineering.js
+      - name: CLI help smoke
+        run: python tools/dlive_re.py --help
