@@ -318,16 +318,96 @@ class MacAutomation:
     def _applescript_string(text: str) -> str:
         return text.replace("\\", "\\\\").replace('"', '\\"')
 
-    def _osascript(self, script: str) -> None:
+    def _osascript_capture(self, script: str) -> str:
         self._check_failsafe()
         proc = subprocess.run(["/usr/bin/osascript", "-e", script], text=True, capture_output=True)
         if proc.returncode:
             raise RuntimeError((proc.stderr or proc.stdout or "osascript failed").strip())
         time.sleep(self.action_delay)
+        return proc.stdout.strip()
 
-    def activate(self, application_name: str) -> None:
-        name = self._applescript_string(application_name)
-        self._osascript(f'tell application "{name}" to activate')
+    def _osascript(self, script: str) -> None:
+        self._osascript_capture(script)
+
+    def running_application_processes(self) -> list[str]:
+        script = (
+            'tell application "System Events"\n'
+            'set namesList to name of every application process\n'
+            'set AppleScript\'s text item delimiters to ASCII character 10\n'
+            'return namesList as text\n'
+            'end tell'
+        )
+        output = self._osascript_capture(script)
+        return [line.strip() for line in output.splitlines() if line.strip()]
+
+    def director_processes(self) -> list[str]:
+        names = self.running_application_processes()
+        exact = [n for n in names if "dlive" in n.lower() and "director" in n.lower()]
+        if exact:
+            return exact
+        return [n for n in names if "dlive" in n.lower()]
+
+    @staticmethod
+    def installed_director_apps() -> list[Path]:
+        roots = [Path("/Applications"), Path.home() / "Applications"]
+        found: list[Path] = []
+        seen: set[str] = set()
+        for root in roots:
+            if not root.exists():
+                continue
+            for app in root.rglob("*.app"):
+                name = app.name.lower()
+                if "dlive" not in name or "director" not in name:
+                    continue
+                key = str(app.resolve())
+                if key not in seen:
+                    seen.add(key)
+                    found.append(app)
+        return found
+
+    def _activate_process(self, process_name: str) -> None:
+        name = self._applescript_string(process_name)
+        self._osascript(
+            'tell application "System Events" to set frontmost of application process "'
+            + name + '" to true'
+        )
+
+    def activate(self, application_name: str) -> str:
+        proc = subprocess.run(
+            ["/usr/bin/open", "-a", application_name],
+            text=True,
+            capture_output=True,
+        )
+        if proc.returncode == 0:
+            time.sleep(0.5)
+            matches = self.director_processes()
+            if matches:
+                self._activate_process(matches[0])
+                return matches[0]
+
+        matches = self.director_processes()
+        if matches:
+            self._activate_process(matches[0])
+            return matches[0]
+
+        apps = self.installed_director_apps()
+        for app in apps:
+            launched = subprocess.run(["/usr/bin/open", str(app)], text=True, capture_output=True)
+            if launched.returncode != 0:
+                continue
+            time.sleep(1.0)
+            matches = self.director_processes()
+            if matches:
+                self._activate_process(matches[0])
+                return matches[0]
+
+        candidates = ", ".join(str(x) for x in apps) or "none found"
+        raise RuntimeError(
+            f'Could not find or activate dLive Director. Configured name: {application_name!r}. '
+            f'Installed Director app candidates: {candidates}. '
+            'Open Director manually, then run python3 tools/director_automation.py doctor '
+            'to see the detected process name.'
+        )
 
     def type_text(self, text: str) -> None:
         value = self._applescript_string(str(text))
@@ -377,6 +457,13 @@ def command_doctor(args: argparse.Namespace) -> int:
         return 1
     mac = MacAutomation()
     print(f"Accessibility permission: {'OK' if mac.accessibility_trusted() else 'NOT GRANTED'}")
+    try:
+        director = mac.director_processes()
+        print("Running dLive Director process: " + (", ".join(director) if director else "NOT DETECTED"))
+        apps = mac.installed_director_apps()
+        print("Installed dLive Director app: " + (", ".join(str(x) for x in apps) if apps else "NOT FOUND"))
+    except RuntimeError as exc:
+        print(f"Director detection: {exc}")
     screen = mac.screen_capture_trusted()
     if screen is not None:
         print(f"Screen Recording permission: {'OK' if screen else 'NOT GRANTED (screenshots may fail)'}")
@@ -406,7 +493,8 @@ def command_calibrate(args: argparse.Namespace) -> int:
         print("Accessibility permission is not granted. In macOS Settings, allow your Terminal/Python host under Privacy & Security > Accessibility, then rerun.", file=sys.stderr)
         return 2
     app_name = str(sweep.get("application_name", "dLive Director"))
-    mac.activate(app_name)
+    activated_name = mac.activate(app_name)
+    print(f"Activated Director process: {activated_name}")
     print("\nCalibration does not click anything. It only records the current pointer position when you press Enter.")
     print("Keep Director on the screen/layout you plan to use for automation. Do not move/resize it after calibration.")
     captured: dict[str, list[float]] = {}
@@ -566,7 +654,8 @@ def command_run(args: argparse.Namespace) -> int:
             return 1
     _countdown(args.countdown)
     try:
-        mac.activate(app_name)
+        activated_name = mac.activate(app_name)
+        print(f"Activated Director process: {activated_name}")
         mac.click(profile["points"]["focus_safe"])
         for p in plan:
             item: SweepItem = p["item"]
