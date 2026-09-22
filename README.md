@@ -186,9 +186,11 @@ LPF bytes `state +1..+2` and `+5..+9` are preserved exactly. Real-event material
 
 Compressor model names are decoded from `state +1`, but **model switching remains read-only** because selecting a model on the console also rewrites model-specific parameter/default bytes. Writing only the model byte would create a hybrid state. Manual RMS parallel/sidechain/source/ratio/attack/release/knee/makeup writes are restricted to controlled values/ranges; other model-specific parameters remain read-only until independently isolated.
 
-### Aux-send evidence
+### Input sends and group assigns
 
-The 169-byte event configuration exposes six mono Aux levels as signed fixed-point dB fields at block offsets `+12,+16,+20,+24,+28,+32`. These offsets are **configuration-specific** and remain read-only until the general bus-layout rule is solved.
+Every input's send block is now decoded from the mixer header, so the layout works in any mixer configuration. Order: group assign bytes, then mono FX, mono Aux, stereo FX, stereo Aux, mono Matrix and stereo Matrix. Mono entries are `[on, pre, level]` and stereo entries `[on, pre, level, pan]`. A 47-byte channel section (fader/pan) and 8 UFX sends follow.
+
+Send level (−39…+10 dB or −∞), On, Pre/Post and group assigns are writable. Stereo send pan is decoded read only. See [docs/input-mixer.md](docs/input-mixer.md).
 
 ### RackUltra / AHFX
 

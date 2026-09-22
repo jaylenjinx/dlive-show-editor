@@ -5,6 +5,7 @@ Commands:
   discover SHOW.tar.gz   Compare adjacent controlled scenes and surface changed fields.
   validate SHOW.tar.gz   Match changed fields against the built-in verified map.
   diff SHOW.tar.gz A B   Detailed binary/record diff for two scene IDs.
+  mixconfig SHOW.tar.gz  Decode the show's MixConfig.dat (bus counts, Main type).
 
 SHOW may also be a directory of "Scene N.dat" files, e.g. Director's live
 .../TLDV2.12/TLDData/Director/Scenes/StageBox folder.
@@ -132,7 +133,8 @@ def scan_records(data: bytes) -> list[Record]:
             pos=p+1
             if p<2 or p in seen: continue
             length=int.from_bytes(data[p-2:p],"big")
-            if length<5 or length>8192: continue
+            # Input Mixer holds 128 per-input blocks (~26 KB); everything else is small.
+            if length<5 or length>(65535 if prefix==b"Input Mixer" else 8192): continue
             frame_start=p-2; frame_end=frame_start+2+length
             if frame_end>n: continue
             nul=data.find(b"\0",p,min(frame_end,p+160))
@@ -174,8 +176,85 @@ def engine_id(record: Record, data: bytes) -> str | None:
         return None
     return data[record.state_start + 3: record.state_start + 5].hex()
 
+def input_mixer_layout(header: bytes) -> tuple[list[tuple[str, int, int]], int, int]:
+    """Per-input block layout of the Input Mixer record (ReverseEngineer9).
+
+    header = [version, monoGrp, stGrp, monoFX, stFX, monoAux, stAux, monoMtx, stMtx,
+              mainType, mainStrips, PAFL] (mirrors MixConfig.dat).
+    Block: one assign byte per group, then send entries in the order mono FX, mono Aux,
+    stereo FX, stereo Aux, mono Matrix, stereo Matrix ([on, pre, level_i16] mono /
+    [on, pre, level_i16, pan] stereo), a 47-byte section that starts with the Main send
+    (On at +0, level at +3 — the input fader — and pan at +5), then 8 stereo UFX sends
+    when version >= 3. The block size does not depend on the Main type.
+    Returns (entries, channel_section_offset, block_size).
+    """
+    ver, mg, sg, mfx, sfx, ma, sa, mm, sm = header[:9]
+    entries: list[tuple[str, int, int]] = []
+    o = mg + sg
+    for kind, count, width in (("FX", mfx, 4), ("Aux", ma, 4), ("St FX", sfx, 5),
+                               ("St Aux", sa, 5), ("Mtx", mm, 4), ("St Mtx", sm, 5)):
+        for i in range(count):
+            entries.append((f"{kind} {i + 1}", o, width)); o += width
+    section = o; o += 47
+    if ver >= 3:
+        for i in range(8):
+            entries.append((f"UFX {i + 1}", o, 5)); o += 5
+    return entries, section, o
+
+def input_mixer_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> dict[str, Any] | None:
+    header = data[record.state_start:record.state_start + 12]
+    if len(header) < 12 or header[0] not in (2, 3):
+        return None
+    entries, section, size = input_mixer_layout(header)
+    if size * 128 + 12 != record.state_length or rel_start < 12:
+        return None
+    ch, a = divmod(rel_start - 12, size); b = a + (rel_end - rel_start)
+    if b >= size:
+        return None
+    def hit(lo: int, hi: int, name: str, enc: str | None) -> dict[str, Any] | None:
+        if lo <= a and b <= hi:
+            base = 12 + ch * size
+            return {"name": f"CH{ch + 1} {name}", "encoding": enc, "field_start": base + lo, "field_end": base + hi}
+        return None
+    groups = header[1] + header[2]
+    if b < groups:
+        g = a + 1
+        label = f"Grp {g}" if g <= header[1] else f"St Grp {g - header[1]}"
+        return hit(a, a, f"{label} assign", "toggle_01_on")
+    for name, o, width in entries:
+        f = (hit(o, o, f"{name} send On", "toggle_01_on") or hit(o + 1, o + 1, f"{name} send Pre", "enum")
+             or hit(o + 2, o + 3, f"{name} send level", "i16_div256")
+             or (hit(o + 4, o + 4, f"{name} send pan", "u8_direct") if width == 5 else None))
+        if f:
+            return f
+    return (hit(section, section, "Main send On", "toggle_01_on")
+            or hit(section + 3, section + 4, "Main send level (fader)", "i16_div256")
+            or hit(section + 5, section + 5, "Main send pan", "u8_direct"))
+
+MIXCONFIG_MAIN_TYPES = {0: "None", 1: "LR", 2: "LR+Msum", 3: "LR+M", 4: "LCR", 5: "5.1 Surround", 6: "LCR+"}
+
+def decode_mixconfig(raw: bytes) -> dict[str, Any]:
+    """Show/MixConfig/MixConfig.dat (13 bytes), mapped from RevEngCfgA / RevEngM0-M6."""
+    if len(raw) != 13:
+        raise ValueError(f"MixConfig.dat should be 13 bytes, got {len(raw)}")
+    return {
+        "version": raw[0], "mono_groups": raw[1], "stereo_groups": raw[2],
+        "mono_fx": raw[3], "stereo_fx": raw[4], "mono_aux": raw[5], "stereo_aux": raw[6],
+        "main_strips": {1: "Combined", 0: "Individual"}.get(raw[7], f"unknown 0x{raw[7]:02x}"),
+        "main_type": MIXCONFIG_MAIN_TYPES.get(raw[8], f"unknown 0x{raw[8]:02x}"),
+        "stereo_matrices": raw[9], "mono_matrices": raw[10], "pafl": raw[11],
+        "unknown_12": raw[12], "raw": raw.hex(" "),
+    }
+
+def load_mixconfig(path: str | Path) -> bytes:
+    with tarfile.open(path, "r:gz") as t:
+        return t.extractfile("Show/MixConfig/MixConfig.dat").read()
+
 def known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> dict[str, Any] | None:
     label = record.label.strip()
+
+    if label.startswith("Input Mixer"):
+        return input_mixer_field(record, rel_start, rel_end, data)
 
     def exact(a: int, b: int, name: str, encoding: str | None = None, **extra: Any):
         if a <= rel_start and rel_end <= b:
@@ -566,6 +645,9 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--json",action="store_true")
         if name=="validate":
             q.add_argument("--strict",action="store_true",help="exit non-zero for new/partial mappings or writer-check failures")
+    q=sub.add_parser("mixconfig", help="decode Show/MixConfig/MixConfig.dat")
+    q.add_argument("show")
+    q.add_argument("--json",action="store_true")
     q=sub.add_parser("diff")
     q.add_argument("show", help="show .tar.gz or a folder of Scene N.dat files")
     q.add_argument("scene_a",type=int)
@@ -576,6 +658,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None=None) -> int:
     args=build_parser().parse_args(argv)
     try:
+        if args.command=="mixconfig":
+            result=decode_mixconfig(load_mixconfig(args.show))
+            if args.json: print(json.dumps(result,indent=2))
+            else:
+                for k,v in result.items(): print(f"{k:16s} {v}")
+            return 0
         if args.command=="diff":
             scenes=load_show(args.show)
             if args.scene_a not in scenes or args.scene_b not in scenes:
