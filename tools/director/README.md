@@ -156,7 +156,7 @@ Each calibrated control has its own `set_workflow`. The default is:
 
 ```json
 [
-  {"click_control": true},
+  {"click_control": true, "modifiers": ["ctrl"]},
   {"hotkey": ["cmd", "a"]},
   {"type": "{entry}"},
   {"key": "enter"},
@@ -164,7 +164,7 @@ Each calibrated control has its own `set_workflow`. The default is:
 ]
 ```
 
-That works for Director numeric fields that accept keyboard entry. You can edit a control's workflow for dropdowns/toggles using the same primitives: `click`, `click_control`, `click_scene_row`, `hotkey`, `key`, `type`, and `sleep`.
+Director only accepts typed values after a **ctrl-click** on a numeric field, which opens its entry box. A plain click does nothing, and dragging adjusts the field like a rotary. `click` and `click_control` accept an optional `modifiers` list (`ctrl`, `shift`, `alt`, `cmd`). You can edit a control's workflow for dropdowns/toggles using the same primitives: `click`, `click_control`, `click_scene_row`, `hotkey`, `key`, `type`, and `sleep`.
 
 The scene-store workflow is also stored in the profile, so if your Director layout uses a different store/name/confirm sequence you can change it without modifying Python.
 
@@ -193,4 +193,4 @@ known mappings + candidate offsets/transforms
 
 ## Current limitation
 
-The first version uses calibrated coordinates plus keyboard entry. It does not yet read Director's value text back through Accessibility or OCR. The screenshots provide an audit trail, and the exported-show checker remains the authoritative binary verification step.
+The runner uses calibrated coordinates plus ctrl-click keyboard entry. It does not read Director's value text back; Director's controls are not exposed through Accessibility, but macOS Vision OCR reads them reliably (used for the ReverseEngineer6 run). The screenshots provide an audit trail, and the exported-show checker remains the authoritative binary verification step.
