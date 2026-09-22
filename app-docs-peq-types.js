@@ -49,7 +49,7 @@ f   = 4 × 2^(raw / 4608)</code></pre>
     <p>Controlled CH16 scenes <code>EQ In</code>, <code>EQ Out</code>, <code>EQ In 2</code> and <code>EQ Out 2</code> reproduce the same toggle. In the clean duplicate pair, the trailing PEQ byte is the only byte that changes after the fixed scene-name header in the complete 412,047-byte StageBox scene.</p>
 
     <h2>Remaining state</h2>
-    <p>Band offsets <code>+7..8</code> remain unknown and are preserved exactly. Bands 2 and 3 have no type writer because no controlled type variants were supplied for those bands.</p>
+    <p>Band offsets <code>+7..8</code> remain unknown and are preserved exactly. Bands 2 and 3 are fixed Bell filters: Director 2.12 has no type control for them, and every observed scene stores <code>00</code>. The ReverseEngineer8 Band 2/3 sweeps never changed the type or <code>+7..8</code> bytes.</p>
 
     <div class="docs-callout"><strong>Write boundary:</strong> band gain <code>+0..1</code>, frequency <code>+2..3</code>, Bell Width <code>+4..5</code>, proven Band 1/4 type byte <code>+6</code>, plus the single trailing PEQ bypass byte. Band bytes <code>+7..8</code> remain untouched.</div>
   `;

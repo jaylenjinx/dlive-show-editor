@@ -6,6 +6,9 @@ Commands:
   validate SHOW.tar.gz   Match changed fields against the built-in verified map.
   diff SHOW.tar.gz A B   Detailed binary/record diff for two scene IDs.
 
+SHOW may also be a directory of "Scene N.dat" files, e.g. Director's live
+.../TLDV2.12/TLDData/Director/Scenes/StageBox folder.
+
 No third-party dependencies are required.
 """
 from __future__ import annotations
@@ -68,8 +71,27 @@ def scene_name(data: bytes) -> str:
         end = min(len(data), 130)
     return data[2:end].decode("ascii", "replace")
 
+def load_scene_dir(path: Path) -> dict[int, Scene]:
+    """Read Director's live StageBox scene folder ("Scene N.dat" files).
+
+    dLive Director writes each stored scene straight to
+    .../TLDV2.12/TLDData/Director/Scenes/StageBox/, byte-identical to the
+    StageBoxSceneN.dat inside a saved show, so no show export is needed.
+    """
+    scenes: dict[int, Scene] = {}
+    for f in path.iterdir():
+        m = re.fullmatch(r"(?:Scene |StageBoxScene)(\d+)\.dat", f.name)
+        if m and f.is_file():
+            data = f.read_bytes()
+            scenes[int(m.group(1))] = Scene(int(m.group(1)), scene_name(data), data, str(f))
+    if not scenes:
+        raise ValueError("No StageBox scene .dat files found")
+    return scenes
+
 def load_show(path: str | Path) -> dict[int, Scene]:
     path = Path(path)
+    if path.is_dir():
+        return load_scene_dir(path)
     scenes: dict[int, Scene] = {}
     with tarfile.open(path, "r:gz") as outer:
         for member in outer.getmembers():
@@ -539,13 +561,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub=p.add_subparsers(dest="command",required=True)
     for name in ("discover","validate"):
         q=sub.add_parser(name)
-        q.add_argument("show")
+        q.add_argument("show", help="show .tar.gz or a folder of Scene N.dat files")
         q.add_argument("--max-gap",type=int,default=1,help="maximum scene-number gap to compare (default: 1)")
         q.add_argument("--json",action="store_true")
         if name=="validate":
             q.add_argument("--strict",action="store_true",help="exit non-zero for new/partial mappings or writer-check failures")
     q=sub.add_parser("diff")
-    q.add_argument("show")
+    q.add_argument("show", help="show .tar.gz or a folder of Scene N.dat files")
     q.add_argument("scene_a",type=int)
     q.add_argument("scene_b",type=int)
     q.add_argument("--json",action="store_true")
