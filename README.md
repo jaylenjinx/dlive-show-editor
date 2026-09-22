@@ -1,4 +1,4 @@
-# dLive Show Editor v2.2
+# dLive Show Editor v2.3
 
 Experimental, browser-only editor and reverse-engineering inspector for Allen & Heath dLive show archives (`.tar.gz`). The current primary target is **dLive firmware 2.12**.
 
