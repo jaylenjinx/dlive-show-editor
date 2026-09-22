@@ -68,4 +68,28 @@ class CheckerTests(unittest.TestCase):
                          (31,47,61,86,119,123,210))
         self.assertEqual((section,section+3,section+5),(126,129,131))  # Main On / level / pan
 
+    def test_plate_engine_fields(self):
+        data=bytes(3)+bytes.fromhex('1d00')+bytes(300)
+        rec=dl.Record(0,0,262,'AHFX Manager 02',0,len(data))
+        self.assertEqual(dl.known_field(rec,30,31,data)['name'],'Plate Pre Delay')
+        self.assertEqual(dl.known_field(rec,88,89,data)['name'],'Plate Echo 1 (L1) Time')
+        self.assertEqual(dl.known_field(rec,90,91,data)['name'],'Plate Echo 1 (L1) Gain')
+        self.assertEqual(dl.known_field(rec,104,105,data)['name'],'Plate Echo 4 (R2) Time')
+        self.assertEqual(dl.known_field(rec,133,133,data)['name'],'Plate Echo 1 (L1) On/Off')
+        self.assertEqual(dl.known_field(rec,143,143,data)['name'],'Plate Echo 6 (R3) On/Off')
+        self.assertEqual(dl.decode_raw(bytes.fromhex('5900'),'offset_db_8000_256'),-39.0)
+        self.assertEqual(dl.decode_raw(bytes.fromhex('8A00'),'offset_db_8000_256'),10.0)
+
+    def test_mixconfig_load_from_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            import tarfile as tf
+            show_dir = pathlib.Path(tmp) / 'Show' / 'MixConfig'
+            show_dir.mkdir(parents=True)
+            (show_dir / 'MixConfig.dat').write_bytes(bytes.fromhex('01 04 09 04 04 06 06 01 00 02 02 01 17'.replace(' ', '')))
+            archive = pathlib.Path(tmp) / 'test.tar.gz'
+            with tf.open(archive, 'w:gz') as t:
+                t.add(show_dir / 'MixConfig.dat', arcname='Show/MixConfig/MixConfig.dat')
+            raw = dl.load_mixconfig(archive)
+            self.assertEqual(dl.decode_mixconfig(raw)['main_type'], 'None')
+
 if __name__=='__main__': unittest.main()

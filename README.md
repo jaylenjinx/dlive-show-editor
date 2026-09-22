@@ -1,4 +1,4 @@
-# dLive Show Editor v2.3
+# dLive Show Editor v2.4
 
 Experimental, browser-only editor and reverse-engineering inspector for Allen & Heath dLive show archives (`.tar.gz`). The current primary target is **dLive firmware 2.12**.
 
@@ -190,11 +190,11 @@ Compressor model names are decoded from `state +1`, but **model switching remain
 
 Every input's send block is now decoded from the mixer header, so the layout works in any mixer configuration. Order: group assign bytes, then mono FX, mono Aux, stereo FX, stereo Aux, mono Matrix and stereo Matrix. Mono entries are `[on, pre, level]` and stereo entries `[on, pre, level, pan]`. A 47-byte channel section (fader/pan) and 8 UFX sends follow.
 
-Send level (−39…+10 dB or −∞), On, Pre/Post and group assigns are writable. Stereo send pan is decoded read only. See [docs/input-mixer.md](docs/input-mixer.md).
+Send level (−39…+10 dB or −∞), On, Pre/Post, stereo send pan and group assigns are writable. See [docs/input-mixer.md](docs/input-mixer.md).
 
 ### RackUltra / AHFX
 
-The editor parses RackUltra record framing, engine IDs, preset labels and same-engine byte differences, but does not write DSP parameters yet.
+The editor parses RackUltra record framing, engine IDs, preset labels and same-engine byte differences for every record. Growing subsets of three engines have verified restricted DSP writes: Spaces / 480 Large (`1c03`), Spaces / 480 Medium (`1c04`, including all six echo taps) and Plate Reverb Designer (`1d00`). See [docs/rackultra.md](docs/rackultra.md).
 
 ### MixConfig and structure inspector
 

@@ -370,6 +370,25 @@ def known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> di
                 common[(96+4*k, 97+4*k)] = (f"Spaces Echo {n} ({tap}) Time", "linear_8000_16")
                 common[(98+4*k, 99+4*k)] = (f"Spaces Echo {n} ({tap}) Gain", "offset_db_8000_256")
                 common[(127+2*k, 127+2*k)] = (f"Spaces Echo {n} ({tap}) On/Off", "toggle_10_on")
+        elif eng == "1d00":
+            # RevEngPlate1: Plate Reverb Designer, UFX Send 2. Same 262-byte AHFX payload
+            # and coordinate systems (linear_8000_16, freq_log, time_log) as the Spaces
+            # engines, at Plate-specific offsets.
+            common.update({
+                (30,31):("Plate Pre Delay","linear_8000_16"),(36,37):("Plate Diffusion","linear_8000_16"),
+                (38,39):("Plate Size","linear_8000_16"),(40,41):("Plate Shape","linear_8000_16"),
+                (56,57):("Plate Decay Time","time_log"),(66,67):("Plate Modulation Speed","linear_8000_16"),
+                (68,69):("Plate Modulation Depth","linear_8000_16"),(70,71):("Plate Output LF Cut","freq_log"),
+                (72,73):("Plate Output HF Cut","freq_log"),(85,85):("Plate Type preset","enum"),
+                (112,113):("Plate Width","linear_8000_16"),(120,121):("Plate Position","linear_8000_16"),
+                (131,131):("Plate Echoes section","enum"),
+            })
+            # Six echo taps, same record order as Spaces (L1,L2,L3,R1,R2,R3); L1/R2 proven,
+            # the other four assumed by analogy with the identical Spaces echo layout.
+            for n, tap, k in ((1,"L1",0),(2,"R1",3),(3,"L2",1),(4,"R2",4),(5,"L3",2),(6,"R3",5)):
+                common[(88+4*k, 89+4*k)] = (f"Plate Echo {n} ({tap}) Time", "linear_8000_16")
+                common[(90+4*k, 91+4*k)] = (f"Plate Echo {n} ({tap}) Gain", "offset_db_8000_256")
+                common[(133+2*k, 133+2*k)] = (f"Plate Echo {n} ({tap}) On/Off", "toggle_10_on")
         for (a,b),val in common.items():
             if a <= rel_start and rel_end <= b:
                 return {"name":val[0],"encoding":val[1],"engine":eng,"field_start":a,"field_end":b}

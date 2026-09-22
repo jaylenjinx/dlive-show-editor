@@ -1,6 +1,6 @@
 # RackUltra / AHFX records
 
-**Status:** decoded generally; **verified restricted writes for growing subsets of Spaces / 480 Large (`1c03`) and Spaces / 480 Medium (`1c04`)**.
+**Status:** decoded generally; **verified restricted writes for growing subsets of Spaces / 480 Large (`1c03`), Spaces / 480 Medium (`1c04`) and Plate Reverb Designer (`1d00`)**.
 
 Eight records are anchored by:
 
@@ -209,3 +209,15 @@ Output HF shelf gain is `state +86..87` with exact anchors `0, −6, −12, −1
 All RackUltra writes are guarded to the exact engine ID and observed payload shape. Values are continuous only when the controlled scenes establish an exact transform over a bounded range; otherwise the editor offers exact observed anchors/enums only. Every unmapped DSP byte and every other RackUltra engine remains preserved and read-only.
 
 See [`reverse-engineer-batch4.md`](reverse-engineer-batch4.md) for the 480 Large batch-4 evidence and [`reverse-engineer-batch5.md`](reverse-engineer-batch5.md) for the new 480 Medium / Echo evidence.
+
+## Plate Reverb Designer (`1d00`) — verified restricted writes
+
+Same 262-byte AHFX payload as the Spaces engines, and the same coordinate systems throughout: linear `0x8000 + 16 × value`, the PEQ log-frequency table, and (for Decay) the Spaces `time_log` coordinate.
+
+Pre Delay, Diffusion, Size, Shape, Modulation Speed/Depth, Width and Position (`+30`, `+36`, `+38`, `+40`, `+66`, `+68`, `+112`, `+120`) are continuous linear writes. Decay Time (`+56`) and Output LF/HF Cut (`+70`/`+72`) use exact anchors, identical in places to the Spaces anchor tables.
+
+Echo taps 1–6 share the Spaces record order (L1, L2, L3, R1, R2, R3) at a 4-byte stride from `state +88`, with On/Off at a 2-byte stride from `+133`. L1 and R2 are independently proven; the rest follow by analogy. Echo gain is a clean continuous `raw = 0x8000 + round(dB × 256)` formula (no low-byte quantisation noise), verified `−39…+10 dB` — Director shows a non-numeric `Off` state below −39 dB. The Echoes section bypass (`+131`) uses an inverted convention: `00 = In`, `10 = Out`.
+
+Type preset (`+85`) is a single enum byte selecting one of eleven Director library presets, but selecting one rewrites many other bytes at once, so it stays read-only.
+
+See [RevEngPlate1](reverse-engineer-plate1.md) for the full evidence.

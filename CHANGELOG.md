@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.4
+
+- **Fixed a long-standing bug**: `app-rackultra-verified.js`, `app-rackultra-spaces-extra.js` and `app-rackultra-spaces-medium.js` were never included in `index.html` (going back to when the first RackUltra module was added), so none of the Spaces (`1c03`/`1c04`) RackUltra editor UI — including all of the v2.3 echo-tap and remaining-controls work — was actually reachable on the live site. Added the missing `<script>` tags.
+- **Plate Reverb Designer** (`1d00`, `RevEngPlate1`, 90 automated Director scenes on UFX Send 2): first mapping of this engine.
+  - Pre Delay, Diffusion, Size, Shape, Modulation Speed/Depth, Width and Position are continuous linear writes (`0x8000 + 16 × value`), matching the Spaces coordinate exactly.
+  - Decay Time and Output LF/HF Cut use exact anchors; several anchor values are byte-identical to the Spaces tables, confirming a shared coordinate system across engines.
+  - Echo taps 1–6 share the Spaces record layout (4-byte stride from `+88`, On/Off at `+133`); L1 and R2 are independently proven. Echo gain uses a clean continuous formula (`raw = 0x8000 + round(dB × 256)`), verified `−39…+10 dB` — cleaner than the Spaces echo gain, which carries typed-entry quantisation noise.
+  - Type preset (`+85`) is decoded but read-only (selecting a preset rewrites many bytes at once).
+  - New `app-rackultra-plate.js`; `dlive_re.py` and the browser checker label every Plate field.
+
 ## v2.3
 
 - **Stereo send pan** (`RevEng10`): entry `+4` uses the input-pan coordinate (`00` L, `25` C, `4A` R), proven on St Aux, St FX, St Mtx and UFX sends. It is now writable in the Sends panel.
