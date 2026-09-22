@@ -118,17 +118,21 @@ f   = 4 × 2^(raw / 4608)</code></pre>
     id:'mixconfig', title:'MixConfig', eyebrow:'High-confidence read',
     html:`
       <h1>MixConfig.dat</h1>
-      <p>The reference show uses a 13-byte mixer-configuration record. Several count bytes are strongly identified, but the record is still read-only because four fields remain unidentified.</p>
-      <pre><code>byte 0   record/version
+      <p>The 13-byte mixer-configuration record, mapped by changing every Director <em>MixRack › Mixer Config</em> setting and saving one show per config (RevEngCfgA, RevEngM0–M6).</p>
+      <pre><code>byte 0   record/version (01)
 byte 1   mono group count
 byte 2   stereo group count
-byte 3   mono RackExtra FX send count
-byte 4   stereo RackExtra FX send count
+byte 3   mono FX send count
+byte 4   stereo FX send count
 byte 5   mono aux count
 byte 6   stereo aux count
-byte 9   mono matrix count
-byte 10  stereo matrix count</code></pre>
-      <p>Bytes 7, 8, 11 and 12 remain unresolved in the current research set.</p>
+byte 7   main channel strips: 01 Combined, 00 Individual
+byte 8   main type: 00 None, 01 LR, 02 LR+Msum, 03 LR+M, 04 LCR, 05 5.1 Surround, 06 LCR+
+byte 9   stereo matrix count
+byte 10  mono matrix count
+byte 11  stereo PAFL bus count
+byte 12  unknown (0x17 in every config tested)</code></pre>
+      <p>Mono counts can only be even. Mono buses use one of the 64 mix channels, stereo buses two; the Main uses 2 (LR), 3 (LR+M, LCR) or 6 (5.1). There are 16 FX sends in total. The scene <code>Input Mixer</code> header mirrors these values as <code>[version, monoGrp, stGrp, monoFX, stFX, monoAux, stAux, monoMtx, stMtx, mainType, mainStrips, PAFL]</code>. Note that the matrix order there is mono first, while MixConfig stores stereo first. The record stays read-only: reconfiguring rewrites every scene.</p>
     `
   },
   {

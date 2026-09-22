@@ -42,4 +42,30 @@ class CheckerTests(unittest.TestCase):
         self.assertAlmostEqual(dl.decode_raw(bytes.fromhex('8BA3'),'time_log'),1000,delta=1)
         self.assertEqual(dl.encode_scene_value({'encoding':'linear_8000_16'},'PREDLY 170',2),bytes.fromhex('8AA0'))
 
+    def test_input_mixer_send_layout(self):
+        header=bytes.fromhex('03 04 09 04 04 06 06 02 02 00 01 01')
+        entries,section,size=dl.input_mixer_layout(header)
+        self.assertEqual(size,208)
+        where={n:o for n,o,w in entries}
+        self.assertEqual((where['FX 1'],where['Aux 1'],where['St FX 1'],where['St Aux 1'],where['Mtx 1'],where['St Mtx 1'],where['UFX 1']),
+                         (13,29,53,73,103,111,168))
+        self.assertEqual(section+3,208-84)  # verified fader offset
+        # legacy (version 2) blocks have no UFX sends
+        self.assertEqual(dl.input_mixer_layout(bytes.fromhex('02 04 04 08 00 08 08 04 04 01 01 01'))[2],195)
+
+    def test_decode_mixconfig(self):
+        a=dl.decode_mixconfig(bytes.fromhex('01 02 07 06 03 04 05 01 01 01 08 02 17'))
+        self.assertEqual((a['mono_groups'],a['stereo_groups'],a['mono_fx'],a['stereo_fx'],a['mono_aux'],a['stereo_aux']),(2,7,6,3,4,5))
+        self.assertEqual((a['stereo_matrices'],a['mono_matrices'],a['pafl'],a['main_type'],a['main_strips']),(1,8,2,'LR','Combined'))
+        self.assertEqual(dl.decode_mixconfig(bytes.fromhex('01 02 07 06 03 04 05 00 05 01 08 02 17'))['main_type'],'5.1 Surround')
+
+    def test_config_a_layout(self):
+        # RevEngCfgA: every send offset measured on input 13 matches the rule
+        entries,section,size=dl.input_mixer_layout(bytes.fromhex('03 02 07 06 03 04 05 08 01 01 01 02'))
+        where={n:o for n,o,w in entries}
+        self.assertEqual(size,213)
+        self.assertEqual((where['FX 6']+2,where['Aux 4']+2,where['St FX 3']+2,where['St Aux 5']+2,where['Mtx 8']+2,where['St Mtx 1']+2,where['UFX 8']+2),
+                         (31,47,61,86,119,123,210))
+        self.assertEqual((section,section+3,section+5),(126,129,131))  # Main On / level / pan
+
 if __name__=='__main__': unittest.main()

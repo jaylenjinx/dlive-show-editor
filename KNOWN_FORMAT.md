@@ -170,31 +170,35 @@ Examples from Scene 10:
 
 V2's Structure inspector now discovers labelled framed records using this rule and reports their frame offset, payload size and post-label state length.
 
-## 6. MixConfig.dat — HIGH-CONFIDENCE READ, NOT WRITE
+## 6. MixConfig.dat — DECODED, READ ONLY
 
-Supplied bytes:
-
-```text
-01 04 09 08 04 06 06 01 00 02 02 01 17
-```
-
-Strongly identified fields:
+Every Director *MixRack › Mixer Config* setting was changed and one show saved per config: RevEngCfgA with all-distinct counts, RevEngM0–M5 for each Main type, and RevEngM6 for Individual strips.
 
 ```text
-byte 0  record/version
-byte 1  mono group count
-byte 2  stereo group count
-byte 3  mono RackExtra FX send count
-byte 4  stereo RackExtra FX send count
-byte 5  mono aux count
-byte 6  stereo aux count
-byte 9  mono matrix count
-byte 10 stereo matrix count
+byte 0   record/version (01)
+byte 1   mono group count
+byte 2   stereo group count
+byte 3   mono FX send count
+byte 4   stereo FX send count
+byte 5   mono aux count
+byte 6   stereo aux count
+byte 7   main channel strips: 01 Combined, 00 Individual
+byte 8   main type: 00 None, 01 LR, 02 LR+Msum, 03 LR+M, 04 LCR, 05 5.1 Surround, 06 LCR+
+byte 9   stereo matrix count
+byte 10  mono matrix count
+byte 11  stereo PAFL bus count
+byte 12  unknown (0x17 in every config tested)
 ```
 
-Bytes 7, 8, 11 and 12 are not labelled in v2.
+Example baseline: `01 04 09 04 04 06 06 01 00 02 02 01 17`. Config A (mono 2/6/4/8, stereo 7/3/5/1, PAFL 2, LR) stores `01 02 07 06 03 04 05 01 01 01 08 02 17`. That separates the matrix bytes: stereo is byte 9 and mono is byte 10. Earlier notes had them swapped, which the 2/2 baseline couldn't reveal.
 
-The Scene 10 `Input Mixer` header contains a matching count sequence, while the Reset scene contains a different count sequence matching its own configuration. This supports the interpretation but is not enough to safely synthesize the whole config record.
+Constraints seen in Director:
+
+- mono counts are even only;
+- 64 mix channels, where a mono bus uses 1, a stereo bus 2 and the Main 2/3/6;
+- 16 FX sends in total.
+
+The per-scene `Input Mixer` header mirrors the config as `[version, monoGrp, stGrp, monoFX, stFX, monoAux, stAux, monoMtx, stMtx, mainType, mainStrips, PAFL]`, with mono matrices first. See [docs/input-mixer.md](docs/input-mixer.md) for how it drives the per-input block layout.
 
 ## 7. Other labelled structures — READ-ONLY
 
