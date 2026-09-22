@@ -151,27 +151,30 @@ The new file confirms that LL, EL and SL are **unnumbered faders** and supplies 
 
 The curves are not treated as linear; only the five exact positions are writable.
 
-### Echo 1 / Echo 2 Time
+### Echo taps (Echo 1–6)
 
-Echo 1 Time is `state +96..97`; Echo 2 Time is `state +108..109`.
+The six Echoes-page taps are consecutive 4-byte blocks from `state +96`, in record order L1, L2, L3, R1, R2, R3. The On/Off bytes are a separate run from `state +127` with a 2-byte stride. Echo 1/2 keep their batch-5 names (L1/R1); Echo 3–6 are L2, R2, L3, R3.
 
-Both independently prove:
+| Echo | Tap | Time | Gain | On/Off |
+|---:|---|---:|---:|---:|
+| 1 | L1 | `+96..97` | `+98..99` | `+127` |
+| 3 | L2 | `+100..101` | `+102..103` | `+129` |
+| 5 | L3 | `+104..105` | `+106..107` | `+131` |
+| 2 | R1 | `+108..109` | `+110..111` | `+133` |
+| 4 | R2 | `+112..113` | `+114..115` | `+135` |
+| 6 | R3 | `+116..117` | `+118..119` | `+137` |
 
-```text
-raw = 0x8000 + 16 * time_ms
-```
+Time: `raw = 0x8000 + 16 * time_ms` (1/16 ms resolution), proven on all six taps. The editor allows continuous integer writes inside `0…200 ms`.
 
-Echo 1 anchors: `0, 50, 100, 150, 200 ms`; Echo 2 anchors: `0, 100, 200 ms`. The editor therefore allows continuous integer writes only inside `0…200 ms`.
+Gain (called Feedback in batch 5): exact anchors `−40=5800`, `−20=6BFD`, `−10=75FD`, `0=8003`, `+10=8A00` on every tap. The stored words fit an offset-binary `/256 dB` coordinate, but typed round values carry small low-byte offsets, so gain stays exact-anchor-only.
 
-### Echo 1 / Echo 2 Feedback
+On/Off: `10 = On`, `00 = Off`.
 
-Echo 1 Feedback is `state +98..99` with exact anchors `−40, −20, −10, 0, +10 dB`.
+See [ReverseEngineer6](reverse-engineer-batch6.md) for the evidence.
 
-Echo 2 Feedback is `state +110..111` with exact anchors `−40, −10, +10 dB`.
+### Remaining 480 Medium controls
 
-The stored words closely resemble an offset-binary `/256 dB` coordinate around `0x8000`, but common values carry small low-byte quantisation offsets. Feedback therefore remains exact-anchor-only.
-
-The engine contains four additional echoes; Echoes 3–6 remain read-only until their own controlled sweeps are supplied.
+Pre Delay, Density, Impact, Diffusion Early/Mid/Late, Direct Send, Width, Length, Modulation Rate/Depth and Stereo Spread are linear `raw = 0x8000 + 16 × value` words. Decay Time is the `time_log` coordinate. Output LF/HF Cut and Colour HF Tone/frequency use the PEQ log-frequency coordinate, and Colour gain is offset dB. Offsets, ranges and anchors are in [ReverseEngineer7](reverse-engineer-batch7.md).
 
 ### Damping LF / HF
 

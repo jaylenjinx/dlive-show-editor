@@ -233,7 +233,7 @@ The runner records a calibration profile for your Director window, creates the r
 
 Use this only with an offline/Preview-mode Director instance, not a Director session controlling live audio. After exporting the generated show, feed it into `tools/dlive_re.py` for binary validation and candidate-field discovery.
 
-A ready-made Echo 3–6 Time/Feedback sweep is in [tools/director/echo3-6.toml](tools/director/echo3-6.toml). Full setup instructions are in [tools/director/README.md](tools/director/README.md).
+Parameters are set through Director's ctrl-click numeric entry, so typed values land exactly. The Spaces Echo 3–6 mapping ([ReverseEngineer6](docs/reverse-engineer-batch6.md)) was generated this way; [tools/director/echo3-6.toml](tools/director/echo3-6.toml) remains as an example sweep. Full setup instructions are in [tools/director/README.md](tools/director/README.md).
 
 ## Documentation
 
