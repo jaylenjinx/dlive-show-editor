@@ -42,4 +42,19 @@ class CheckerTests(unittest.TestCase):
         # legacy (version 2) blocks have no UFX sends
         self.assertEqual(dl.input_mixer_layout(bytes.fromhex('02 04 04 08 00 08 08 04 04 01 01 01'))[2],195)
 
+    def test_decode_mixconfig(self):
+        a=dl.decode_mixconfig(bytes.fromhex('01 02 07 06 03 04 05 01 01 01 08 02 17'))
+        self.assertEqual((a['mono_groups'],a['stereo_groups'],a['mono_fx'],a['stereo_fx'],a['mono_aux'],a['stereo_aux']),(2,7,6,3,4,5))
+        self.assertEqual((a['stereo_matrices'],a['mono_matrices'],a['pafl'],a['main_type'],a['main_strips']),(1,8,2,'LR','Combined'))
+        self.assertEqual(dl.decode_mixconfig(bytes.fromhex('01 02 07 06 03 04 05 00 05 01 08 02 17'))['main_type'],'5.1 Surround')
+
+    def test_config_a_layout(self):
+        # RevEngCfgA: every send offset measured on input 13 matches the rule
+        entries,section,size=dl.input_mixer_layout(bytes.fromhex('03 02 07 06 03 04 05 08 01 01 01 02'))
+        where={n:o for n,o,w in entries}
+        self.assertEqual(size,213)
+        self.assertEqual((where['FX 6']+2,where['Aux 4']+2,where['St FX 3']+2,where['St Aux 5']+2,where['Mtx 8']+2,where['St Mtx 1']+2,where['UFX 8']+2),
+                         (31,47,61,86,119,123,210))
+        self.assertEqual((section,section+3,section+5),(126,129,131))  # Main On / level / pan
+
 if __name__=='__main__': unittest.main()

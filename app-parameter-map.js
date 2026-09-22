@@ -124,24 +124,34 @@ const PARAMETER_MAP = [
     confidence:'decoded', write:false, evidence:'Global config + Scene 10 bus layout', notes:'Read-only.'
   },
   {
-    id:'mixconfig-unknown-7-8', area:'Mixer config', record:'Show/MixConfig/MixConfig.dat', payload:'13 bytes',
-    field:'Unknown fields', offset:'7, 8', datatype:'uint8 ×2', transform:'unknown',
-    confidence:'unknown', write:false, evidence:'Observed but not independently labelled', notes:'Preserved exactly.'
+    id:'mixconfig-main-strips', area:'Mixer config', record:'Show/MixConfig/MixConfig.dat', payload:'13 bytes',
+    field:'Main channel strips', offset:'7', datatype:'uint8', transform:'01 Combined, 00 Individual (LR main)',
+    confidence:'decoded', write:false, evidence:'RevEngM6 vs RevEngCfgA: only this byte (and Input Mixer header [10]) changes', notes:'Read-only; reconfiguring rewrites the whole show.'
   },
   {
-    id:'mixconfig-mono-matrix', area:'Mixer config', record:'Show/MixConfig/MixConfig.dat', payload:'13 bytes',
-    field:'Mono Matrix count', offset:'9', datatype:'uint8', transform:'direct count',
-    confidence:'decoded', write:false, evidence:'Global config + Scene 10 matrix layout', notes:'Read-only.'
+    id:'mixconfig-main-type', area:'Mixer config', record:'Show/MixConfig/MixConfig.dat', payload:'13 bytes',
+    field:'Main type', offset:'8', datatype:'uint8 enum', transform:'00 None, 01 LR, 02 LR+Msum, 03 LR+M, 04 LCR, 05 5.1 Surround, 06 LCR+',
+    confidence:'decoded', write:false, evidence:'RevEngCfgA + RevEngM0–M5: one show per Main type; mirrored in Input Mixer header [9]', notes:'Read-only.'
   },
   {
     id:'mixconfig-st-matrix', area:'Mixer config', record:'Show/MixConfig/MixConfig.dat', payload:'13 bytes',
-    field:'Stereo Matrix count', offset:'10', datatype:'uint8', transform:'direct count',
-    confidence:'decoded', write:false, evidence:'Global config + Scene 10 matrix layout', notes:'Read-only.'
+    field:'Stereo Matrix count', offset:'9', datatype:'uint8', transform:'direct count',
+    confidence:'decoded', write:false, evidence:'RevEngCfgA (mono 8 / stereo 1) separates the matrix bytes: stereo is byte 9, mono byte 10', notes:'Earlier notes had these two swapped.'
   },
   {
-    id:'mixconfig-unknown-11-12', area:'Mixer config', record:'Show/MixConfig/MixConfig.dat', payload:'13 bytes',
-    field:'Unknown fields', offset:'11, 12', datatype:'uint8 ×2', transform:'unknown',
-    confidence:'unknown', write:false, evidence:'Observed but not independently labelled', notes:'Preserved exactly.'
+    id:'mixconfig-mono-matrix', area:'Mixer config', record:'Show/MixConfig/MixConfig.dat', payload:'13 bytes',
+    field:'Mono Matrix count', offset:'10', datatype:'uint8', transform:'direct count (even only)',
+    confidence:'decoded', write:false, evidence:'RevEngCfgA', notes:'Read-only.'
+  },
+  {
+    id:'mixconfig-pafl', area:'Mixer config', record:'Show/MixConfig/MixConfig.dat', payload:'13 bytes',
+    field:'Stereo PAFL bus count', offset:'11', datatype:'uint8', transform:'direct count',
+    confidence:'decoded', write:false, evidence:'RevEngCfgA: 1 → 2; mirrored in Input Mixer header [11]', notes:'Read-only.'
+  },
+  {
+    id:'mixconfig-unknown-12', area:'Mixer config', record:'Show/MixConfig/MixConfig.dat', payload:'13 bytes',
+    field:'Unknown', offset:'12', datatype:'uint8', transform:'always 0x17 in every config tested',
+    confidence:'unknown', write:false, evidence:'Unchanged across nine mixer configs', notes:'Preserved exactly.'
   },
   {
     id:'hpf-record', area:'Input processing', record:'Highpass Filter Input Channel NN', payload:'framed, current size to catalogue per scene',

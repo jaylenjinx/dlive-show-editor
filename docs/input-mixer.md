@@ -219,9 +219,16 @@ blockSize = groups + 4 × (mono sends) + 5 × (stereo sends) + 47 + (40 if versi
 - `on`: `01` On, `00` Off.
 - `pre`: `01` Pre, `00` Post.
 - `level`: `int16_be / 256 dB`, `8001` = −∞. Director's range is −39…+10 dB; any lower typed value becomes −∞.
-- `pan` (stereo entries only): decoded with the same `00…25…4A` coordinate as input pan, but kept read only because it hasn't been swept.
+- `pan` (stereo entries only): the same `00…25…4A` coordinate as input pan. See the RevEng10 section below.
 
-The channel section places the verified fader at `blockSize − 84` and pan at `blockSize − 82`, which confirms the rule independently.
+The 47-byte section starts with the **Main send**:
+
+- `+0`: On (`01`/`00`).
+- `+1..2`: always `01 01`; unmapped.
+- `+3..4`: level. This is the verified input fader at `blockSize − 84`.
+- `+5`: pan. This is the verified input pan at `blockSize − 82`.
+
+In other words, an input's fader and pan are its Main send. The block size does not depend on the Main type.
 
 Measured offsets for the ReverseEngineer9 config:
 
@@ -255,6 +262,46 @@ These carry the usual ±3-code typed-entry offset. The editor writes `round(dB �
 All 195,456 channel blocks parse as valid entries: On/Pre bytes are 0/1, levels are in range or −∞, pan ≤ `4A`, and the fader is in range. The 224-byte config also fixes the header order, because mono and stereo FX counts only reproduce the size when read as `[monoFX, stFX]`.
 
 The editor enables send and assign writes only when the header reproduces both the block size and the verified fader offset.
+
+## Stereo send pan — verified write (RevEng10)
+
+`RevEng10.tar.gz`, scenes 351–372. On input 13, one send of each stereo type (St Aux 1, St FX 1, St Mtx 1, UFX 1) was dragged hard L, hard R, to centre and to about ±50 %. Every adjacent pair changes only that entry's pan byte.
+
+| Position | Raw |
+|---|---:|
+| hard L | `00` |
+| ≈ 50 % L | `12` |
+| centre (by eye) | `26` |
+| ≈ 50 % R | `39` |
+| hard R | `4A` |
+
+Every untouched stereo send stores the default centre `25`. Director shows no numeric pan for sends, so centring by eye landed one step right (`26`). This is the verified input-pan coordinate, so the editor reuses the input-pan writer.
+
+## Second mixer config — RevEngCfgA
+
+Director's *MixRack › Mixer Config* was set to all-distinct counts:
+
+- mono Group/FX/Aux/Matrix = 2/6/4/8;
+- stereo = 7/3/5/1;
+- PAFL 2, Main LR.
+
+Mono counts can only be even.
+
+The header became `03 02 07 06 03 04 05 08 01 01 01 02`. The rule predicts a 213-byte block (`9 + 4×18 + 5×9 + 47 + 40`), and that is exactly the size. Scenes 373–389 then set the last send of every type and toggled Grp 2, St Grp 7 and Main:
+
+| Field | Predicted | Measured |
+|---|---:|---:|
+| Grp 2 / St Grp 7 assign | `+1` / `+8` | `+1` / `+8` |
+| FX 6 level | `+31` | `+31` |
+| Aux 4 level | `+47` | `+47` |
+| St FX 3 level | `+61` | `+61` |
+| St Aux 5 level | `+86` | `+86` |
+| Mtx 8 level | `+119` | `+119` |
+| St Mtx 1 level | `+123` | `+123` |
+| Main On / level / pan | `+126` / `+129` / `+131` | same |
+| UFX 8 level | `+210` | `+210` |
+
+Header bytes `[9..11]` are the Main type, Main strip mode and PAFL count, identical to `MixConfig.dat` bytes 8, 7 and 11 (see [KNOWN_FORMAT.md](../KNOWN_FORMAT.md#6-mixconfigdat--decoded-read-only)). Across all 13 header variants now available, every Input Mixer record matches the size rule and parses as valid entries.
 
 ## Earlier event-show mono Aux evidence
 

@@ -87,6 +87,8 @@ function scanFramedRecords(dat){
   return out;
 }
 
+// RevEngCfgA/RevEngM*: every byte changed one at a time in Director's MixRack > Mixer Config.
+const MIXCONFIG_MAIN_TYPES={0:'None',1:'LR',2:'LR+Msum',3:'LR+M',4:'LCR',5:'5.1 Surround',6:'LCR+'};
 function parseMixConfig(entries){
   const e=entries.find(x=>x.name==='Show/MixConfig/MixConfig.dat');
   if(!e)return null;
@@ -101,12 +103,12 @@ function parseMixConfig(entries){
       ['Stereo RackExtra FX sends',b[4],'high'],
       ['Mono Auxes',b[5],'high'],
       ['Stereo Auxes',b[6],'high'],
-      ['Unknown field 7',b[7],'unknown'],
-      ['Unknown field 8',b[8],'unknown'],
-      ['Mono Matrices',b[9],'high'],
-      ['Stereo Matrices',b[10],'high'],
-      ['Unknown field 11',b[11],'unknown'],
-      ['Unknown field 12',b[12],'unknown'],
+      ['Main strips (1 Combined, 0 Individual)',b[7],'high'],
+      ['Main type ('+(MIXCONFIG_MAIN_TYPES[b[8]]||'unknown')+')',b[8],'high'],
+      ['Stereo Matrices',b[9],'high'],
+      ['Mono Matrices',b[10],'high'],
+      ['Stereo PAFL buses',b[11],'high'],
+      ['Unknown field 12 (always 0x17 so far)',b[12],'unknown'],
     ];
   }
   return result;

@@ -5,6 +5,7 @@ Commands:
   discover SHOW.tar.gz   Compare adjacent controlled scenes and surface changed fields.
   validate SHOW.tar.gz   Match changed fields against the built-in verified map.
   diff SHOW.tar.gz A B   Detailed binary/record diff for two scene IDs.
+  mixconfig SHOW.tar.gz  Decode the show's MixConfig.dat (bus counts, Main type).
 
 SHOW may also be a directory of "Scene N.dat" files, e.g. Director's live
 .../TLDV2.12/TLDData/Director/Scenes/StageBox folder.
@@ -178,11 +179,13 @@ def engine_id(record: Record, data: bytes) -> str | None:
 def input_mixer_layout(header: bytes) -> tuple[list[tuple[str, int, int]], int, int]:
     """Per-input block layout of the Input Mixer record (ReverseEngineer9).
 
-    header = [version, monoGrp, stGrp, monoFX, stFX, monoAux, stAux, monoMtx, stMtx, ...].
+    header = [version, monoGrp, stGrp, monoFX, stFX, monoAux, stAux, monoMtx, stMtx,
+              mainType, mainStrips, PAFL] (mirrors MixConfig.dat).
     Block: one assign byte per group, then send entries in the order mono FX, mono Aux,
     stereo FX, stereo Aux, mono Matrix, stereo Matrix ([on, pre, level_i16] mono /
-    [on, pre, level_i16, pan] stereo), a 47-byte channel section (fader at +3, pan at +5),
-    then 8 stereo UFX sends when version >= 3.
+    [on, pre, level_i16, pan] stereo), a 47-byte section that starts with the Main send
+    (On at +0, level at +3 — the input fader — and pan at +5), then 8 stereo UFX sends
+    when version >= 3. The block size does not depend on the Main type.
     Returns (entries, channel_section_offset, block_size).
     """
     ver, mg, sg, mfx, sfx, ma, sa, mm, sm = header[:9]
@@ -224,7 +227,28 @@ def input_mixer_field(record: Record, rel_start: int, rel_end: int, data: bytes)
              or (hit(o + 4, o + 4, f"{name} send pan", "u8_direct") if width == 5 else None))
         if f:
             return f
-    return hit(section + 3, section + 4, "fader", "i16_div256") or hit(section + 5, section + 5, "pan", "u8_direct")
+    return (hit(section, section, "Main send On", "toggle_01_on")
+            or hit(section + 3, section + 4, "Main send level (fader)", "i16_div256")
+            or hit(section + 5, section + 5, "Main send pan", "u8_direct"))
+
+MIXCONFIG_MAIN_TYPES = {0: "None", 1: "LR", 2: "LR+Msum", 3: "LR+M", 4: "LCR", 5: "5.1 Surround", 6: "LCR+"}
+
+def decode_mixconfig(raw: bytes) -> dict[str, Any]:
+    """Show/MixConfig/MixConfig.dat (13 bytes), mapped from RevEngCfgA / RevEngM0-M6."""
+    if len(raw) != 13:
+        raise ValueError(f"MixConfig.dat should be 13 bytes, got {len(raw)}")
+    return {
+        "version": raw[0], "mono_groups": raw[1], "stereo_groups": raw[2],
+        "mono_fx": raw[3], "stereo_fx": raw[4], "mono_aux": raw[5], "stereo_aux": raw[6],
+        "main_strips": {1: "Combined", 0: "Individual"}.get(raw[7], f"unknown 0x{raw[7]:02x}"),
+        "main_type": MIXCONFIG_MAIN_TYPES.get(raw[8], f"unknown 0x{raw[8]:02x}"),
+        "stereo_matrices": raw[9], "mono_matrices": raw[10], "pafl": raw[11],
+        "unknown_12": raw[12], "raw": raw.hex(" "),
+    }
+
+def load_mixconfig(path: str | Path) -> bytes:
+    with tarfile.open(path, "r:gz") as t:
+        return t.extractfile("Show/MixConfig/MixConfig.dat").read()
 
 def known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> dict[str, Any] | None:
     label = record.label.strip()
@@ -605,6 +629,9 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--json",action="store_true")
         if name=="validate":
             q.add_argument("--strict",action="store_true",help="exit non-zero for new/partial mappings or writer-check failures")
+    q=sub.add_parser("mixconfig", help="decode Show/MixConfig/MixConfig.dat")
+    q.add_argument("show")
+    q.add_argument("--json",action="store_true")
     q=sub.add_parser("diff")
     q.add_argument("show", help="show .tar.gz or a folder of Scene N.dat files")
     q.add_argument("scene_a",type=int)
@@ -615,6 +642,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None=None) -> int:
     args=build_parser().parse_args(argv)
     try:
+        if args.command=="mixconfig":
+            result=decode_mixconfig(load_mixconfig(args.show))
+            if args.json: print(json.dumps(result,indent=2))
+            else:
+                for k,v in result.items(): print(f"{k:16s} {v}")
+            return 0
         if args.command=="diff":
             scenes=load_show(args.show)
             if args.scene_a not in scenes or args.scene_b not in scenes:

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Stereo send pan** (`RevEng10`): entry `+4` uses the input-pan coordinate (`00` L, `25` C, `4A` R), proven on St Aux, St FX, St Mtx and UFX sends. It is now writable in the Sends panel.
+- **Mixer config** (`RevEngCfgA`, `RevEngM0–M6`): fully mapped `MixConfig.dat` apart from byte 12 (constant `0x17`).
+  - Byte 7 is the Main strip mode and byte 8 the Main type (None/LR/LR+Msum/LR+M/LCR/5.1/LCR+).
+  - Byte 9 is the stereo matrix count and byte 10 mono (previously swapped); byte 11 is the PAFL count.
+  - The Input Mixer header mirrors these values. An all-distinct second config confirmed every send offset the layout rule predicts.
+- The Input Mixer channel section is the **Main send** (On `+0`, level `+3` = fader, pan `+5` = pan); Main send On is now writable.
+- `dlive_re.py mixconfig SHOW` decodes a show's mixer config.
 - **Input sends and group assigns** (`ReverseEngineer9`, 79 automated Director scenes on input 13): solved the general Input Mixer bus layout.
   - Block order: group assign bytes, then mono FX, mono Aux, stereo FX, stereo Aux, mono Matrix, stereo Matrix sends (`[on, pre, level]` / `[on, pre, level, pan]`), a 47-byte channel section, then 8 UFX sends.
   - `blockSize = groups + 4 × mono + 5 × stereo + 47 (+40 UFX)` holds for every block in five mixer configurations, including legacy pre-UFX blocks.
