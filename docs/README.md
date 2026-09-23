@@ -27,6 +27,7 @@ The current primary reference is **dLive firmware 2.12**. The project distinguis
 - [ReverseEngineer6 — Spaces echo taps](reverse-engineer-batch6.md)
 - [ReverseEngineer7 — Spaces remaining controls](reverse-engineer-batch7.md)
 - [RevEngPlate1 — Plate Reverb Designer](reverse-engineer-plate1.md)
+- [RevEngRD1 — Rhythm Delay](reverse-engineer-rhythmdelay1.md)
 - [ReverseEngineer6 — Spaces echo taps](reverse-engineer-batch6.md)
 - [ReverseEngineer7 — Spaces remaining controls](reverse-engineer-batch7.md)
 - [Research method](research-method.md)

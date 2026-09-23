@@ -389,6 +389,20 @@ def known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> di
                 common[(88+4*k, 89+4*k)] = (f"Plate Echo {n} ({tap}) Time", "linear_8000_16")
                 common[(90+4*k, 91+4*k)] = (f"Plate Echo {n} ({tap}) Gain", "offset_db_8000_256")
                 common[(133+2*k, 133+2*k)] = (f"Plate Echo {n} ({tap}) On/Off", "toggle_10_on")
+        elif eng == "2d00":
+            # RevEngRD1: Rhythm Delay, UFX Send 3, Simple mode only. Same 262-byte AHFX
+            # payload; BPM uses a new coordinate (raw = round(60000 / BPM), i.e. the delay
+            # time in ms for one beat), everything else reuses coordinates already proven
+            # on the Spaces/Plate engines.
+            common.update({
+                (28,29):("Rhythm Delay Tempo","bpm_60000"),
+                (30,31):("Rhythm Delay Feedback","offset_db_8000_256"),
+                (35,35):("Rhythm Delay Groove","enum"),  # 00 Triplet, 10 Straight, 20 Dotted
+                (38,39):("Rhythm Delay Amplitude","linear_8000_16"),
+                (144,145):("Rhythm Delay Drive","linear_8000_16"),
+                (147,147):("Rhythm Delay Global Tap","toggle_10_on"),
+                (148,149):("Rhythm Delay Auto Pan","linear_8000_16"),
+            })
         for (a,b),val in common.items():
             if a <= rel_start and rel_end <= b:
                 return {"name":val[0],"encoding":val[1],"engine":eng,"field_start":a,"field_end":b}
@@ -413,6 +427,9 @@ def decode_raw(raw: bytes, encoding: str | None) -> Any:
         return raw[0]
     if encoding == "time_log" and len(raw) == 2:
         return 10 ** ((int.from_bytes(raw, "big") - 17874) / 5958)
+    if encoding == "bpm_60000" and len(raw) == 2:
+        raw16 = int.from_bytes(raw, "big")
+        return round(60000 / raw16) if raw16 else None
     return None
 
 def normalize_label_number(name: str) -> dict[str, Any] | None:
@@ -452,6 +469,10 @@ def encode_scene_value(known: dict[str,Any] | None, scene_label: str, width: int
         raw=round((value+15)*4)
     elif enc=="freq_log" and meta and meta.get("unit")=="hz" and value and width==2:
         raw=math.floor(4608*math.log2(value/4))
+    elif enc=="bpm_60000" and value and width==2:
+        raw=round(60000/value)
+    elif enc=="offset_db_8000_256" and value is not None and width==2:
+        raw=round(0x8000+value*256)
     elif enc in ("toggle_00_on","toggle_01_on","toggle_10_on") and width==1:
         u=scene_label.upper()
         off=bool(re.search(r"\b(?:OFF|OUT)\b",u))
