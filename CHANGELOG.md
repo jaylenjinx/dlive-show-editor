@@ -1,5 +1,26 @@
 # Changelog
 
+## v2.6
+
+- **Promoted anchor-only fields to continuous writers wherever the anchors matched an already-proven canonical coordinate.** Several controls that are physically continuous (frequencies, gains, times) had been left as `<select>` dropdowns with only 4–9 discrete choices, exposing far less range than Director actually allows. Every promoted field was verified first: its existing controlled-scene anchors were checked against the coordinate's formula, and only promoted when the match was exact or within the same small typed-entry rounding noise (±1–3 raw units, ≤0.012 dB / a fraction of a Hz) already accepted elsewhere in the format.
+  - RackUltra Spaces medium (`1c04`), Spaces large (`1c03`) and Plate Reverb (`1d00`): Decay Time (`time_log`), Output/Damping/Colour frequencies (`freq_log`) and Output/Damping/Colour gains (`offset_db`) are now continuous number inputs instead of anchor selects. Echo feedback gain on Spaces medium is likewise continuous.
+  - Plate's originally recorded 0.1 s Decay anchor (`91B1`) did not fit the time_log formula at all (it decodes to ~1.8 s) while Spaces' independently-verified 0.1 s point fits exactly and both engines are documented as sharing one Decay coordinate — treated as a transcription error from the original sweep, superseded by the formula.
+  - RackUltra Spaces extra (`1c03`) Low Cut/High Cut frequencies.
+  - Input compressor: Attack, Release, and Sidechain Low/High/BPF filter frequencies are now continuous (`time_log` / `freq_log`).
+  - Input gate: Attack, Hold, Release (`time_log`) and Sidechain Low/High filter frequencies (`freq_log`).
+  - Manual Peak's own attack/release stay restricted to their two independently-tested exact values — only two data points were ever swept for that model, not enough to trust the general formula.
+  - Fixed several console-UI (`app-console-ui-*.js`) controls that still referenced the old anchor tables after this change; they now use the same continuous number inputs as the main editor tabs.
+
+## v2.5
+
+- **Rhythm Delay** (`2d00`, `RevEngRD1`, 32 automated Director scenes on UFX Send 3, Simple mode): first mapping of this engine.
+  - Tempo introduces a new coordinate: `raw = round(60000 / BPM)`, verified `33…1000` BPM.
+  - Feedback is a clean continuous `raw = 0x8000 + round(dB × 256)`, verified `−39…+5 dB` — no typed-entry quantisation noise, unlike the Spaces engines.
+  - Auto Pan, Drive and Amplitude reuse the standard `0x8000 + 16 × value` percentage coordinate. Amplitude also proportionally scales several read-only tap-gain bytes belonging to Advanced mode's (unmapped) per-tap pattern editor.
+  - Global Tap Tempo and Groove (Dotted/Triplet — one shared three-state enum, not two independent toggles) are writable.
+  - New `app-rackultra-rhythm-delay.js`; `dlive_re.py` and the browser checker label every field, including a new `bpm_60000` encoding.
+- Hardened the Director automation: the display's backing-scale factor (Retina vs non-Retina) is now auto-detected each session instead of assumed, since the physical monitor Director ends up on can change between sessions.
+
 ## v2.4
 
 - **Fixed a long-standing bug**: `app-rackultra-verified.js`, `app-rackultra-spaces-extra.js` and `app-rackultra-spaces-medium.js` were never included in `index.html` (going back to when the first RackUltra module was added), so none of the Spaces (`1c03`/`1c04`) RackUltra editor UI — including all of the v2.3 echo-tap and remaining-controls work — was actually reachable on the live site. Added the missing `<script>` tags.

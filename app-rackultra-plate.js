@@ -13,12 +13,18 @@ const AHFX_PLATE_LINEAR=[
   ['modDepth','Modulation Depth',68,0,100,'%'],['width',"Width",112,0,100,'%'],
   ['position','Position',120,0,100,'%'],
 ];
-// Exact typed anchors: Decay carries the same rounding as Spaces' time_log coordinate;
-// HF/LF Cut are the canonical PEQ log-frequency coordinate.
-const AHFX_PLATE_ANCHORS=[
-  ['decay','Decay Time',56,new Map([[0.1,0x91B1],[1,0x8BA3],[5,0x9BE8],[10,0xA2E9],[20,0xA9EB],[30,0xAE04]]),v=>`${v} s`],
-  ['lfCut','Output LF Cut',70,new Map([[20,0x29CB],[50,0x4196],[100,0x5396],[200,0x6596],[500,0x7D62],[1000,0x8F62]]),v=>formatHz(v)],
-  ['hfCut','Output HF Cut',72,new Map([[1000,0x8F63],[2000,0xA162],[5000,0xB92D],[10000,0xCB2D],[20000,0xDD2D]]),v=>formatHz(v)],
+// Decay Time uses the same time_log coordinate as Spaces (raw encodes milliseconds even
+// though Decay is displayed in seconds). The 1/5/10/20/30 s anchors matched
+// round(17874+5958×log10(ms)) exactly; the originally recorded 0.1 s anchor (0x91B1) does
+// not fit that formula at all (it decodes to ~1.8 s), while Spaces' independently-verified
+// 0.1 s point matches the formula exactly and the docs already establish both engines share
+// one Decay coordinate — so 0x91B1 looks like a transcription error from the original sweep,
+// not a real device floor, and the continuous writer covers the full 0.1-30 s range.
+const AHFX_PLATE_DECAY_OFF=56,AHFX_PLATE_DECAY_MIN_S=0.1,AHFX_PLATE_DECAY_MAX_S=30;
+// LF/HF Cut are the canonical PEQ log-frequency coordinate, matched exactly at every point.
+const AHFX_PLATE_FREQ=[
+  ['lfCut','Output LF Cut',70,20,1000],
+  ['hfCut','Output HF Cut',72,1000,20000],
 ];
 // Echo taps: L1 and R2 independently proven; the record order (4-byte stride from state
 // +88, On/Off 2-byte stride from +133) matches the Spaces engines' echo layout exactly,
@@ -50,8 +56,16 @@ function ahfxPlateWriteLinear(slot,key,value){
   if(!ctx||!spec||!Number.isFinite(v))return false;v=Math.max(spec[3],Math.min(spec[4],Math.round(v)));
   return ahfxPlateWrite16(ctx,spec[2],0x8000+16*v);
 }
-function ahfxPlateWriteMapped16(slot,off,map,value){
-  const ctx=ahfxPlateCtx(slot),raw=map.get(Number(value));if(!ctx||raw==null)return false;return ahfxPlateWrite16(ctx,off,raw);
+function ahfxPlateWriteFreq(slot,key,hz){
+  const ctx=ahfxPlateCtx(slot),spec=AHFX_PLATE_FREQ.find(x=>x[0]===key);let v=Number(hz);
+  if(!ctx||!spec||!Number.isFinite(v))return false;v=Math.max(spec[3],Math.min(spec[4],v));
+  return ahfxPlateWrite16(ctx,spec[2],Math.max(0,Math.min(0xffff,Math.floor(4608*Math.log2(v/4)))));
+}
+function ahfxPlateWriteDecay(slot,sec){
+  const ctx=ahfxPlateCtx(slot);let v=Number(sec);
+  if(!ctx||!Number.isFinite(v))return false;
+  v=Math.max(AHFX_PLATE_DECAY_MIN_S,Math.min(AHFX_PLATE_DECAY_MAX_S,v));
+  return ahfxPlateWrite16(ctx,AHFX_PLATE_DECAY_OFF,Math.round(17874+5958*Math.log10(v*1000)));
 }
 function ahfxPlateWriteEchoTime(slot,echo,ms){
   const ctx=ahfxPlateCtx(slot),spec=AHFX_PLATE_ECHO[echo];let value=Number(ms);
@@ -78,7 +92,8 @@ function injectRackUltraPlateControls(){
     const p=document.createElement('div');p.dataset.ahfxPlate='1';p.className='ahfx-verified-controls';
     p.innerHTML=`<div class="manager-head inline"><strong>Plate Reverb Designer verified controls</strong><span class="confidence verified">VERIFIED WRITE</span></div>
       ${AHFX_PLATE_LINEAR.map(([key,label,off,min,max,unit])=>`<div class="peq-field"><span>${label} <small>continuous verified ${min}…${max}${unit?' '+unit:''}</small></span><div><input data-k="${key}" type="number" min="${min}" max="${max}" step="1"><b>${unit}</b></div><code>${ahfxPlateHex16(read16(off))}</code></div>`).join('')}
-      ${AHFX_PLATE_ANCHORS.map(([key,label,off,map,fmt])=>`<div class="peq-field"><span>${label} <small>exact controlled anchors</small></span><select data-k="${key}">${ahfxPlateOptions(map,fmt)}</select><code>${ahfxPlateHex16(read16(off))}</code></div>`).join('')}
+      ${AHFX_PLATE_FREQ.map(([key,label,off,min,max])=>`<div class="peq-field"><span>${label} <small>continuous verified ${formatHz(min)}…${formatHz(max)}</small></span><div><input data-k="${key}" type="number" min="${min}" max="${max}" step="1"><b>Hz</b></div><code>${ahfxPlateHex16(read16(off))}</code></div>`).join('')}
+      <div class="peq-field"><span>Decay Time <small>continuous verified ${AHFX_PLATE_DECAY_MIN_S}…${AHFX_PLATE_DECAY_MAX_S} s</small></span><div><input data-k="decay" type="number" min="${AHFX_PLATE_DECAY_MIN_S}" max="${AHFX_PLATE_DECAY_MAX_S}" step="0.1"><b>s</b></div><code>${ahfxPlateHex16(read16(AHFX_PLATE_DECAY_OFF))}</code></div>
       ${Object.entries(AHFX_PLATE_ECHO).map(([key,spec])=>`<div class="peq-field"><span>Echo ${key.slice(1)} (${spec.tap}) Time <small>continuous verified 0…200 ms</small></span><div><input data-k="${key}time" type="number" min="0" max="200" step="1"><b>ms</b></div><code>${ahfxPlateHex16(read16(spec.timeOff))}</code></div>
       <div class="peq-field"><span>Echo ${key.slice(1)} (${spec.tap}) Gain <small>continuous verified ${AHFX_PLATE_ECHO_GAIN_MIN_DB}…${AHFX_PLATE_ECHO_GAIN_MAX_DB} dB</small></span><div><input data-k="${key}gain" type="number" min="${AHFX_PLATE_ECHO_GAIN_MIN_DB}" max="${AHFX_PLATE_ECHO_GAIN_MAX_DB}" step="0.1"><b>dB</b></div><code>${ahfxPlateHex16(read16(spec.gainOff))}</code></div>
       <div class="peq-field"><span>Echo ${key.slice(1)} (${spec.tap}) On/Off</span><select data-k="${key}on">${[...AHFX_PLATE_ECHO_ON].map(([raw,label])=>`<option value="${raw}">${label}</option>`).join('')}</select><code>${hexByte(read8(spec.onOff))}</code></div>`).join('')}
@@ -92,7 +107,16 @@ function injectRackUltraPlateControls(){
       if(Number.isInteger(v)&&v>=min&&v<=max)input.value=String(v);else{input.disabled=true;input.title=`Current raw ${ahfxPlateHex16(raw)} is outside the controlled ${min}–${max} range.`;}
       input.onchange=()=>{if(ahfxPlateWriteLinear(fx.slot,key,input.value))renderFx();else toast(`RackUltra ${key} write blocked.`,true);};
     }
-    for(const [key,,off,map] of AHFX_PLATE_ANCHORS){const sel=p.querySelector(`[data-k="${key}"]`);ahfxPlateSetExact(sel,map,read16(off));sel.onchange=()=>{if(sel.value!==''&&ahfxPlateWriteMapped16(fx.slot,off,map,sel.value))renderFx();else if(sel.value!=='')toast(`RackUltra ${key} write blocked.`,true);};}
+    for(const [key,,off,min,max] of AHFX_PLATE_FREQ){
+      const input=p.querySelector(`[data-k="${key}"]`),raw=read16(off),hz=4*Math.pow(2,raw/4608);
+      if(hz>=min*0.98&&hz<=max*1.02)input.value=String(Math.round(hz*100)/100);else{input.disabled=true;input.title=`Current raw ${ahfxPlateHex16(raw)} is outside the controlled ${formatHz(min)}–${formatHz(max)} range.`;}
+      input.onchange=()=>{if(ahfxPlateWriteFreq(fx.slot,key,input.value))renderFx();else toast(`RackUltra ${key} write blocked.`,true);};
+    }
+    {
+      const input=p.querySelector('[data-k="decay"]'),raw=read16(AHFX_PLATE_DECAY_OFF),sec=Math.pow(10,(raw-17874)/5958)/1000;
+      input.value=String(Math.round(sec*100)/100);
+      input.onchange=()=>{if(ahfxPlateWriteDecay(fx.slot,input.value))renderFx();else toast('RackUltra decay write blocked.',true);};
+    }
 
     for(const echo of Object.keys(AHFX_PLATE_ECHO)){
       const spec=AHFX_PLATE_ECHO[echo];
@@ -120,7 +144,8 @@ renderFx=function(){renderFxBeforeRackUltraPlate();injectRackUltraPlateControls(
 if(typeof PARAMETER_MAP!=='undefined'){
   const rows=[];
   for(const [key,label,off,min,max,unit] of AHFX_PLATE_LINEAR)rows.push([key,label,`state +${off}..${off+1}`,`raw=0x8000+16×value; verified ${min}…${max}${unit?' '+unit:''}`]);
-  for(const [key,label,off,map,fmt] of AHFX_PLATE_ANCHORS)rows.push([key,label,`state +${off}..${off+1}`,`exact anchors ${[...map.keys()].map(fmt).join(', ')}`]);
+  for(const [key,label,off,min,max] of AHFX_PLATE_FREQ)rows.push([key,label,`state +${off}..${off+1}`,`raw=floor(4608×log2(hz/4)); verified ${formatHz(min)}…${formatHz(max)}`]);
+  rows.push(['decay','Decay Time',`state +${AHFX_PLATE_DECAY_OFF}..${AHFX_PLATE_DECAY_OFF+1}`,`raw=round(17874+5958×log10(ms)); verified ${AHFX_PLATE_DECAY_MIN_S}…${AHFX_PLATE_DECAY_MAX_S} s`]);
   for(const [key,spec] of Object.entries(AHFX_PLATE_ECHO)){
     const n=key.slice(1);
     rows.push([`echo${n}-time`,`Echo ${n} (${spec.tap}) Time`,`state +${spec.timeOff}..${spec.timeOff+1}`,'raw=0x8000+16×milliseconds; verified 0…200 ms']);

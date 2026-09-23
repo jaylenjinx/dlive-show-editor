@@ -140,7 +140,7 @@ Known engine IDs from the supplied Reset scene and Scene 10:
 1c03 Spaces / 480 Large family
 1c04 Spaces / 480 Medium family
 1d00 Plate Reverb Designer — verified restricted writes; see docs/reverse-engineer-plate1.md
-2d00 Rhythm Delay
+2d00 Rhythm Delay — verified restricted writes (Simple mode); see docs/reverse-engineer-rhythmdelay1.md
 2b00 Saturator
 2a00 Amp/Cab
 2400 Shifter

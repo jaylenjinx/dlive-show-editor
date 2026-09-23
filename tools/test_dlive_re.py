@@ -92,4 +92,19 @@ class CheckerTests(unittest.TestCase):
             raw = dl.load_mixconfig(archive)
             self.assertEqual(dl.decode_mixconfig(raw)['main_type'], 'None')
 
+    def test_rhythm_delay_engine_fields(self):
+        data=bytes(3)+bytes.fromhex('2d00')+bytes(300)
+        rec=dl.Record(0,0,262,'AHFX Manager 03',0,len(data))
+        self.assertEqual(dl.known_field(rec,28,29,data)['name'],'Rhythm Delay Tempo')
+        self.assertEqual(dl.known_field(rec,28,29,data)['encoding'],'bpm_60000')
+        self.assertEqual(dl.known_field(rec,30,31,data)['name'],'Rhythm Delay Feedback')
+        self.assertEqual(dl.known_field(rec,35,35,data)['name'],'Rhythm Delay Groove')
+        self.assertEqual(dl.known_field(rec,147,147,data)['name'],'Rhythm Delay Global Tap')
+        self.assertEqual(dl.known_field(rec,148,149,data)['name'],'Rhythm Delay Auto Pan')
+
+    def test_bpm_60000_encoding(self):
+        self.assertEqual(dl.decode_raw(bytes.fromhex('071A'),'bpm_60000'),33)
+        self.assertEqual(dl.decode_raw(bytes.fromhex('003C'),'bpm_60000'),1000)
+        self.assertEqual(dl.encode_scene_value({'encoding':'bpm_60000'},'BPM 500',2),bytes.fromhex('0078'))
+
 if __name__=='__main__': unittest.main()

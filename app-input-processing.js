@@ -16,18 +16,14 @@ const IP_PREAMP_GAIN_MAX_DB=60;
 const IP_DELAY_MIN_MS=0;
 const IP_DELAY_MAX_MS=340;
 
-const IP_GATE_ATTACK_MS_TO_RAW=new Map([
-  [0.05,0x278B],[0.1,0x2E8C],[1,0x45D2],[10,0x5D18],[100,0x745E],[300,0x7F78]
-]);
-const IP_GATE_HOLD_MS_TO_RAW=new Map([
-  [10,0x5D18],[50,0x6D5C],[100,0x745E],[500,0x84A2],[1000,0x8BA3],[5000,0x9BE8]
-]);
-const IP_GATE_RELEASE_MS_TO_RAW=new Map([
-  [10,0x5D18],[50,0x6D5C],[100,0x745E],[500,0x84A2],[1000,0x8BA3]
-]);
-const IP_GATE_ATTACK_RAW_TO_MS=new Map([...IP_GATE_ATTACK_MS_TO_RAW].map(([ms,raw])=>[raw,ms]));
-const IP_GATE_HOLD_RAW_TO_MS=new Map([...IP_GATE_HOLD_MS_TO_RAW].map(([ms,raw])=>[raw,ms]));
-const IP_GATE_RELEASE_RAW_TO_MS=new Map([...IP_GATE_RELEASE_MS_TO_RAW].map(([ms,raw])=>[raw,ms]));
+// Every tested anchor matches raw = round(17874 + 5958 × log10(ms)) within ±1 raw unit,
+// the same time_log coordinate proven continuous on the compressor attack/release and
+// RackUltra Decay Time fields, so all three gate time controls are continuous writers.
+const IP_GATE_ATTACK_MIN_MS=0.05,IP_GATE_ATTACK_MAX_MS=300;
+const IP_GATE_HOLD_MIN_MS=10,IP_GATE_HOLD_MAX_MS=5000;
+const IP_GATE_RELEASE_MIN_MS=10,IP_GATE_RELEASE_MAX_MS=1000;
+function ipTimeRawFromMs(ms){return Math.max(0,Math.min(0xffff,Math.round(17874+5958*Math.log10(ms))));}
+function ipTimeMsFromRaw(raw){return Math.pow(10,(Number(raw)-17874)/5958);}
 
 const IP_STEREO_IMAGE_MODE_LABELS=new Map([
   [0x00,'L/R'],[0x01,'R/L'],[0x02,'L Polarity'],[0x03,'R Polarity'],
@@ -64,9 +60,9 @@ function parseInputGates(dat){
     const enableRaw=dat[s+18],writableShape=dat[s]===0x03&&(enableRaw===0||enableRaw===1);
     out.push({...r,channel,discriminator:dat[s],thresholdOffset:s+2,thresholdRaw,thresholdDb:thresholdRaw/256,
       depthOffset:s+8,depthRaw,depthDb:depthRaw/256,
-      holdOffset:s+10,holdRaw,holdMs:IP_GATE_HOLD_RAW_TO_MS.get(holdRaw)??null,holdExact:IP_GATE_HOLD_RAW_TO_MS.has(holdRaw),
-      releaseOffset:s+13,releaseRaw,releaseMs:IP_GATE_RELEASE_RAW_TO_MS.get(releaseRaw)??null,releaseExact:IP_GATE_RELEASE_RAW_TO_MS.has(releaseRaw),
-      attackOffset:s+15,attackRaw,attackMs:IP_GATE_ATTACK_RAW_TO_MS.get(attackRaw)??null,attackExact:IP_GATE_ATTACK_RAW_TO_MS.has(attackRaw),
+      holdOffset:s+10,holdRaw,holdMs:ipTimeMsFromRaw(holdRaw),
+      releaseOffset:s+13,releaseRaw,releaseMs:ipTimeMsFromRaw(releaseRaw),
+      attackOffset:s+15,attackRaw,attackMs:ipTimeMsFromRaw(attackRaw),
       enableOffset:s+18,enableRaw,active:enableRaw===1,writableShape});
   }
   return out;
@@ -141,11 +137,12 @@ function getStageBoxAnalogueInput(socket){return ensureInputProcessing()?.analog
 function setInputGateActive(channel,on){const g=getInputGate(channel);if(!g?.writableShape)return false;const raw=on?1:0;state.current.stage.datBytes[g.enableOffset]=raw;g.enableRaw=raw;g.active=!!on;markStageDirty();return true;}
 function setInputGateThreshold(channel,db){const g=getInputGate(channel);if(!g?.writableShape)return false;let v=Number(db);if(!Number.isFinite(v))return false;v=Math.max(IP_GATE_THRESHOLD_MIN_DB,Math.min(IP_GATE_THRESHOLD_MAX_DB,v));const raw=Math.round(v*256);writeI16BE(state.current.stage.datBytes,g.thresholdOffset,raw);g.thresholdRaw=raw;g.thresholdDb=raw/256;markStageDirty();return true;}
 function setInputGateDepth(channel,db){const g=getInputGate(channel);if(!g?.writableShape)return false;let v=Number(db);if(!Number.isFinite(v))return false;v=Math.max(IP_GATE_DEPTH_MIN_DB,Math.min(IP_GATE_DEPTH_MAX_DB,v));const raw=Math.round(v*256);writeI16BE(state.current.stage.datBytes,g.depthOffset,raw);g.depthRaw=raw;g.depthDb=raw/256;markStageDirty();return true;}
-function setInputGateTime(channel,kind,rawValue){
-  const g=getInputGate(channel);if(!g?.writableShape)return false;const raw=Number(rawValue);
-  const map=kind==='attack'?IP_GATE_ATTACK_RAW_TO_MS:kind==='hold'?IP_GATE_HOLD_RAW_TO_MS:kind==='release'?IP_GATE_RELEASE_RAW_TO_MS:null;if(!map?.has(raw))return false;
+function setInputGateTime(channel,kind,msValue){
+  const g=getInputGate(channel);if(!g?.writableShape)return false;let ms=Number(msValue);if(!Number.isFinite(ms))return false;
+  const range=kind==='attack'?[IP_GATE_ATTACK_MIN_MS,IP_GATE_ATTACK_MAX_MS]:kind==='hold'?[IP_GATE_HOLD_MIN_MS,IP_GATE_HOLD_MAX_MS]:kind==='release'?[IP_GATE_RELEASE_MIN_MS,IP_GATE_RELEASE_MAX_MS]:null;if(!range)return false;
+  ms=Math.max(range[0],Math.min(range[1],ms));const raw=ipTimeRawFromMs(ms);
   const off=kind==='attack'?g.attackOffset:kind==='hold'?g.holdOffset:g.releaseOffset;ipWriteU16(state.current.stage.datBytes,off,raw);
-  if(kind==='attack'){g.attackRaw=raw;g.attackMs=map.get(raw);g.attackExact=true;}else if(kind==='hold'){g.holdRaw=raw;g.holdMs=map.get(raw);g.holdExact=true;}else{g.releaseRaw=raw;g.releaseMs=map.get(raw);g.releaseExact=true;}
+  if(kind==='attack'){g.attackRaw=raw;g.attackMs=ms;}else if(kind==='hold'){g.holdRaw=raw;g.holdMs=ms;}else{g.releaseRaw=raw;g.releaseMs=ms;}
   markStageDirty();return true;
 }
 

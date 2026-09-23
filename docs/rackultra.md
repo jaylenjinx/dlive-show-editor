@@ -1,6 +1,6 @@
 # RackUltra / AHFX records
 
-**Status:** decoded generally; **verified restricted writes for growing subsets of Spaces / 480 Large (`1c03`), Spaces / 480 Medium (`1c04`) and Plate Reverb Designer (`1d00`)**.
+**Status:** decoded generally; **verified restricted writes for growing subsets of Spaces / 480 Large (`1c03`), Spaces / 480 Medium (`1c04`), Plate Reverb Designer (`1d00`) and Rhythm Delay (`2d00`)**.
 
 Eight records are anchored by:
 
@@ -221,3 +221,11 @@ Echo taps 1–6 share the Spaces record order (L1, L2, L3, R1, R2, R3) at a 4-by
 Type preset (`+85`) is a single enum byte selecting one of eleven Director library presets, but selecting one rewrites many other bytes at once, so it stays read-only.
 
 See [RevEngPlate1](reverse-engineer-plate1.md) for the full evidence.
+
+## Rhythm Delay (`2d00`) — verified restricted writes, Simple mode
+
+Same 262-byte AHFX payload as the other RackUltra engines. Simple mode's Tempo, Feedback, Auto Pan, Drive, Amplitude, Global Tap and Groove (Dotted/Triplet, one shared enum) are writable.
+
+Tempo introduces a new coordinate: `raw = round(60000 / BPM)`, verified `33…1000` BPM. Feedback is a clean continuous `raw = 0x8000 + round(dB × 256)`, verified `−39…+5 dB`, without the typed-entry quantisation noise seen on the Spaces engines. Auto Pan, Drive and Amplitude reuse the standard `0x8000 + 16 × value` percentage coordinate. Amplitude also proportionally scales several tap-gain bytes belonging to Advanced mode's pattern editor, which is not itself mapped.
+
+See [RevEngRD1](reverse-engineer-rhythmdelay1.md) for the full evidence, an unexplained incidental byte, and the controls that were not swept (Type preset, Interval, Number of Repeats, and Advanced mode's variable-length tap pattern).

@@ -8,32 +8,15 @@
 const COMP_SC_MODEL_VERIFIED=0x01; // Manual RMS
 const COMP_SC_LO_TYPE_LABELS=new Map([[0x04,'Lo-Cut'],[0x06,'Low Shelf']]);
 const COMP_SC_HI_TYPE_LABELS=new Map([[0x03,'Hi-Cut'],[0x07,'High Shelf']]);
-const COMP_SC_LO_HZ_TO_RAW=new Map([
-  [20,0x29CB],
-  [100,0x5396],
-  [500,0x7D62],
-  [2000,0xA162],
-  [5000,0xB92E],
-]);
-const COMP_SC_HI_HZ_TO_RAW=new Map([
-  [120,0x5853],
-  [200,0x6596],
-  [500,0x7D62],
-  [1000,0x8F62],
-  [5000,0xB92D],
-  [10000,0xCB2D],
-  [20000,0xDD2E],
-]);
-const COMP_SC_LO_RAW_TO_HZ=new Map([...COMP_SC_LO_HZ_TO_RAW].map(([hz,raw])=>[raw,hz]));
-const COMP_SC_HI_RAW_TO_HZ=new Map([...COMP_SC_HI_HZ_TO_RAW].map(([hz,raw])=>[raw,hz]));
+// Anchors matched raw = floor(4608 × log2(hz/4)) within ±1 raw unit at every tested point
+// (the canonical PEQ log-frequency coordinate). Continuous over the tested range.
+const COMP_SC_LO_MIN_HZ=20,COMP_SC_LO_MAX_HZ=5000;
+const COMP_SC_HI_MIN_HZ=120,COMP_SC_HI_MAX_HZ=20000;
 
 function compScReadU16(dat,off){return ((dat[off]<<8)|dat[off+1])>>>0;}
 function compScRawHex(raw){return raw==null?'—':`${hexByte(raw>>8)} ${hexByte(raw&255)}`;}
 function compScFreqEstimate(raw){return peqFrequencyFromRaw(Number(raw));}
-function compScFreqLabel(raw,table){
-  const exact=table.get(raw);
-  return exact!=null?formatHz(exact):`≈ ${formatHz(compScFreqEstimate(raw))}`;
-}
+function compScFreqLabel(raw){return formatHz(compScFreqEstimate(raw));}
 
 const parseInputCompressorStatesBeforeSidechain=parseInputCompressorStates;
 parseInputCompressorStates=function(dat){
@@ -42,8 +25,7 @@ parseInputCompressorStates=function(dat){
     if(c.stateLength>=127){
       c.scLoFreqOffset=c.stateStart+107;
       c.scLoFreqRaw=compScReadU16(dat,c.scLoFreqOffset);
-      c.scLoFreqHz=COMP_SC_LO_RAW_TO_HZ.get(c.scLoFreqRaw)??compScFreqEstimate(c.scLoFreqRaw);
-      c.scLoFreqExact=COMP_SC_LO_RAW_TO_HZ.has(c.scLoFreqRaw);
+      c.scLoFreqHz=compScFreqEstimate(c.scLoFreqRaw);
 
       c.scLoTypeOffset=c.stateStart+111;
       c.scLoTypeRaw=dat[c.scLoTypeOffset];
@@ -52,8 +34,7 @@ parseInputCompressorStates=function(dat){
 
       c.scHiFreqOffset=c.stateStart+116;
       c.scHiFreqRaw=compScReadU16(dat,c.scHiFreqOffset);
-      c.scHiFreqHz=COMP_SC_HI_RAW_TO_HZ.get(c.scHiFreqRaw)??compScFreqEstimate(c.scHiFreqRaw);
-      c.scHiFreqExact=COMP_SC_HI_RAW_TO_HZ.has(c.scHiFreqRaw);
+      c.scHiFreqHz=compScFreqEstimate(c.scHiFreqRaw);
 
       c.scHiTypeOffset=c.stateStart+120;
       c.scHiTypeRaw=dat[c.scHiTypeOffset];
@@ -75,7 +56,7 @@ parseInputCompressorStates=function(dat){
       c.scLoFreqOffset=c.scLoTypeOffset=c.scHiFreqOffset=c.scHiTypeOffset=c.scFilterOffset=c.scMiddleOffset=null;
       c.scLoFreqRaw=c.scHiFreqRaw=c.scLoTypeRaw=c.scHiTypeRaw=c.scFilterRaw=c.scMiddleRaw=null;
       c.scLoFreqHz=c.scHiFreqHz=null;
-      c.scLoFreqExact=c.scHiFreqExact=c.scLoTypeKnown=c.scHiTypeKnown=c.scFilterKnown=c.scMiddleKnown=false;
+      c.scLoTypeKnown=c.scHiTypeKnown=c.scFilterKnown=c.scMiddleKnown=false;
       c.scFilterActive=c.scMiddleActive=false;c.scWritableShape=false;
     }
   }
@@ -120,20 +101,20 @@ function setInputCompressorSidechainFrequency(channel,kind,hzValue){
   const decoded=ensureChannelState();
   const comp=decoded?.compressors?.find(c=>c.channel===Number(channel));
   if(!comp?.scWritableShape)return false;
-  const hz=Number(hzValue);
-  const map=kind==='lo'?COMP_SC_LO_HZ_TO_RAW:COMP_SC_HI_HZ_TO_RAW;
-  const raw=map.get(hz);if(raw==null)return false;
+  let hz=Number(hzValue);if(!Number.isFinite(hz))return false;
+  const min=kind==='lo'?COMP_SC_LO_MIN_HZ:COMP_SC_HI_MIN_HZ,max=kind==='lo'?COMP_SC_LO_MAX_HZ:COMP_SC_HI_MAX_HZ;
+  hz=Math.max(min,Math.min(max,hz));
+  const raw=Math.max(0,Math.min(0xffff,Math.floor(4608*Math.log2(hz/4))));
   const off=kind==='lo'?comp.scLoFreqOffset:comp.scHiFreqOffset;
   writeU16BE(state.current.stage.datBytes,off,raw);
   if(kind==='lo'){
-    comp.scLoFreqRaw=raw;comp.scLoFreqHz=hz;comp.scLoFreqExact=true;
+    comp.scLoFreqRaw=raw;comp.scLoFreqHz=hz;
   }else{
-    comp.scHiFreqRaw=raw;comp.scHiFreqHz=hz;comp.scHiFreqExact=true;
+    comp.scHiFreqRaw=raw;comp.scHiFreqHz=hz;
   }
   markStageDirty();return true;
 }
 
-function compScSelectOptions(map){return [...map.entries()].map(([hz,raw])=>`<option value="${hz}">${formatHz(hz)}</option>`).join('');}
 function compScTypeOptions(map){return [...map.entries()].map(([raw,label])=>`<option value="${raw}">${label}</option>`).join('');}
 
 function injectCompressorSidechainUi(){
@@ -157,7 +138,7 @@ function injectCompressorSidechainUi(){
   filterRow.insertAdjacentElement('afterend',loTypeRow);
 
   const loFreqRow=document.createElement('div');loFreqRow.className='peq-field';
-  loFreqRow.innerHTML=`<span>SC low filter frequency <small>verified anchors only</small></span><select data-k="comp-sc-lo-freq">${compScSelectOptions(COMP_SC_LO_HZ_TO_RAW)}</select><code>${compScRawHex(comp.scLoFreqRaw)}</code>`;
+  loFreqRow.innerHTML=`<span>SC low filter frequency <small>continuous verified ${formatHz(COMP_SC_LO_MIN_HZ)}–${formatHz(COMP_SC_LO_MAX_HZ)}</small></span><div><input data-k="comp-sc-lo-freq" type="number" min="${COMP_SC_LO_MIN_HZ}" max="${COMP_SC_LO_MAX_HZ}" step="1"><b>Hz</b></div><code>${compScRawHex(comp.scLoFreqRaw)}</code>`;
   loTypeRow.insertAdjacentElement('afterend',loFreqRow);
 
   const middleRow=document.createElement('div');middleRow.className='peq-field';
@@ -169,7 +150,7 @@ function injectCompressorSidechainUi(){
   middleRow.insertAdjacentElement('afterend',hiTypeRow);
 
   const hiFreqRow=document.createElement('div');hiFreqRow.className='peq-field';
-  hiFreqRow.innerHTML=`<span>SC high filter frequency <small>verified anchors only</small></span><select data-k="comp-sc-hi-freq">${compScSelectOptions(COMP_SC_HI_HZ_TO_RAW)}</select><code>${compScRawHex(comp.scHiFreqRaw)}</code>`;
+  hiFreqRow.innerHTML=`<span>SC high filter frequency <small>continuous verified ${formatHz(COMP_SC_HI_MIN_HZ)}–${formatHz(COMP_SC_HI_MAX_HZ)}</small></span><div><input data-k="comp-sc-hi-freq" type="number" min="${COMP_SC_HI_MIN_HZ}" max="${COMP_SC_HI_MAX_HZ}" step="1"><b>Hz</b></div><code>${compScRawHex(comp.scHiFreqRaw)}</code>`;
   hiTypeRow.insertAdjacentElement('afterend',hiFreqRow);
 
   const filterSel=filterRow.querySelector('[data-k="comp-sc-filter"]');
@@ -181,12 +162,12 @@ function injectCompressorSidechainUi(){
 
   if(comp.scFilterKnown)filterSel.value=comp.scFilterActive?'1':'0';
   if(comp.scLoTypeKnown)loTypeSel.value=String(comp.scLoTypeRaw);
-  if(comp.scLoFreqExact)loFreqSel.value=String(COMP_SC_LO_RAW_TO_HZ.get(comp.scLoFreqRaw));
-  else{const o=document.createElement('option');o.value='';o.textContent=`Current ${compScFreqLabel(comp.scLoFreqRaw,COMP_SC_LO_RAW_TO_HZ)} (untested raw)`;o.selected=true;loFreqSel.prepend(o);}
+  if(comp.scLoFreqHz>=COMP_SC_LO_MIN_HZ*0.98&&comp.scLoFreqHz<=COMP_SC_LO_MAX_HZ*1.02)loFreqSel.value=String(Math.round(comp.scLoFreqHz*100)/100);
+  else{loFreqSel.disabled=true;loFreqSel.title=`Current raw ${compScRawHex(comp.scLoFreqRaw)} is outside the controlled ${formatHz(COMP_SC_LO_MIN_HZ)}–${formatHz(COMP_SC_LO_MAX_HZ)} range.`;}
   if(comp.scMiddleKnown)middleSel.value=comp.scMiddleActive?'1':'0';
   if(comp.scHiTypeKnown)hiTypeSel.value=String(comp.scHiTypeRaw);
-  if(comp.scHiFreqExact)hiFreqSel.value=String(COMP_SC_HI_RAW_TO_HZ.get(comp.scHiFreqRaw));
-  else{const o=document.createElement('option');o.value='';o.textContent=`Current ${compScFreqLabel(comp.scHiFreqRaw,COMP_SC_HI_RAW_TO_HZ)} (untested raw)`;o.selected=true;hiFreqSel.prepend(o);}
+  if(comp.scHiFreqHz>=COMP_SC_HI_MIN_HZ*0.98&&comp.scHiFreqHz<=COMP_SC_HI_MAX_HZ*1.02)hiFreqSel.value=String(Math.round(comp.scHiFreqHz*100)/100);
+  else{hiFreqSel.disabled=true;hiFreqSel.title=`Current raw ${compScRawHex(comp.scHiFreqRaw)} is outside the controlled ${formatHz(COMP_SC_HI_MIN_HZ)}–${formatHz(COMP_SC_HI_MAX_HZ)} range.`;}
 
   if(!comp.scLoTypeKnown){const o=document.createElement('option');o.value='';o.textContent=comp.scLoTypeLabel;o.selected=true;loTypeSel.prepend(o);}
   if(!comp.scHiTypeKnown){const o=document.createElement('option');o.value='';o.textContent=comp.scHiTypeLabel;o.selected=true;hiTypeSel.prepend(o);}
@@ -201,18 +182,18 @@ function injectCompressorSidechainUi(){
   middleSel.onchange=()=>{if(setInputCompressorSidechainToggle(channel,'middle',middleSel.value==='1'))renderChannelState();else toast('Sidechain BPF/notch write blocked.',true);};
   loTypeSel.onchange=()=>{if(setInputCompressorSidechainType(channel,'lo',loTypeSel.value))renderChannelState();else toast('Sidechain low-filter type write blocked.',true);};
   hiTypeSel.onchange=()=>{if(setInputCompressorSidechainType(channel,'hi',hiTypeSel.value))renderChannelState();else toast('Sidechain high-filter type write blocked.',true);};
-  loFreqSel.onchange=()=>{if(setInputCompressorSidechainFrequency(channel,'lo',loFreqSel.value))renderChannelState();else toast('Sidechain low-filter frequency write blocked: use a controlled anchor.',true);};
-  hiFreqSel.onchange=()=>{if(setInputCompressorSidechainFrequency(channel,'hi',hiFreqSel.value))renderChannelState();else toast('Sidechain high-filter frequency write blocked: use a controlled anchor.',true);};
+  loFreqSel.onchange=()=>{if(setInputCompressorSidechainFrequency(channel,'lo',loFreqSel.value))renderChannelState();else toast('Sidechain low-filter frequency write blocked.',true);};
+  hiFreqSel.onchange=()=>{if(setInputCompressorSidechainFrequency(channel,'hi',hiFreqSel.value))renderChannelState();else toast('Sidechain high-filter frequency write blocked.',true);};
 
   const table=panel.querySelector('.config-table');
   if(table){
     const rows=[
       ['SC Filter',`state + 123 = ${comp.scFilterRaw==null?'—':hexByte(comp.scFilterRaw)}`,comp.scFilterKnown?(comp.scFilterActive?'In':'Out / bypassed'):'Unknown'],
       ['SC Low type',`state + 111 = ${comp.scLoTypeRaw==null?'—':hexByte(comp.scLoTypeRaw)}`,comp.scLoTypeLabel||'—'],
-      ['SC Low freq',`state + 107..108 = ${compScRawHex(comp.scLoFreqRaw)}`,compScFreqLabel(comp.scLoFreqRaw,COMP_SC_LO_RAW_TO_HZ)],
+      ['SC Low freq',`state + 107..108 = ${compScRawHex(comp.scLoFreqRaw)}`,compScFreqLabel(comp.scLoFreqRaw)],
       ['SC BPF / notch',`state + 124 = ${comp.scMiddleRaw==null?'—':hexByte(comp.scMiddleRaw)}`,comp.scMiddleKnown?(comp.scMiddleActive?'On':'Off'):'Unknown'],
       ['SC High type',`state + 120 = ${comp.scHiTypeRaw==null?'—':hexByte(comp.scHiTypeRaw)}`,comp.scHiTypeLabel||'—'],
-      ['SC High freq',`state + 116..117 = ${compScRawHex(comp.scHiFreqRaw)}`,compScFreqLabel(comp.scHiFreqRaw,COMP_SC_HI_RAW_TO_HZ)],
+      ['SC High freq',`state + 116..117 = ${compScRawHex(comp.scHiFreqRaw)}`,compScFreqLabel(comp.scHiFreqRaw)],
     ];
     for(const [name,code,text] of rows){const r=document.createElement('div');r.className='config-row';r.innerHTML=`<strong>${name}</strong><code>${code}</code><span>${text}${comp.scWritableShape?' · verified/restricted write':''}</span>`;table.appendChild(r);}
   }
@@ -230,9 +211,9 @@ renderChannelState=function(){renderChannelStateBeforeSidechain();injectCompress
 
 if(typeof PARAMETER_MAP!=='undefined'){
   const entries=[
-    {id:'input-comp-sc-lo-freq',field:'Sidechain low-filter frequency',offset:'state + 107..108',datatype:'uint16 big-endian logarithmic frequency coordinate',transform:'scene-proven anchors: 20 Hz=29CB, 100=5396, 500=7D62, 2 kHz=A162, 5 kHz=B92E',evidence:'Controlled CH16 scenes sc lpf 20hz/100hz/500hz/2000hz/5000hz; each adjacent scene changes only these two bytes outside scene-label bytes.',notes:'A&H reference range is 20 Hz–5 kHz. Writer exposes exact controlled anchors only.'},
+    {id:'input-comp-sc-lo-freq',field:'Sidechain low-filter frequency',offset:'state + 107..108',datatype:'uint16 big-endian logarithmic frequency coordinate',transform:`raw=floor(4608×log2(hz/4)); verified ${COMP_SC_LO_MIN_HZ} Hz…${COMP_SC_LO_MAX_HZ/1000} kHz`,evidence:'Controlled CH16 scenes sc lpf 20hz/100hz/500hz/2000hz/5000hz; each adjacent scene changes only these two bytes outside scene-label bytes; every point matches the canonical PEQ log-frequency coordinate within ±1 raw unit.',notes:'A&H reference range is 20 Hz–5 kHz.'},
     {id:'input-comp-sc-lo-type',field:'Sidechain low-filter type',offset:'state + 111',datatype:'uint8 enum',transform:'04 = Lo-Cut; 06 = Low Shelf',evidence:'Controlled CH16 filter low cut vs filter low shelf changes only state +111 outside scene-label bytes.',notes:'Official dLive terminology is Lo-Cut / shelf.'},
-    {id:'input-comp-sc-hi-freq',field:'Sidechain high-filter frequency',offset:'state + 116..117',datatype:'uint16 big-endian logarithmic frequency coordinate',transform:'scene-proven anchors: 120 Hz=5853, 200=6596, 500=7D62, 1 kHz=8F62, 5 kHz=B92D, 10 kHz=CB2D, 20 kHz=DD2E',evidence:'Controlled CH16 scenes sc hpf 20khz/10khz/5khz/1khz/500hz/200hz/120hz; each adjacent scene changes only these two bytes outside scene-label bytes.',notes:'A&H reference range is 120 Hz–20 kHz. Writer exposes exact controlled anchors only.'},
+    {id:'input-comp-sc-hi-freq',field:'Sidechain high-filter frequency',offset:'state + 116..117',datatype:'uint16 big-endian logarithmic frequency coordinate',transform:`raw=floor(4608×log2(hz/4)); verified ${COMP_SC_HI_MIN_HZ} Hz…${COMP_SC_HI_MAX_HZ/1000} kHz`,evidence:'Controlled CH16 scenes sc hpf 20khz/10khz/5khz/1khz/500hz/200hz/120hz; each adjacent scene changes only these two bytes outside scene-label bytes; every point matches the canonical PEQ log-frequency coordinate within ±1 raw unit.',notes:'A&H reference range is 120 Hz–20 kHz.'},
     {id:'input-comp-sc-hi-type',field:'Sidechain high-filter type',offset:'state + 120',datatype:'uint8 enum',transform:'03 = Hi-Cut; 07 = High Shelf',evidence:'Controlled CH16 filter high cut vs filter high shelf changes only state +120 outside scene-label bytes.',notes:'Official dLive terminology is Hi-Cut / shelf.'},
     {id:'input-comp-sc-filter',field:'Sidechain Filter In/Out',offset:'state + 123',datatype:'uint8',transform:'00 = In/active; 01 = Out/bypassed',evidence:'Two independent Filter On/Off CH16 pairs toggle only state +123 outside scene-label bytes.',notes:'Writer guarded to the verified current-format Manual RMS record shape.'},
     {id:'input-comp-sc-middle',field:'Sidechain BPF / scene-labelled notch',offset:'state + 124',datatype:'uint8',transform:'00 = Off; 01 = On',evidence:'Controlled CH16 filter notch on/off pair changes only state +124 outside scene-label bytes.',notes:'Operator scene labels call this notch; A&H documentation describes a BPF option. Exact UI semantic naming is intentionally recorded as BPF/notch. Source selection remains unmapped.'},
@@ -251,8 +232,8 @@ high frequency= state +116..117
 high type     = state +120   (03 Hi-Cut / 07 High Shelf)
 Filter In/Out = state +123   (00 In / 01 Out)
 BPF/notch     = state +124   (00 Off / 01 On)</code></pre>
-      <p>The controlled low-frequency series covers <code>20 Hz, 100 Hz, 500 Hz, 2 kHz, 5 kHz</code>; the high-frequency series covers <code>120 Hz, 200 Hz, 500 Hz, 1 kHz, 5 kHz, 10 kHz, 20 kHz</code>. Every adjacent scene changes only the target two bytes. These ranges independently match Allen &amp; Heath's published sidechain Lo-Cut and Hi-Cut ranges.</p>
+      <p>The controlled low-frequency series covers <code>20 Hz, 100 Hz, 500 Hz, 2 kHz, 5 kHz</code>; the high-frequency series covers <code>120 Hz, 200 Hz, 500 Hz, 1 kHz, 5 kHz, 10 kHz, 20 kHz</code>. Every adjacent scene changes only the target two bytes and matches the canonical PEQ log-frequency coordinate, so both fields are continuous over their tested ranges. These ranges independently match Allen &amp; Heath's published sidechain Lo-Cut and Hi-Cut ranges.</p>
       <p>Low type <code>04→06</code> isolates Lo-Cut vs Low Shelf. High type <code>03→07</code> isolates Hi-Cut vs High Shelf. Duplicate Filter In/Out scenes isolate <code>+123</code>. The operator-labelled notch pair isolates <code>+124</code>; A&amp;H documentation describes a BPF option, so the editor labels this conservatively as BPF/notch.</p>
-      <div class="docs-callout"><strong>Writer guard:</strong> sidechain writes are currently enabled only on Manual RMS <code>01</code>. Frequency writes use exact scene-proven anchors only. Sidechain Source was not included in the test and remains untouched.</div>`;
+      <div class="docs-callout"><strong>Writer guard:</strong> sidechain writes are currently enabled only on Manual RMS <code>01</code>. Frequency writers are continuous over their tested ranges (20 Hz–5 kHz low, 120 Hz–20 kHz high). Sidechain Source was not included in the test and remains untouched.</div>`;
   }
 }

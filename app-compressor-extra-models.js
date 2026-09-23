@@ -76,13 +76,18 @@ setInputCompressorRatioRaw=function(channel,rawValue){
   state.current.stage.datBytes[comp.stateStart+15]=raw;comp.ratioRaw=raw;comp.ratioLabel=COMP_MP_RATIO_RAW_TO_LABEL.get(raw);comp.mpRatioKnown=true;markStageDirty();return true;
 };
 
-const setInputCompressorTimeRawBeforeExtraModels=setInputCompressorTimeRaw;
-setInputCompressorTimeRaw=function(channel,kind,rawValue){
+// Manual Peak has only two independently-tested time points per control (no
+// intermediate anchors), so unlike Manual RMS this stays restricted to those
+// exact tested milliseconds rather than being promoted to a continuous writer.
+const setInputCompressorTimeBeforeExtraModels=setInputCompressorTime;
+setInputCompressorTime=function(channel,kind,msValue){
   const comp=ensureChannelState()?.compressors?.find(c=>c.channel===Number(channel));
-  if(comp?.modelRaw!==COMP_MANUAL_PEAK_MODEL)return setInputCompressorTimeRawBeforeExtraModels(channel,kind,rawValue);
-  if(!comp.writableShape)return false;const raw=Number(rawValue),map=kind==='attack'?COMP_MP_ATTACK_RAW_TO_MS:kind==='release'?COMP_MP_RELEASE_RAW_TO_MS:null;if(!map?.has(raw))return false;
+  if(comp?.modelRaw!==COMP_MANUAL_PEAK_MODEL)return setInputCompressorTimeBeforeExtraModels(channel,kind,msValue);
+  if(!comp.writableShape)return false;
+  const rawByMs=kind==='attack'?COMP_MP_ATTACK_RAW_TO_MS:kind==='release'?COMP_MP_RELEASE_RAW_TO_MS:null;if(!rawByMs)return false;
+  const ms=Number(msValue),raw=[...rawByMs].find(([r,m])=>m===ms)?.[0];if(raw==null)return false;
   const off=kind==='attack'?comp.stateStart+10:comp.stateStart+12;writeU16BE(state.current.stage.datBytes,off,raw);
-  if(kind==='attack'){comp.attackRaw=raw;comp.attackMs=map.get(raw);comp.attackExact=true;comp.mpAttackExact=true;}else{comp.releaseRaw=raw;comp.releaseMs=map.get(raw);comp.releaseExact=true;comp.mpReleaseExact=true;}
+  if(kind==='attack'){comp.attackRaw=raw;comp.attackMs=ms;comp.mpAttackExact=true;}else{comp.releaseRaw=raw;comp.releaseMs=ms;comp.mpReleaseExact=true;}
   markStageDirty();return true;
 };
 
