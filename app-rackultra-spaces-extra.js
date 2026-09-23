@@ -9,8 +9,10 @@ const AHFX_SPACES_EXTRA={
   length:{off:62,kind:'linear',min:1,max:35},
   el:{off:68,kind:'anchors',options:[[0x6C00,'Low'],[0x7646,'Mid'],[0x8000,'High']]},
   ll:{off:70,kind:'anchors',options:[[0x6C00,'Low'],[0x767E,'Medium'],[0x8000,'High']]},
-  lowCut:{off:76,kind:'freq',options:[[20,0x29CB],[500,0x7D62],[1000,0x8F63]]},
-  highCut:{off:78,kind:'freq',options:[[1000,0x8F63],[10000,0xCB2D],[20000,0xDD2E]]},
+  // Anchors matched raw = floor(4608 × log2(hz/4)) exactly (within the same ±1 raw-unit
+  // per-control noise already documented for Spaces medium/Plate). Continuous over range.
+  lowCut:{off:76,kind:'contFreq',min:20,max:1000},
+  highCut:{off:78,kind:'contFreq',min:1000,max:20000},
   sl:{off:94,kind:'anchors',options:[[0x6C00,'Low'],[0x7B69,'Mid'],[0x8A00,'High']]},
   spread:{off:122,kind:'linear',min:0,max:100},
   echo:{off:125,kind:'toggle'},
@@ -26,7 +28,7 @@ function ahfxExtraGet(slot){
   const values={};
   for(const [key,spec] of Object.entries(AHFX_SPACES_EXTRA)){
     const raw=spec.kind==='enum'||spec.kind==='toggle'?read8(spec.off):read16(spec.off);
-    values[key]={raw,value:spec.kind==='linear'?(raw-0x8000)/16:null};
+    values[key]={raw,value:spec.kind==='linear'?(raw-0x8000)/16:spec.kind==='contFreq'?4*Math.pow(2,raw/4608):null};
   }
   return {stage,fx,stateStart:s,values};
 }
@@ -36,8 +38,9 @@ function ahfxExtraWrite(slot,key,value){
   if(spec.kind==='linear'){
     let v=Number(value);if(!Number.isFinite(v))return false;v=Math.max(spec.min,Math.min(spec.max,Math.round(v)));raw=0x8000+v*16;
     writeU16BE(ctx.stage.datBytes,ctx.stateStart+spec.off,raw);
-  }else if(spec.kind==='freq'){
-    raw=new Map(spec.options).get(Number(value));if(raw==null)return false;writeU16BE(ctx.stage.datBytes,ctx.stateStart+spec.off,raw);
+  }else if(spec.kind==='contFreq'){
+    let v=Number(value);if(!Number.isFinite(v))return false;v=Math.max(spec.min,Math.min(spec.max,v));
+    raw=Math.max(0,Math.min(0xffff,Math.floor(4608*Math.log2(v/4))));writeU16BE(ctx.stage.datBytes,ctx.stateStart+spec.off,raw);
   }else if(spec.kind==='anchors'){
     raw=Number(value);if(!new Map(spec.options).has(raw))return false;writeU16BE(ctx.stage.datBytes,ctx.stateStart+spec.off,raw);
   }else if(spec.kind==='enum'){
@@ -73,8 +76,7 @@ function injectRackUltraBatch4Controls(){
     const v=ctx.values,p=document.createElement('div');p.dataset.ahfxBatch4='1';p.className='ahfx-verified-controls';
     p.innerHTML=`<div class="manager-head inline"><strong>480 Large additional verified controls</strong><span class="confidence verified">BATCH 4</span></div>
       <div class="peq-field"><span>Space model <small>exact enum</small></span><select data-k="mode">${ahfxExtraSelectOptions('mode')}</select><code>${hexByte(v.mode.raw)}</code></div>
-      <div class="peq-field"><span>Low Cut <small>exact anchors</small></span><select data-k="lowCut">${ahfxExtraSelectOptions('lowCut')}</select><code>${ahfxExtraHex16(v.lowCut.raw)}</code></div>
-      <div class="peq-field"><span>High Cut <small>exact anchors</small></span><select data-k="highCut">${ahfxExtraSelectOptions('highCut')}</select><code>${ahfxExtraHex16(v.highCut.raw)}</code></div>
+      ${[['lowCut','Low Cut'],['highCut','High Cut']].map(([k,label])=>{const s=AHFX_SPACES_EXTRA[k];return `<div class="peq-field"><span>${label} <small>continuous verified ${formatHz(s.min)}…${formatHz(s.max)}</small></span><div><input data-k="${k}" type="number" min="${s.min}" max="${s.max}" step="1" value="${Math.round(v[k].value*100)/100}"><b>Hz</b></div><code>${ahfxExtraHex16(v[k].raw)}</code></div>`;}).join('')}
       <div class="peq-field"><span>Size Link</span><span data-k="sizeLink"></span><code>${hexByte(v.sizeLink.raw)}</code></div>
       ${[['width','Width'],['length','Length'],['ds','DS'],['spread','Spread']].map(([k,label])=>{const s=AHFX_SPACES_EXTRA[k];return `<div class="peq-field"><span>${label} <small>linear ${s.min}…${s.max}</small></span><input data-k="${k}" type="number" min="${s.min}" max="${s.max}" step="1" value="${Number(v[k].value.toFixed(3))}"><code>${ahfxExtraHex16(v[k].raw)}</code></div>`;}).join('')}
       ${[['el','EL'],['ll','LL'],['sl','SL']].map(([k,label])=>`<div class="peq-field"><span>${label} <small>exact Low/Mid/High anchors</small></span><select data-k="${k}">${ahfxExtraSelectOptions(k)}</select><code>${ahfxExtraHex16(v[k].raw)}</code></div>`).join('')}
@@ -83,8 +85,8 @@ function injectRackUltraBatch4Controls(){
       <div class="peq-field"><span>Echo 2</span><span data-k="echo2"></span><code>${hexByte(v.echo2.raw)}</code></div>
       <div class="console-note">DS, EL, LL and SL retain the scene abbreviations because their binary fields are proven but the full UI label semantics are not.</div>`;
     card.appendChild(p);
-    for(const k of ['mode','lowCut','highCut','el','ll','sl']){const s=p.querySelector(`[data-k="${k}"]`);ahfxExtraSetCurrent(s,k,v[k].raw);s.onchange=()=>{if(s.value!==''&&ahfxExtraWrite(fx.slot,k,s.value))renderFx();else if(s.value!=='')toast(`RackUltra ${k} write blocked.`,true);};}
-    for(const k of ['width','length','ds','spread']){const i=p.querySelector(`[data-k="${k}"]`);i.onchange=()=>{if(ahfxExtraWrite(fx.slot,k,i.value))renderFx();else toast(`RackUltra ${k} write blocked.`,true);};}
+    for(const k of ['mode','el','ll','sl']){const s=p.querySelector(`[data-k="${k}"]`);ahfxExtraSetCurrent(s,k,v[k].raw);s.onchange=()=>{if(s.value!==''&&ahfxExtraWrite(fx.slot,k,s.value))renderFx();else if(s.value!=='')toast(`RackUltra ${k} write blocked.`,true);};}
+    for(const k of ['width','length','ds','spread','lowCut','highCut']){const i=p.querySelector(`[data-k="${k}"]`);i.onchange=()=>{if(ahfxExtraWrite(fx.slot,k,i.value))renderFx();else toast(`RackUltra ${k} write blocked.`,true);};}
     for(const k of ['sizeLink','echo','echo1','echo2']){const host=p.querySelector(`[data-k="${k}"]`),s=ahfxExtraToggle(v[k].raw);host.appendChild(s);s.onchange=()=>{if(s.value!==''&&ahfxExtraWrite(fx.slot,k,s.value))renderFx();else if(s.value!=='')toast(`RackUltra ${k} write blocked.`,true);};}
   });
 }
@@ -99,8 +101,8 @@ if(typeof PARAMETER_MAP!=='undefined'){
     ['length','Length','state +62..63','raw=0x8000+16×value; 1…35'],
     ['el','EL','state +68..69','Low=6C00;Mid=7646;High=8000'],
     ['ll','LL','state +70..71','Low=6C00;Medium=767E;High=8000'],
-    ['lowCut','Low Cut','state +76..77','20Hz=29CB;500Hz=7D62;1k=8F63'],
-    ['highCut','High Cut','state +78..79','1k=8F63;10k=CB2D;20k=DD2E'],
+    ['lowCut','Low Cut','state +76..77','raw=floor(4608×log2(hz/4)); verified 20 Hz…1 kHz'],
+    ['highCut','High Cut','state +78..79','raw=floor(4608×log2(hz/4)); verified 1 kHz…20 kHz'],
     ['sl','SL','state +94..95','Low=6C00;Mid=7B69;High=8A00'],
     ['spread','Spread','state +122..123','raw=0x8000+16×value; 0…100'],
     ['echo','Echo section In/Out','state +125','10=In;00=Out'],
@@ -135,5 +137,5 @@ Spread            state +122..123
 Echo In/Out       state +125
 Echo 1 On/Off     state +127
 Echo 2 On/Off     state +133
-Size Link         state +147</code></pre><p>Width, Length, DS and Spread use <code>raw = 0x8000 + 16 × value</code> over their controlled ranges. Cut frequencies use exact scene-proven words. EL/LL/SL remain exact Low/Mid/High tables until their full UI semantics are independently established.</p>`;
+Size Link         state +147</code></pre><p>Width, Length, DS and Spread use <code>raw = 0x8000 + 16 × value</code> over their controlled ranges. Low Cut and High Cut are continuous over the canonical PEQ log-frequency coordinate. EL/LL/SL remain exact Low/Mid/High tables until their full UI semantics are independently established.</p>`;
 }

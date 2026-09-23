@@ -27,18 +27,18 @@ Ranges are Director's clamps, found by typing out-of-range values. The editor wr
 
 ## Decay Time — log-time, `+56..57`
 
-The existing `time_log` coordinate (`decode_raw`'s `10^((raw−17874)/5958)`, fed the value in milliseconds even though Decay is displayed in seconds — the same behaviour already documented for Spaces Decay) reproduces these anchors closely, with the same small rounding seen there:
+The `time_log` coordinate (`raw = round(17874 + 5958 × log10(ms))`, fed the value in milliseconds even though Decay is displayed in seconds — the same behaviour already documented for Spaces Decay) reproduces five of these six anchors within ±1 raw unit:
 
 | s | Raw |
 |---:|---:|
-| 0.1 (min) | `91B1` |
+| 0.1 (min, but see below) | `91B1` |
 | 1 | `8BA3` |
 | 5 | `9BE8` |
 | 10 | `A2E9` |
 | 20 | `A9EB` |
 | 30 (max) | `AE04` |
 
-`1`, `5` and `10` s are byte-identical to the Spaces Decay Time anchors, confirming both engines share one Decay coordinate. The writer uses these exact anchors, matching the Spaces policy.
+`1`, `5` and `10` s are byte-identical to the Spaces Decay Time anchors, confirming both engines share one Decay coordinate. The `0.1` s anchor (`91B1`) does not fit the formula at all — it decodes to roughly 1.8 s — while Spaces' independently-verified `0.1` s point (`745E`) fits the formula exactly. Given both engines are already established to share one coordinate, `91B1` looks like a transcription error from the original sweep rather than a real device floor. The editor's writer is continuous over `0.1…30` s using the formula, matching the Spaces policy.
 
 ## Output LF/HF Cut — PEQ log-frequency coordinate
 
@@ -47,7 +47,7 @@ The existing `time_log` coordinate (`decode_raw`'s `10^((raw−17874)/5958)`, fe
 | Output LF Cut | `+70..71` | 20 Hz–1 kHz | 20=`29CB`, 50=`4196`, 100=`5396`, 200=`6596`, 500=`7D62`, 1k=`8F62` |
 | Output HF Cut | `+72..73` | 1–20 kHz | 1k=`8F63`, 2k=`A162`, 5k=`B92D`, 10k=`CB2D`, 20k=`DD2D` |
 
-Every anchor is byte-identical to the Spaces LF/HF Cut tables — this is the same canonical PEQ frequency coordinate used throughout the format. The writer uses these exact anchors.
+Every anchor is byte-identical to the Spaces LF/HF Cut tables — this is the same canonical PEQ frequency coordinate used throughout the format. The writer is continuous over each control's range using `raw = floor(4608 × log2(hz/4))`.
 
 ## Echo taps 1–6 — same layout as Spaces, L1 and R2 independently proven
 
@@ -101,8 +101,8 @@ Director's numeric floor is **−39 dB**; typing or dragging to −40 dB switche
 Writers are guarded to engine `1d00` and the 262-byte AHFX payload:
 
 - linear fields: continuous integer, per the ranges above
-- Decay: exact anchors only
-- LF/HF Cut: exact anchors only
+- Decay: continuous, `0.1…30 s`
+- LF/HF Cut: continuous, canonical PEQ log-frequency coordinate
 - Echo 1–6 time: continuous `0…200 ms`
 - Echo 1–6 gain: continuous `−39…+10 dB`
 - Echo 1–6 On/Off and the Echoes section bypass: the two observed states

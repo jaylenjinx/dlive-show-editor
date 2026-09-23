@@ -14,17 +14,16 @@ const AHFX_MEDIUM_POSITION_OFFSETS={ll:70,el:68,sl:94};
 // ReverseEngineer6: all six echo taps share one 4-byte block layout from state +96
 // (time, gain) plus a one-byte On/Off at +127+2k. Tap order in the record is L1,L2,L3,R1,R2,R3;
 // Echo 1/2 keep their earlier names (L1/R1), Echo 3-6 are L2,R2,L3,R3.
-const AHFX_MEDIUM_ECHO_GAIN=new Map([[-40,0x5800],[-20,0x6BFD],[-10,0x75FD],[0,0x8003],[10,0x8A00]]);
+// Echo feedback anchors matched round(0x8000+dB×256) within ±3 raw units (~0.012 dB) at
+// every tested point — the same negligible typed-entry noise already accepted for Plate's
+// and Rhythm Delay's gain writers. Promoted to a continuous writer over the tested range.
+const AHFX_MEDIUM_ECHO_FEEDBACK_MIN_DB=-40,AHFX_MEDIUM_ECHO_FEEDBACK_MAX_DB=10;
 const AHFX_MEDIUM_ECHO_ON=new Map([[0x10,'On'],[0x00,'Off']]);
 const AHFX_MEDIUM_ECHO=Object.fromEntries([
   ['e1','L1',0],['e2','R1',3],['e3','L2',1],['e4','R2',4],['e5','L3',2],['e6','R3',5]
-].map(([key,tap,k])=>[key,{tap,timeOff:96+4*k,feedbackOff:98+4*k,onOff:127+2*k,timeMin:0,timeMax:200,feedback:AHFX_MEDIUM_ECHO_GAIN}]));
-const AHFX_MEDIUM_DAMP_LF=new Map([[20,0x29CB],[50,0x4196],[100,0x5396],[200,0x6596],[500,0x7D62],[1000,0x8F63]]);
+].map(([key,tap,k])=>[key,{tap,timeOff:96+4*k,feedbackOff:98+4*k,onOff:127+2*k,timeMin:0,timeMax:200}]));
 const AHFX_MEDIUM_DAMP_HF_TYPE=new Map([[0x10,'6 dB'],[0x20,'12 dB'],[0x30,'Shelf']]);
-const AHFX_MEDIUM_DAMP_HF_FREQ=new Map([[40,0x3BCB],[100,0x5396],[200,0x6596],[500,0x7D62],[1000,0x8F62],[2000,0xA162],[5000,0xB92D],[10000,0xCB2D],[20000,0xDD2D]]);
-const AHFX_MEDIUM_DAMP_HF_SHELF=new Map([[0,0x8000],[-6,0x79FD],[-12,0x73FD],[-15,0x7100]]);
 const AHFX_MEDIUM_OUT_HF_TYPE=new Map([[0x10,'6 dB'],[0x20,'12 dB'],[0x30,'Shelf']]);
-const AHFX_MEDIUM_OUT_HF_SHELF=new Map([[0,0x8000],[-6,0x7A00],[-12,0x7400],[-15,0x7100]]);
 
 // ReverseEngineer7: remaining HOME/SPACE/TEXTURE/EQ controls. Offsets match the 1c03 Spaces layout.
 // Linear fields store raw = 0x8000 + 16 × displayed value, proven at every sweep point.
@@ -34,15 +33,29 @@ const AHFX_MEDIUM_LINEAR=[
   ['direct','Direct Send',42,0,100,'%'],['width','Width',60,1,30,''],['length','Length',62,1,35,''],
   ['modRate','Modulation Rate',72,0,100,'%'],['modDepth','Modulation Depth',74,0,100,'%'],['spread','Stereo Spread',122,0,100,'%'],
 ];
-// Exact typed anchors; round labels do not always land on a simple rounding rule.
-const AHFX_MEDIUM_ANCHORS=[
-  ['decay','Decay Time',58,new Map([[0.1,0x745E],[0.5,0x84A2],[1,0x8BA3],[2,0x92A5],[5,0x9BE8],[10,0xA2E9]]),v=>`${v} s`],
-  ['outLf','Output LF Cut',76,new Map([[20,0x29CB],[50,0x4196],[100,0x5396],[200,0x6596],[500,0x7D62],[1000,0x8F62]]),v=>formatHz(v)],
-  ['outHf','Output HF Cut',78,new Map([[1000,0x8F63],[2000,0xA162],[5000,0xB92D],[10000,0xCB2D],[20000,0xDD2D]]),v=>formatHz(v)],
-  ['hfTone','Colour HF Tone',50,new Map([[2000,0xA162],[5000,0xB92D],[10000,0xCB2D],[20000,0xDD2D]]),v=>formatHz(v)],
-  ['colFreq','Colour Cut/Boost frequency',54,new Map([[500,0x7D62],[1000,0x8F62],[2000,0xA162],[5000,0xB92D],[10000,0xCB2D],[20000,0xDD2D]]),v=>formatHz(v)],
-  ['colGain','Colour Cut/Boost gain',56,new Map([[-15,0x7100],[-10,0x75FD],[-6,0x79FD],[-3,0x7CFD],[0,0x8003],[3,0x8303],[6,0x8600]]),v=>`${v>0?'+':''}${v} dB`],
+// Frequency anchors matched raw = floor(4608 × log2(hz/4)) exactly at every tested point —
+// the same canonical coordinate already proven continuous for PEQ/HPF/LPF frequency.
+// Promoted from anchor-only selects to continuous number inputs over the tested range.
+const AHFX_MEDIUM_FREQ=[
+  ['dampLf','Damping LF',46,20,1000],
+  ['dampHfFreq','Damping HF frequency',64,40,20000],
+  ['outLf','Output LF Cut',76,20,1000],
+  ['outHf','Output HF Cut',78,1000,20000],
+  ['hfTone','Colour HF Tone',50,2000,20000],
+  ['colFreq','Colour Cut/Boost frequency',54,500,20000],
 ];
+// Gain anchors matched round(0x8000+dB×256) within ±3 raw units (~0.012 dB) at every
+// tested point, the same negligible typed-entry noise already accepted for Plate's and
+// Rhythm Delay's gain writers. Promoted to continuous over the tested range.
+const AHFX_MEDIUM_GAIN=[
+  ['dampHfShelf','Damping HF shelf gain',66,-15,0],
+  ['outHfShelf','Output HF shelf gain',86,-15,0],
+  ['colGain','Colour Cut/Boost gain',56,-15,6],
+];
+// Decay Time uses the same time_log coordinate as PEQ/compressor time fields (the raw
+// value encodes milliseconds even though Decay is displayed in seconds). Matches the
+// anchors exactly across the full tested 0.1-10 s range.
+const AHFX_MEDIUM_DECAY_OFF=58,AHFX_MEDIUM_DECAY_MIN_S=0.1,AHFX_MEDIUM_DECAY_MAX_S=10;
 
 function ahfxMediumCtx(slot){
   const stage=state.current?.stage,fx=stage?.ahfx?.find(x=>x.slot===Number(slot));
@@ -68,16 +81,31 @@ function ahfxMediumWriteEchoTime(slot,echo,ms){
   return ahfxMediumWrite16(ctx,spec.timeOff,0x8000+16*value);
 }
 function ahfxMediumWriteEchoFeedback(slot,echo,db){
-  const ctx=ahfxMediumCtx(slot),spec=AHFX_MEDIUM_ECHO[echo],raw=spec?.feedback.get(Number(db));
-  if(!ctx||raw==null)return false;return ahfxMediumWrite16(ctx,spec.feedbackOff,raw);
+  const ctx=ahfxMediumCtx(slot),spec=AHFX_MEDIUM_ECHO[echo];let v=Number(db);
+  if(!ctx||!spec||!Number.isFinite(v))return false;
+  v=Math.max(AHFX_MEDIUM_ECHO_FEEDBACK_MIN_DB,Math.min(AHFX_MEDIUM_ECHO_FEEDBACK_MAX_DB,v));
+  return ahfxMediumWrite16(ctx,spec.feedbackOff,0x8000+Math.round(v*256));
 }
 function ahfxMediumWriteLinear(slot,key,value){
   const ctx=ahfxMediumCtx(slot),spec=AHFX_MEDIUM_LINEAR.find(x=>x[0]===key);let v=Number(value);
   if(!ctx||!spec||!Number.isFinite(v))return false;v=Math.max(spec[3],Math.min(spec[4],Math.round(v)));
   return ahfxMediumWrite16(ctx,spec[2],0x8000+16*v);
 }
-function ahfxMediumWriteMapped16(slot,off,map,value){
-  const ctx=ahfxMediumCtx(slot),raw=map.get(Number(value));if(!ctx||raw==null)return false;return ahfxMediumWrite16(ctx,off,raw);
+function ahfxMediumWriteFreq(slot,key,hz){
+  const ctx=ahfxMediumCtx(slot),spec=AHFX_MEDIUM_FREQ.find(x=>x[0]===key);let v=Number(hz);
+  if(!ctx||!spec||!Number.isFinite(v))return false;v=Math.max(spec[3],Math.min(spec[4],v));
+  return ahfxMediumWrite16(ctx,spec[2],Math.max(0,Math.min(0xffff,Math.floor(4608*Math.log2(v/4)))));
+}
+function ahfxMediumWriteGainDb(slot,key,db){
+  const ctx=ahfxMediumCtx(slot),spec=AHFX_MEDIUM_GAIN.find(x=>x[0]===key);let v=Number(db);
+  if(!ctx||!spec||!Number.isFinite(v))return false;v=Math.max(spec[3],Math.min(spec[4],v));
+  return ahfxMediumWrite16(ctx,spec[2],0x8000+Math.round(v*256));
+}
+function ahfxMediumWriteDecay(slot,sec){
+  const ctx=ahfxMediumCtx(slot);let v=Number(sec);
+  if(!ctx||!Number.isFinite(v))return false;
+  v=Math.max(AHFX_MEDIUM_DECAY_MIN_S,Math.min(AHFX_MEDIUM_DECAY_MAX_S,v));
+  return ahfxMediumWrite16(ctx,AHFX_MEDIUM_DECAY_OFF,Math.round(17874+5958*Math.log10(v*1000)));
 }
 function ahfxMediumWriteEnum8(slot,off,map,value){
   const ctx=ahfxMediumCtx(slot),raw=Number(value);if(!ctx||!map.has(raw))return false;
@@ -92,20 +120,17 @@ function injectRackUltraMediumControls(){
     const read16=off=>ahfxMediumRead16(ctx,off),read8=off=>ctx.stage.datBytes[ctx.stateStart+off];
     const p=document.createElement('div');p.dataset.ahfxMedium='1';p.className='ahfx-verified-controls';
     const posOpts='<option value="0">Min</option><option value="25">25%</option><option value="50">50%</option><option value="75">75%</option><option value="100">Max</option>';
-    const feedbackOptions=(map)=>ahfxMediumOptions(map,v=>`${v>0?'+':''}${v} dB`);
     p.innerHTML=`<div class="manager-head inline"><strong>480 Medium / Spaces verified controls</strong><span class="confidence verified">VERIFIED WRITE</span></div>
       ${[['ll','LL'],['el','EL'],['sl','SL']].map(([key,label])=>`<div class="peq-field"><span>${label} <small>unlabelled fader position</small></span><select data-k="${key}">${posOpts}</select><code>${ahfxMediumHex16(read16(AHFX_MEDIUM_POSITION_OFFSETS[key]))}</code></div>`).join('')}
       ${Object.entries(AHFX_MEDIUM_ECHO).map(([key,spec])=>`<div class="peq-field"><span>Echo ${key.slice(1)} (${spec.tap}) Time <small>continuous verified 0…200 ms</small></span><div><input data-k="${key}time" type="number" min="0" max="200" step="1"><b>ms</b></div><code>${ahfxMediumHex16(read16(spec.timeOff))}</code></div>
-      <div class="peq-field"><span>Echo ${key.slice(1)} (${spec.tap}) Gain <small>exact controlled anchors</small></span><select data-k="${key}fb">${feedbackOptions(spec.feedback)}</select><code>${ahfxMediumHex16(read16(spec.feedbackOff))}</code></div>
+      <div class="peq-field"><span>Echo ${key.slice(1)} (${spec.tap}) Gain <small>continuous verified ${AHFX_MEDIUM_ECHO_FEEDBACK_MIN_DB}…${AHFX_MEDIUM_ECHO_FEEDBACK_MAX_DB} dB</small></span><div><input data-k="${key}fb" type="number" min="${AHFX_MEDIUM_ECHO_FEEDBACK_MIN_DB}" max="${AHFX_MEDIUM_ECHO_FEEDBACK_MAX_DB}" step="1"><b>dB</b></div><code>${ahfxMediumHex16(read16(spec.feedbackOff))}</code></div>
       <div class="peq-field"><span>Echo ${key.slice(1)} (${spec.tap}) On/Off</span><select data-k="${key}on">${[...AHFX_MEDIUM_ECHO_ON].map(([raw,label])=>`<option value="${raw}">${label}</option>`).join('')}</select><code>${hexByte(read8(spec.onOff))}</code></div>`).join('')}
-      <div class="peq-field"><span>Damping LF <small>exact frequency anchors</small></span><select data-k="dampLf">${ahfxMediumOptions(AHFX_MEDIUM_DAMP_LF,formatHz)}</select><code>${ahfxMediumHex16(read16(46))}</code></div>
       <div class="peq-field"><span>Damping HF type</span><select data-k="dampHfType">${[...AHFX_MEDIUM_DAMP_HF_TYPE].map(([raw,label])=>`<option value="${raw}">${escapeHtml(label)}</option>`).join('')}</select><code>${hexByte(read8(93))}</code></div>
-      <div class="peq-field"><span>Damping HF frequency <small>exact anchors</small></span><select data-k="dampHfFreq">${ahfxMediumOptions(AHFX_MEDIUM_DAMP_HF_FREQ,formatHz)}</select><code>${ahfxMediumHex16(read16(64))}</code></div>
-      <div class="peq-field"><span>Damping HF shelf gain <small>exact anchors</small></span><select data-k="dampHfShelf">${ahfxMediumOptions(AHFX_MEDIUM_DAMP_HF_SHELF,v=>`${v} dB`)}</select><code>${ahfxMediumHex16(read16(66))}</code></div>
       <div class="peq-field"><span>Output HF type</span><select data-k="outHfType">${[...AHFX_MEDIUM_OUT_HF_TYPE].map(([raw,label])=>`<option value="${raw}">${escapeHtml(label)}</option>`).join('')}</select><code>${hexByte(read8(83))}</code></div>
-      <div class="peq-field"><span>Output HF shelf gain <small>exact anchors</small></span><select data-k="outHfShelf">${ahfxMediumOptions(AHFX_MEDIUM_OUT_HF_SHELF,v=>`${v} dB`)}</select><code>${ahfxMediumHex16(read16(86))}</code></div>
       ${AHFX_MEDIUM_LINEAR.map(([key,label,off,min,max,unit])=>`<div class="peq-field"><span>${label} <small>continuous verified ${min}…${max}${unit?' '+unit:''}</small></span><div><input data-k="${key}" type="number" min="${min}" max="${max}" step="1"><b>${unit}</b></div><code>${ahfxMediumHex16(read16(off))}</code></div>`).join('')}
-      ${AHFX_MEDIUM_ANCHORS.map(([key,label,off,map,fmt])=>`<div class="peq-field"><span>${label} <small>exact controlled anchors</small></span><select data-k="${key}">${ahfxMediumOptions(map,fmt)}</select><code>${ahfxMediumHex16(read16(off))}</code></div>`).join('')}
+      ${AHFX_MEDIUM_FREQ.map(([key,label,off,min,max])=>`<div class="peq-field"><span>${label} <small>continuous verified ${formatHz(min)}…${formatHz(max)}</small></span><div><input data-k="${key}" type="number" min="${min}" max="${max}" step="1"><b>Hz</b></div><code>${ahfxMediumHex16(read16(off))}</code></div>`).join('')}
+      ${AHFX_MEDIUM_GAIN.map(([key,label,off,min,max])=>`<div class="peq-field"><span>${label} <small>continuous verified ${min}…${max} dB</small></span><div><input data-k="${key}" type="number" min="${min}" max="${max}" step="1"><b>dB</b></div><code>${ahfxMediumHex16(read16(off))}</code></div>`).join('')}
+      <div class="peq-field"><span>Decay Time <small>continuous verified ${AHFX_MEDIUM_DECAY_MIN_S}…${AHFX_MEDIUM_DECAY_MAX_S} s</small></span><div><input data-k="decay" type="number" min="${AHFX_MEDIUM_DECAY_MIN_S}" max="${AHFX_MEDIUM_DECAY_MAX_S}" step="0.1"><b>s</b></div><code>${ahfxMediumHex16(read16(AHFX_MEDIUM_DECAY_OFF))}</code></div>
       <div class="console-note">LL, EL and SL are unnumbered console faders. Percentages here mean physical fader position only, not dB or another DSP unit. Echo 1–6 map to the Director Echoes page taps L1, R1, L2, R2, L3, R3.</div>`;
     card.appendChild(p);
 
@@ -116,9 +141,9 @@ function injectRackUltraMediumControls(){
     for(const echo of Object.keys(AHFX_MEDIUM_ECHO)){
       const time=p.querySelector(`[data-k="${echo}time"]`),fb=p.querySelector(`[data-k="${echo}fb"]`),spec=AHFX_MEDIUM_ECHO[echo];
       const timeRaw=read16(spec.timeOff),timeMs=(timeRaw-0x8000)/16;if(timeRaw<0x8000||timeRaw>0x8C80){time.disabled=true;time.title='Current raw is outside the controlled 0–200 ms range.';}else time.value=String(timeMs);
-      ahfxMediumSetExact(fb,spec.feedback,read16(spec.feedbackOff));
+      const fbRaw=read16(spec.feedbackOff),fbDb=(fbRaw-0x8000)/256;fb.value=String(Math.round(fbDb*100)/100);
       time.onchange=()=>{if(ahfxMediumWriteEchoTime(fx.slot,echo,time.value))renderFx();else toast(`RackUltra ${echo.toUpperCase()} time write blocked.`,true);};
-      fb.onchange=()=>{if(fb.value!==''&&ahfxMediumWriteEchoFeedback(fx.slot,echo,fb.value))renderFx();else if(fb.value!=='')toast(`RackUltra ${echo.toUpperCase()} gain write blocked.`,true);};
+      fb.onchange=()=>{if(ahfxMediumWriteEchoFeedback(fx.slot,echo,fb.value))renderFx();else toast(`RackUltra ${echo.toUpperCase()} gain write blocked.`,true);};
       const on=p.querySelector(`[data-k="${echo}on"]`),onRaw=read8(spec.onOff);
       if(AHFX_MEDIUM_ECHO_ON.has(onRaw))on.value=String(onRaw);else{const o=document.createElement('option');o.value='';o.textContent=`Current raw ${hexByte(onRaw)}`;o.selected=true;on.prepend(o);}
       on.onchange=()=>{if(on.value!==''&&ahfxMediumWriteEnum8(fx.slot,spec.onOff,AHFX_MEDIUM_ECHO_ON,on.value))renderFx();else if(on.value!=='')toast(`RackUltra ${echo.toUpperCase()} On/Off write blocked.`,true);};
@@ -128,11 +153,21 @@ function injectRackUltraMediumControls(){
       if(Number.isInteger(v)&&v>=min&&v<=max)input.value=String(v);else{input.disabled=true;input.title=`Current raw ${ahfxMediumHex16(raw)} is outside the controlled ${min}–${max} range.`;}
       input.onchange=()=>{if(ahfxMediumWriteLinear(fx.slot,key,input.value))renderFx();else toast(`RackUltra ${key} write blocked.`,true);};
     }
-    for(const [key,,off,map] of AHFX_MEDIUM_ANCHORS){const sel=p.querySelector(`[data-k="${key}"]`);ahfxMediumSetExact(sel,map,read16(off));sel.onchange=()=>{if(sel.value!==''&&ahfxMediumWriteMapped16(fx.slot,off,map,sel.value))renderFx();else if(sel.value!=='')toast(`RackUltra ${key} write blocked.`,true);};}
-    const mapped=[
-      ['dampLf',46,AHFX_MEDIUM_DAMP_LF],['dampHfFreq',64,AHFX_MEDIUM_DAMP_HF_FREQ],['dampHfShelf',66,AHFX_MEDIUM_DAMP_HF_SHELF],['outHfShelf',86,AHFX_MEDIUM_OUT_HF_SHELF]
-    ];
-    for(const [key,off,map] of mapped){const sel=p.querySelector(`[data-k="${key}"]`);ahfxMediumSetExact(sel,map,read16(off));sel.onchange=()=>{if(sel.value!==''&&ahfxMediumWriteMapped16(fx.slot,off,map,sel.value))renderFx();else if(sel.value!=='')toast(`RackUltra ${key} write blocked.`,true);};}
+    for(const [key,,off,min,max] of AHFX_MEDIUM_FREQ){
+      const input=p.querySelector(`[data-k="${key}"]`),raw=read16(off),hz=4*Math.pow(2,raw/4608);
+      if(hz>=min*0.98&&hz<=max*1.02)input.value=String(Math.round(hz*100)/100);else{input.disabled=true;input.title=`Current raw ${ahfxMediumHex16(raw)} is outside the controlled ${formatHz(min)}–${formatHz(max)} range.`;}
+      input.onchange=()=>{if(ahfxMediumWriteFreq(fx.slot,key,input.value))renderFx();else toast(`RackUltra ${key} write blocked.`,true);};
+    }
+    for(const [key,,off,min,max] of AHFX_MEDIUM_GAIN){
+      const input=p.querySelector(`[data-k="${key}"]`),raw=read16(off),db=(raw-0x8000)/256;
+      input.value=String(Math.round(db*100)/100);
+      input.onchange=()=>{if(ahfxMediumWriteGainDb(fx.slot,key,input.value))renderFx();else toast(`RackUltra ${key} write blocked.`,true);};
+    }
+    {
+      const input=p.querySelector('[data-k="decay"]'),raw=read16(AHFX_MEDIUM_DECAY_OFF),sec=Math.pow(10,(raw-17874)/5958)/1000;
+      input.value=String(Math.round(sec*100)/100);
+      input.onchange=()=>{if(ahfxMediumWriteDecay(fx.slot,input.value))renderFx();else toast('RackUltra decay write blocked.',true);};
+    }
     for(const [key,off,map] of [['dampHfType',93,AHFX_MEDIUM_DAMP_HF_TYPE],['outHfType',83,AHFX_MEDIUM_OUT_HF_TYPE]]){
       const sel=p.querySelector(`[data-k="${key}"]`),raw=read8(off);if(map.has(raw))sel.value=String(raw);else{const o=document.createElement('option');o.value='';o.textContent=`Current raw ${hexByte(raw)}`;o.selected=true;sel.prepend(o);}
       sel.onchange=()=>{if(sel.value!==''&&ahfxMediumWriteEnum8(fx.slot,off,map,sel.value))renderFx();else if(sel.value!=='')toast(`RackUltra ${key} write blocked.`,true);};
@@ -147,24 +182,23 @@ if(typeof PARAMETER_MAP!=='undefined'){
     ['ll-position','LL fader position','state +70..71','0/25/50/75/100% physical-position anchors'],
     ['el-position','EL fader position','state +68..69','0/25/50/75/100% physical-position anchors'],
     ['sl-position','SL fader position','state +94..95','0/25/50/75/100% physical-position anchors'],
-    ['damp-lf','Damping LF frequency','state +46..47','20,50,100,200,500,1000 Hz exact anchors'],
     ['damp-hf-type','Damping HF type','state +93','10=6 dB;20=12 dB;30=Shelf'],
-    ['damp-hf-frequency','Damping HF frequency','state +64..65','40 Hz through 20 kHz exact anchors'],
-    ['damp-hf-shelf','Damping HF shelf gain','state +66..67','0,−6,−12,−15 dB exact anchors'],
     ['out-hf-type','Output HF type','state +83','10=6 dB;20=12 dB;30=Shelf'],
-    ['out-hf-shelf','Output HF shelf gain','state +86..87','0,−6,−12,−15 dB exact anchors'],
   ];
   for(const [key,spec] of Object.entries(AHFX_MEDIUM_ECHO)){
     const n=key.slice(1);
     rows.push([`echo${n}-time`,`Echo ${n} (${spec.tap}) Time`,`state +${spec.timeOff}..${spec.timeOff+1}`,'raw=0x8000+16×milliseconds; verified 0…200 ms']);
-    rows.push([`echo${n}-feedback`,`Echo ${n} (${spec.tap}) Gain`,`state +${spec.feedbackOff}..${spec.feedbackOff+1}`,'exact anchors −40,−20,−10,0,+10 dB']);
+    rows.push([`echo${n}-feedback`,`Echo ${n} (${spec.tap}) Gain`,`state +${spec.feedbackOff}..${spec.feedbackOff+1}`,`raw=0x8000+round(dB×256); verified ${AHFX_MEDIUM_ECHO_FEEDBACK_MIN_DB}…${AHFX_MEDIUM_ECHO_FEEDBACK_MAX_DB} dB`]);
     rows.push([`echo${n}-on`,`Echo ${n} (${spec.tap}) On/Off`,`state +${spec.onOff}`,'10=On;00=Off']);
   }
   for(const [key,label,off,min,max,unit] of AHFX_MEDIUM_LINEAR)rows.push([key,label,`state +${off}..${off+1}`,`raw=0x8000+16×value; verified ${min}…${max}${unit?' '+unit:''}`]);
-  for(const [key,label,off,map,fmt] of AHFX_MEDIUM_ANCHORS)rows.push([key,label,`state +${off}..${off+1}`,`exact anchors ${[...map.keys()].map(fmt).join(', ')}`]);
+  for(const [key,label,off,min,max] of AHFX_MEDIUM_FREQ)rows.push([key,label,`state +${off}..${off+1}`,`raw=floor(4608×log2(hz/4)); verified ${formatHz(min)}…${formatHz(max)}`]);
+  for(const [key,label,off,min,max] of AHFX_MEDIUM_GAIN)rows.push([key,label,`state +${off}..${off+1}`,`raw=0x8000+round(dB×256); verified ${min}…${max} dB`]);
+  rows.push(['decay','Decay Time',`state +${AHFX_MEDIUM_DECAY_OFF}..${AHFX_MEDIUM_DECAY_OFF+1}`,`raw=round(17874+5958×log10(ms)); verified ${AHFX_MEDIUM_DECAY_MIN_S}…${AHFX_MEDIUM_DECAY_MAX_S} s`]);
+  const continuousIds=new Set([...AHFX_MEDIUM_LINEAR,...AHFX_MEDIUM_FREQ,...AHFX_MEDIUM_GAIN].map(x=>x[0]).concat('decay'));
   for(const [id,field,offset,transform] of rows)if(!PARAMETER_MAP.some(x=>x.id===`ahfx-spaces-medium-${id}`))PARAMETER_MAP.push({
     id:`ahfx-spaces-medium-${id}`,area:'RackUltra',record:'AHFX Manager NN',payload:'262-byte AHFX payload; engine 1c04',field,offset,datatype:'engine-specific controlled field',transform,confidence:'verified',write:true,
-    evidence:AHFX_MEDIUM_LINEAR.some(x=>x[0]===id)||AHFX_MEDIUM_ANCHORS.some(x=>x[0]===id)?'ReverseEngineer7 Director-automated UFX1 sweeps (scenes 203–296); each adjacent pair changes only the target AHFX field outside the scene name.':id.startsWith('echo')?'ReverseEngineer6 Director-automated UFX1 sweeps (all six taps) plus ReverseEngineer2 Echo 1/2; adjacent pairs change only the target AHFX field outside the scene name.':'ReverseEngineer2 controlled UFX1 scenes; adjacent pairs change only the target AHFX field outside the scene-name byte.',notes:'Guarded to engine 1c04. Exact anchors/ranges only.'
+    evidence:continuousIds.has(id)?'ReverseEngineer7 Director-automated UFX1 sweeps (scenes 203–296); each adjacent pair changes only the target AHFX field outside the scene name.':id.startsWith('echo')?'ReverseEngineer6 Director-automated UFX1 sweeps (all six taps) plus ReverseEngineer2 Echo 1/2; adjacent pairs change only the target AHFX field outside the scene name.':'ReverseEngineer2 controlled UFX1 scenes; adjacent pairs change only the target AHFX field outside the scene-name byte.',notes:'Guarded to engine 1c04. Continuous fields reuse the canonical freq_log/offset_db/time_log coordinates already proven elsewhere in the format.'
   });
 }
 

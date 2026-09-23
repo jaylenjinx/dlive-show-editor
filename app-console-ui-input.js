@@ -4,10 +4,6 @@
 function ipConsoleField(label,key,value,unit,min,max,step,disabled=false){
   return `<label>${safeText(label)}<div class="console-value-row"><input data-k="${key}" type="number" min="${min}" max="${max}" step="${step}" value="${value}"><span>${safeText(unit)}</span></div></label>`;
 }
-function ipPopulateTimeSelect(select,map,currentRaw,currentExact){
-  select.innerHTML=[...map.entries()].map(([ms,raw])=>`<option value="${raw}">${safeText(ipTimeLabel(ms))}</option>`).join('');
-  if(currentExact)select.value=String(currentRaw);else injectCurrentOption(select,`Current raw ${ipU16Hex(currentRaw)}`);
-}
 function ipRenderGateGraph(svg,gate){
   const W=650,H=340,pad=42;svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.innerHTML='';
   svg.appendChild(svgEl('rect',{x:0,y:0,width:W,height:H,class:'console-graph-bg'}));
@@ -28,21 +24,22 @@ function renderGateConsole(root,gate){
       <section class="console-gate-controls">
         ${ipConsoleField('Threshold','gate-threshold',gate.thresholdDb.toFixed(2),'dB',IP_GATE_THRESHOLD_MIN_DB,IP_GATE_THRESHOLD_MAX_DB,.1)}
         ${ipConsoleField('Depth','gate-depth',gate.depthDb.toFixed(2),'dB',IP_GATE_DEPTH_MIN_DB,IP_GATE_DEPTH_MAX_DB,.1)}
-        <label>Attack<select data-k="gate-attack"></select></label>
-        <label>Hold<select data-k="gate-hold"></select></label>
-        <label>Release<select data-k="gate-release"></select></label>
+        ${ipConsoleField('Attack','gate-attack',Number(gate.attackMs.toPrecision(4)),'ms',IP_GATE_ATTACK_MIN_MS,IP_GATE_ATTACK_MAX_MS,0.01)}
+        ${ipConsoleField('Hold','gate-hold',Number(gate.holdMs.toPrecision(4)),'ms',IP_GATE_HOLD_MIN_MS,IP_GATE_HOLD_MAX_MS,1)}
+        ${ipConsoleField('Release','gate-release',Number(gate.releaseMs.toPrecision(4)),'ms',IP_GATE_RELEASE_MIN_MS,IP_GATE_RELEASE_MAX_MS,1)}
       </section>
     </div>
-    <div class="console-note">Threshold and Depth use the verified signed /256 dB format. Attack/Hold/Release writes are restricted to exact controlled scene anchors until the complete time-coordinate rounding rule is proven.</div>`;
+    <div class="console-note">Threshold and Depth use the verified signed /256 dB format. Attack/Hold/Release are continuous over their tested ranges using the canonical log-time coordinate.</div>`;
   root.appendChild(shell);ipRenderGateGraph(shell.querySelector('.console-gate-svg'),gate);
   const toggleHost=shell.querySelector('[data-k="gate-toggle"]');toggleHost.appendChild(makeToggle(gate.active?'Gate In':'Gate Out',gate.active,!gate.writableShape,()=>{if(setInputGateActive(gate.channel,!gate.active))triggerConsoleRerender();else toast('Gate On/Off write blocked.',true);}));
   const th=shell.querySelector('[data-k="gate-threshold"]'),depth=shell.querySelector('[data-k="gate-depth"]');th.disabled=depth.disabled=!gate.writableShape;
   th.onchange=()=>{if(setInputGateThreshold(gate.channel,th.value))triggerConsoleRerender();else toast('Gate threshold write blocked.',true);};
   depth.onchange=()=>{if(setInputGateDepth(gate.channel,depth.value))triggerConsoleRerender();else toast('Gate depth write blocked.',true);};
   const atk=shell.querySelector('[data-k="gate-attack"]'),hold=shell.querySelector('[data-k="gate-hold"]'),rel=shell.querySelector('[data-k="gate-release"]');
-  ipPopulateTimeSelect(atk,IP_GATE_ATTACK_MS_TO_RAW,gate.attackRaw,gate.attackExact);ipPopulateTimeSelect(hold,IP_GATE_HOLD_MS_TO_RAW,gate.holdRaw,gate.holdExact);ipPopulateTimeSelect(rel,IP_GATE_RELEASE_MS_TO_RAW,gate.releaseRaw,gate.releaseExact);
   atk.disabled=hold.disabled=rel.disabled=!gate.writableShape;
-  atk.onchange=()=>{if(setInputGateTime(gate.channel,'attack',atk.value))triggerConsoleRerender();};hold.onchange=()=>{if(setInputGateTime(gate.channel,'hold',hold.value))triggerConsoleRerender();};rel.onchange=()=>{if(setInputGateTime(gate.channel,'release',rel.value))triggerConsoleRerender();};
+  atk.onchange=()=>{if(setInputGateTime(gate.channel,'attack',atk.value))triggerConsoleRerender();else toast('Gate attack write blocked.',true);};
+  hold.onchange=()=>{if(setInputGateTime(gate.channel,'hold',hold.value))triggerConsoleRerender();else toast('Gate hold write blocked.',true);};
+  rel.onchange=()=>{if(setInputGateTime(gate.channel,'release',rel.value))triggerConsoleRerender();else toast('Gate release write blocked.',true);};
 }
 
 function renderPreampConsole(root,channel){

@@ -108,13 +108,13 @@ function renderCompressorConsole(root, comp) {
         <div class="console-sidechain-top"><div data-k="sc-filter-toggle"></div><select data-k="sc-lo-type"></select><select data-k="sc-hi-type"></select></div>
         <svg class="console-sidechain-svg"></svg>
         <div class="console-sidechain-controls">
-          <label>Low<select data-k="sc-lo-freq"></select></label>
-          <label>BPF<div data-k="sc-bpf-toggle"></div><select data-k="sc-bpf-freq"></select></label>
-          <label>High<select data-k="sc-hi-freq"></select></label>
+          <label>Low<div class="console-value-row"><input data-k="sc-lo-freq" type="number" step="1"><span>Hz</span></div></label>
+          <label>BPF<div data-k="sc-bpf-toggle"></div><div class="console-value-row"><input data-k="sc-bpf-freq" type="number" step="1"><span>Hz</span></div></label>
+          <label>High<div class="console-value-row"><input data-k="sc-hi-freq" type="number" step="1"><span>Hz</span></div></label>
         </div>
       </section>
       <section class="console-transfer-panel">
-        <div class="console-comp-topline"><div class="console-model-large">${safeText(comp.modelLabel || 'Compressor')}</div><div class="console-time-pair"><label>Attack<select data-k="attack"></select></label><label>Release<select data-k="release"></select></label></div><div data-k="knee-toggle"></div></div>
+        <div class="console-comp-topline"><div class="console-model-large">${safeText(comp.modelLabel || 'Compressor')}</div><div class="console-time-pair"><label>Attack<div class="console-value-row"><input data-k="attack" type="number" step="0.01"><span>ms</span></div></label><label>Release<div class="console-value-row"><input data-k="release" type="number" step="1"><span>ms</span></div></label></div><div data-k="knee-toggle"></div></div>
         <svg class="console-comp-svg"></svg>
       </section>
       <section class="console-comp-controls">
@@ -152,13 +152,13 @@ function renderCompressorConsole(root, comp) {
   ratio.onchange = () => { if (setInputCompressorRatioRaw(comp.channel, ratio.value)) triggerConsoleRerender(); else toast('Ratio write blocked: use a verified Manual RMS value.', true); };
 
   const attack = shell.querySelector('[data-k="attack"]'), release = shell.querySelector('[data-k="release"]');
-  if (typeof COMP_ATTACK_MS_TO_RAW !== 'undefined') attack.innerHTML = [...COMP_ATTACK_MS_TO_RAW.entries()].map(([ms, raw]) => `<option value="${raw}">${safeText(compFormatTimeMs(ms))}</option>`).join('');
-  if (typeof COMP_RELEASE_MS_TO_RAW !== 'undefined') release.innerHTML = [...COMP_RELEASE_MS_TO_RAW.entries()].map(([ms, raw]) => `<option value="${raw}">${safeText(compFormatTimeMs(ms))}</option>`).join('');
-  if (comp.attackExact) attack.value = String(comp.attackRaw); else injectCurrentOption(attack, `Current ≈ ${compFormatTimeMs(Number(comp.attackMs || 0))}`);
-  if (comp.releaseExact) release.value = String(comp.releaseRaw); else injectCurrentOption(release, `Current ≈ ${compFormatTimeMs(Number(comp.releaseMs || 0))}`);
+  if (typeof COMP_ATTACK_MIN_MS !== 'undefined') { attack.min = COMP_ATTACK_MIN_MS; attack.max = COMP_ATTACK_MAX_MS; }
+  if (typeof COMP_RELEASE_MIN_MS !== 'undefined') { release.min = COMP_RELEASE_MIN_MS; release.max = COMP_RELEASE_MAX_MS; }
+  attack.value = String(Number((comp.attackMs || 0).toPrecision(4)));
+  release.value = String(Number((comp.releaseMs || 0).toPrecision(4)));
   attack.disabled = release.disabled = !comp.timeWritableShape;
-  attack.onchange = () => { if (setInputCompressorTimeRaw(comp.channel, 'attack', attack.value)) triggerConsoleRerender(); };
-  release.onchange = () => { if (setInputCompressorTimeRaw(comp.channel, 'release', release.value)) triggerConsoleRerender(); };
+  attack.onchange = () => { if (setInputCompressorTime(comp.channel, 'attack', attack.value)) triggerConsoleRerender(); else toast('Attack write blocked.', true); };
+  release.onchange = () => { if (setInputCompressorTime(comp.channel, 'release', release.value)) triggerConsoleRerender(); else toast('Release write blocked.', true); };
 
   const makeup = shell.querySelector('[data-k="makeup"]'); makeup.disabled = !comp.kneeGainWritableShape;
   makeup.onchange = () => { if (setInputCompressorMakeup(comp.channel, makeup.value)) triggerConsoleRerender(); else toast('Makeup gain write blocked for this compressor model.', true); };
@@ -205,15 +205,15 @@ function renderCompressorConsole(root, comp) {
   hiType.onchange = () => { if (setInputCompressorSidechainType(comp.channel, 'hi', hiType.value)) triggerConsoleRerender(); };
 
   const loFreq = shell.querySelector('[data-k="sc-lo-freq"]'), hiFreq = shell.querySelector('[data-k="sc-hi-freq"]'), bpfFreq = shell.querySelector('[data-k="sc-bpf-freq"]');
-  if (typeof COMP_SC_LO_HZ_TO_RAW !== 'undefined') loFreq.innerHTML = selectOptionsFromValues([...COMP_SC_LO_HZ_TO_RAW.keys()], formatHz);
-  if (typeof COMP_SC_HI_HZ_TO_RAW !== 'undefined') hiFreq.innerHTML = selectOptionsFromValues([...COMP_SC_HI_HZ_TO_RAW.keys()], formatHz);
-  if (typeof COMP_SC_BPF_HZ_TO_RAW !== 'undefined') bpfFreq.innerHTML = selectOptionsFromValues([...COMP_SC_BPF_HZ_TO_RAW.keys()], formatHz);
-  if (comp.scLoFreqExact && typeof COMP_SC_LO_RAW_TO_HZ !== 'undefined') loFreq.value = String(COMP_SC_LO_RAW_TO_HZ.get(comp.scLoFreqRaw)); else injectCurrentOption(loFreq, `Current ≈ ${formatHz(comp.scLoFreqHz || 20)}`);
-  if (comp.scHiFreqExact && typeof COMP_SC_HI_RAW_TO_HZ !== 'undefined') hiFreq.value = String(COMP_SC_HI_RAW_TO_HZ.get(comp.scHiFreqRaw)); else injectCurrentOption(hiFreq, `Current ≈ ${formatHz(comp.scHiFreqHz || 20000)}`);
-  if (comp.scBpfFreqExact && typeof COMP_SC_BPF_RAW_TO_HZ !== 'undefined') bpfFreq.value = String(COMP_SC_BPF_RAW_TO_HZ.get(comp.scBpfFreqRaw)); else injectCurrentOption(bpfFreq, `Current ≈ ${formatHz(comp.scBpfFreqHz || 1000)}`);
+  if (typeof COMP_SC_LO_MIN_HZ !== 'undefined') { loFreq.min = COMP_SC_LO_MIN_HZ; loFreq.max = COMP_SC_LO_MAX_HZ; }
+  if (typeof COMP_SC_HI_MIN_HZ !== 'undefined') { hiFreq.min = COMP_SC_HI_MIN_HZ; hiFreq.max = COMP_SC_HI_MAX_HZ; }
+  if (typeof COMP_SC_BPF_MIN_HZ !== 'undefined') { bpfFreq.min = COMP_SC_BPF_MIN_HZ; bpfFreq.max = COMP_SC_BPF_MAX_HZ; }
+  loFreq.value = String(Math.round((comp.scLoFreqHz || 20) * 100) / 100);
+  hiFreq.value = String(Math.round((comp.scHiFreqHz || 20000) * 100) / 100);
+  bpfFreq.value = String(Math.round((comp.scBpfFreqHz || 1000) * 100) / 100);
   loFreq.disabled = hiFreq.disabled = !comp.scWritableShape;
   bpfFreq.disabled = !comp.scBpfWritableShape;
-  loFreq.onchange = () => { if (setInputCompressorSidechainFrequency(comp.channel, 'lo', loFreq.value)) triggerConsoleRerender(); };
-  hiFreq.onchange = () => { if (setInputCompressorSidechainFrequency(comp.channel, 'hi', hiFreq.value)) triggerConsoleRerender(); };
-  bpfFreq.onchange = () => { if (setInputCompressorSidechainBpfFrequency(comp.channel, bpfFreq.value)) triggerConsoleRerender(); };
+  loFreq.onchange = () => { if (setInputCompressorSidechainFrequency(comp.channel, 'lo', loFreq.value)) triggerConsoleRerender(); else toast('Sidechain low-filter frequency write blocked.', true); };
+  hiFreq.onchange = () => { if (setInputCompressorSidechainFrequency(comp.channel, 'hi', hiFreq.value)) triggerConsoleRerender(); else toast('Sidechain high-filter frequency write blocked.', true); };
+  bpfFreq.onchange = () => { if (setInputCompressorSidechainBpfFrequency(comp.channel, bpfFreq.value)) triggerConsoleRerender(); else toast('BPF frequency write blocked.', true); };
 }

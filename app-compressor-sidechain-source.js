@@ -5,8 +5,9 @@
 // Separate record `Compressor side chain source, Input Channel NN` = 01 TT II,
 // where TT is a source type and II is a zero-based index.
 const COMP_SC_BPF_MODEL_VERIFIED=0x01;
-const COMP_SC_BPF_HZ_TO_RAW=new Map([[50,0x4197],[100,0x5396],[200,0x6596],[500,0x7D62],[1000,0x8F62],[2000,0xA162],[5000,0xB92D],[10000,0xCB2D],[12000,0xCFEA]]);
-const COMP_SC_BPF_RAW_TO_HZ=new Map([...COMP_SC_BPF_HZ_TO_RAW].map(([hz,raw])=>[raw,hz]));
+// Anchors matched raw = floor(4608 × log2(hz/4)) within ±1 raw unit at every tested point
+// (the canonical PEQ log-frequency coordinate). Continuous over the tested 50 Hz-12 kHz range.
+const COMP_SC_BPF_MIN_HZ=50,COMP_SC_BPF_MAX_HZ=12000;
 const COMP_SC_SOURCE_TYPE_LABELS=new Map([[0x01,'Input'],[0x02,'Mono Group'],[0x03,'Stereo Group'],[0x04,'Mono Aux'],[0x05,'Stereo Aux'],[0x08,'Main'],[0x0A,'Mono Matrix'],[0x0B,'Stereo Matrix']]);
 const COMP_SC_SOURCE_TESTED=[
   {type:0x01,index:0x00,label:'Input 1'},
@@ -27,8 +28,7 @@ parseInputCompressorStates=function(dat){
     if(c.stateLength>=127){
       c.scBpfFreqOffset=c.stateStart+125;
       c.scBpfFreqRaw=readU16BE(dat,c.scBpfFreqOffset);
-      c.scBpfFreqHz=COMP_SC_BPF_RAW_TO_HZ.get(c.scBpfFreqRaw)??peqFrequencyFromRaw(c.scBpfFreqRaw);
-      c.scBpfFreqExact=COMP_SC_BPF_RAW_TO_HZ.has(c.scBpfFreqRaw);
+      c.scBpfFreqHz=peqFrequencyFromRaw(c.scBpfFreqRaw);
       c.scBpfWritableShape=!!c.writableShape&&c.modelRaw===COMP_SC_BPF_MODEL_VERIFIED;
     }else{
       c.scBpfFreqOffset=null;c.scBpfFreqRaw=null;c.scBpfFreqHz=null;c.scBpfFreqExact=false;c.scBpfWritableShape=false;
@@ -57,8 +57,10 @@ function getInputCompressorSidechainSource(channel){return ensureInputCompressor
 
 function setInputCompressorSidechainBpfFrequency(channel,hzValue){
   const comp=ensureChannelState()?.compressors?.find(c=>c.channel===Number(channel));
-  const hz=Number(hzValue),raw=COMP_SC_BPF_HZ_TO_RAW.get(hz);if(!comp?.scBpfWritableShape||raw==null)return false;
-  writeU16BE(state.current.stage.datBytes,comp.scBpfFreqOffset,raw);comp.scBpfFreqRaw=raw;comp.scBpfFreqHz=hz;comp.scBpfFreqExact=true;markStageDirty();return true;
+  let hz=Number(hzValue);if(!comp?.scBpfWritableShape||!Number.isFinite(hz))return false;
+  hz=Math.max(COMP_SC_BPF_MIN_HZ,Math.min(COMP_SC_BPF_MAX_HZ,hz));
+  const raw=Math.max(0,Math.min(0xffff,Math.floor(4608*Math.log2(hz/4))));
+  writeU16BE(state.current.stage.datBytes,comp.scBpfFreqOffset,raw);comp.scBpfFreqRaw=raw;comp.scBpfFreqHz=hz;markStageDirty();return true;
 }
 function setInputCompressorSidechainSource(channel,typeValue,indexValue){
   const src=getInputCompressorSidechainSource(channel),type=Number(typeValue),index=Number(indexValue);
@@ -66,7 +68,6 @@ function setInputCompressorSidechainSource(channel,typeValue,indexValue){
   state.current.stage.datBytes[src.stateStart+1]=type;state.current.stage.datBytes[src.stateStart+2]=index;
   src.typeRaw=type;src.indexRaw=index;src.typeLabel=COMP_SC_SOURCE_TYPE_LABELS.get(type);src.currentTested=COMP_SC_SOURCE_TESTED.find(x=>x.type===type&&x.index===index)||null;markStageDirty();return true;
 }
-function compScBpfOptions(){return [...COMP_SC_BPF_HZ_TO_RAW.keys()].map(hz=>`<option value="${hz}">${formatHz(hz)}</option>`).join('');}
 function compScSourceValue(type,index){return `${type}:${index}`;}
 function compScSourceOptions(){return COMP_SC_SOURCE_TESTED.map(x=>`<option value="${compScSourceValue(x.type,x.index)}">${x.label}</option>`).join('');}
 
@@ -83,19 +84,21 @@ function injectCompressorSidechainBpfSourceUi(){
   }
   const middleRow=panel.querySelector('[data-k="comp-sc-middle"]')?.closest('.peq-field');
   if(middleRow){
-    const row=document.createElement('div');row.className='peq-field';row.innerHTML=`<span>SC BPF frequency <small>verified anchors: 50 Hz–12 kHz</small></span><select data-k="comp-sc-bpf-freq">${compScBpfOptions()}</select><code>${comp.scBpfFreqRaw==null?'—':`${hexByte(comp.scBpfFreqRaw>>8)} ${hexByte(comp.scBpfFreqRaw&255)}`}</code>`;middleRow.insertAdjacentElement('afterend',row);
-    const sel=row.querySelector('[data-k="comp-sc-bpf-freq"]');if(comp.scBpfFreqExact)sel.value=String(COMP_SC_BPF_RAW_TO_HZ.get(comp.scBpfFreqRaw));else{const o=document.createElement('option');o.value='';o.textContent=`Current ≈ ${formatHz(peqFrequencyFromRaw(comp.scBpfFreqRaw))} (untested raw)`;o.selected=true;sel.prepend(o);}if(!comp.scBpfWritableShape)sel.disabled=true;
-    sel.onchange=()=>{if(setInputCompressorSidechainBpfFrequency(channel,sel.value))renderChannelState();else toast('BPF frequency write blocked: use an exact controlled anchor.',true);};
+    const row=document.createElement('div');row.className='peq-field';row.innerHTML=`<span>SC BPF frequency <small>continuous verified ${formatHz(COMP_SC_BPF_MIN_HZ)}–${formatHz(COMP_SC_BPF_MAX_HZ)}</small></span><div><input data-k="comp-sc-bpf-freq" type="number" min="${COMP_SC_BPF_MIN_HZ}" max="${COMP_SC_BPF_MAX_HZ}" step="1"><b>Hz</b></div><code>${comp.scBpfFreqRaw==null?'—':`${hexByte(comp.scBpfFreqRaw>>8)} ${hexByte(comp.scBpfFreqRaw&255)}`}</code>`;middleRow.insertAdjacentElement('afterend',row);
+    const sel=row.querySelector('[data-k="comp-sc-bpf-freq"]');
+    if(comp.scBpfFreqHz>=COMP_SC_BPF_MIN_HZ*0.98&&comp.scBpfFreqHz<=COMP_SC_BPF_MAX_HZ*1.02)sel.value=String(Math.round(comp.scBpfFreqHz*100)/100);else{sel.disabled=true;sel.title=`Current raw is outside the controlled ${formatHz(COMP_SC_BPF_MIN_HZ)}–${formatHz(COMP_SC_BPF_MAX_HZ)} range.`;}
+    if(!comp.scBpfWritableShape)sel.disabled=true;
+    sel.onchange=()=>{if(setInputCompressorSidechainBpfFrequency(channel,sel.value))renderChannelState();else toast('BPF frequency write blocked.',true);};
   }
 }
 const renderChannelStateBeforeScBpfSource=renderChannelState;
 renderChannelState=function(){renderChannelStateBeforeScBpfSource();injectCompressorSidechainBpfSourceUi();};
 
 if(typeof PARAMETER_MAP!=='undefined'){
-  if(!PARAMETER_MAP.some(x=>x.id==='input-comp-sc-bpf-freq'))PARAMETER_MAP.push({id:'input-comp-sc-bpf-freq',area:'Input compressor sidechain',record:'Compressor, Input Channel NN',payload:'Manual RMS model 0x01',field:'Sidechain BPF frequency',offset:'state + 125..126',datatype:'uint16 big-endian log frequency',transform:'same frequency coordinate family; exact controlled anchors only',confidence:'verified',write:true,evidence:'CH16 50,100,200,500 Hz, 1k,2k,5k,10k,12k scenes isolate only +125..126.',notes:'Writer restricted to exact tested anchors and Manual RMS.'});
+  if(!PARAMETER_MAP.some(x=>x.id==='input-comp-sc-bpf-freq'))PARAMETER_MAP.push({id:'input-comp-sc-bpf-freq',area:'Input compressor sidechain',record:'Compressor, Input Channel NN',payload:'Manual RMS model 0x01',field:'Sidechain BPF frequency',offset:'state + 125..126',datatype:'uint16 big-endian log frequency',transform:`raw=floor(4608×log2(hz/4)); verified ${COMP_SC_BPF_MIN_HZ} Hz…${COMP_SC_BPF_MAX_HZ/1000} kHz`,confidence:'verified',write:true,evidence:'CH16 50,100,200,500 Hz, 1k,2k,5k,10k,12k scenes isolate only +125..126; every point matches the canonical PEQ log-frequency coordinate within ±1 raw unit.',notes:'Writer restricted to Manual RMS and the tested frequency range.'});
   if(!PARAMETER_MAP.some(x=>x.id==='input-comp-sc-source'))PARAMETER_MAP.push({id:'input-comp-sc-source',area:'Input compressor sidechain',record:'Compressor side chain source, Input Channel NN',payload:'3-byte state',field:'Sidechain source',offset:'state +0..2',datatype:'[discriminator,type,index]',transform:'01 TT II; II is zero-based',confidence:'verified',write:true,evidence:'CH16 Self, Input 1/16, Mono/Stereo Group 1, Mono/Stereo Aux 1, Main, Mono/Stereo Matrix 1. Self and Input 16 both serialize as 01 01 0F.',notes:'Writer exposes only exact tested type/index pairs.'});
 }
 
 if(typeof DOC_SECTIONS!=='undefined'){
-  const sec=DOC_SECTIONS.find(s=>s.id==='channel-state');if(sec&&!sec.html.includes('BPF frequency and sidechain source'))sec.html+=`<h2>BPF frequency and sidechain source</h2><pre><code>BPF frequency = compressor state +125..126\nsource record  = Compressor side chain source, Input Channel NN\n                 01 TT II</code></pre><p>BPF anchors: <code>50 Hz=41 97</code>, <code>100=53 96</code>, <code>200=65 96</code>, <code>500=7D 62</code>, <code>1k=8F 62</code>, <code>2k=A1 62</code>, <code>5k=B9 2D</code>, <code>10k=CB 2D</code>, <code>12k=CF EA</code>. Source type IDs match the already-proven strip-assignment IDs. On CH16, Self and Input 16 are byte-identical: <code>01 01 0F</code>.</p><div class="docs-callout"><strong>Writer guard:</strong> BPF uses exact anchors only; Source uses exact tested type/index pairs only.</div>`;
+  const sec=DOC_SECTIONS.find(s=>s.id==='channel-state');if(sec&&!sec.html.includes('BPF frequency and sidechain source'))sec.html+=`<h2>BPF frequency and sidechain source</h2><pre><code>BPF frequency = compressor state +125..126\nsource record  = Compressor side chain source, Input Channel NN\n                 01 TT II</code></pre><p>BPF frequency uses the canonical PEQ log-frequency coordinate <code>raw = floor(4608 × log2(hz/4))</code>, confirmed at 50 Hz, 100, 200, 500 Hz, 1k, 2k, 5k, 10k and 12 kHz, and is continuous over that range. Source type IDs match the already-proven strip-assignment IDs. On CH16, Self and Input 16 are byte-identical: <code>01 01 0F</code>.</p><div class="docs-callout"><strong>Writer guard:</strong> BPF is continuous over 50 Hz–12 kHz on Manual RMS only; Source uses exact tested type/index pairs only.</div>`;
 }
