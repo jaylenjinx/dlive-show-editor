@@ -53,6 +53,18 @@ class CheckerTests(unittest.TestCase):
         # legacy (version 2) blocks have no UFX sends
         self.assertEqual(dl.input_mixer_layout(bytes.fromhex('02 04 04 08 00 08 08 04 04 01 01 01'))[2],195)
 
+    def test_input_mixer_dca_mutegroup_labels(self):
+        header=bytes.fromhex('03 04 09 04 04 06 06 02 02 00 01 01')
+        _,section,size=dl.input_mixer_layout(header)
+        state_len=12+128*size
+        rec=dl.Record(0,2,state_len+20,'Input Mixer',20,20+state_len)
+        data=bytearray(20+state_len); data[20:32]=header
+        base=12+12*size  # CH13
+        # RevEng scenes: DCA1 = end-72, DCA24 = end-49, Mute Group 1 = end-48, Mute Group 8 = end-41
+        for off,name in [(size-72,'DCA 1'),(size-49,'DCA 24'),(size-48,'Mute Group 1'),(size-41,'Mute Group 8')]:
+            f=dl.input_mixer_field(rec,base+off,base+off,bytes(data))
+            self.assertEqual(f['name'],f'CH13 {name} assign')
+
     def test_decode_mixconfig(self):
         a=dl.decode_mixconfig(bytes.fromhex('01 02 07 06 03 04 05 01 01 01 08 02 17'))
         self.assertEqual((a['mono_groups'],a['stereo_groups'],a['mono_fx'],a['stereo_fx'],a['mono_aux'],a['stereo_aux']),(2,7,6,3,4,5))

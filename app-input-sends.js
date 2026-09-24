@@ -12,7 +12,8 @@
 //     mono   = [on, pre, level_hi, level_lo]
 //     stereo = [on, pre, level_hi, level_lo, pan]
 //   47-byte section starting with the Main send: On at +0, level at +3 (the verified input fader,
-//   blockSize−84) and pan at +5 (blockSize−82); bytes +1..2 are 01 01 and unmapped
+//   blockSize−84) and pan at +5 (blockSize−82); bytes +1..2 are 01 01 and unmapped;
+//   DCA 1–24 assigns at +15..+38 and Mute Group 1–8 assigns at +39..+46 (one 00/01 byte each)
 //   8 stereo UFX sends (version >= 3 only)
 const SEND_LEVEL_MIN_DB=-39,SEND_LEVEL_MAX_DB=10;
 
@@ -27,7 +28,9 @@ function inputSendLayout(header){
   const groups=[];
   for(let i=0;i<mg;i++)groups.push({name:`Grp ${i+1}`,offset:i});
   for(let i=0;i<sg;i++)groups.push({name:`St Grp ${i+1}`,offset:mg+i});
-  return {entries,groups,section,blockSize:o};
+  const dcas=[];for(let i=0;i<24;i++)dcas.push({name:`DCA ${i+1}`,offset:section+15+i});
+  const muteGroups=[];for(let i=0;i<8;i++)muteGroups.push({name:`Mute Group ${i+1}`,offset:section+39+i});
+  return {entries,groups,dcas,muteGroups,section,blockSize:o};
 }
 
 function inputSendsContext(channel){
@@ -74,6 +77,12 @@ function setInputGroupAssign(channel,name,on){
   ctx.dat[at]=on?1:0;markStageDirty();return true;
 }
 
+function setInputSectionFlag(channel,list,name,on){
+  const ctx=inputSendsContext(channel),g=ctx?.layout[list].find(x=>x.name===name);if(!g)return false;
+  const at=ctx.ch.blockStart+g.offset;if(ctx.dat[at]!==0&&ctx.dat[at]!==1)return false;
+  ctx.dat[at]=on?1:0;markStageDirty();return true;
+}
+
 function injectInputSendsUi(){
   const root=$('#channelStateEditor');if(!root||!state.current?.stage)return;
   const select=root.querySelector('.peq-channel-select');
@@ -100,12 +109,14 @@ function injectInputSendsUi(){
     </div>`;
   }).join('');
   const groups=layout.groups.map(g=>`<label class="config-row" data-group="${escapeHtml(g.name)}"><strong>${escapeHtml(g.name)}</strong><select data-k="assign"><option value="1">Assigned</option><option value="0">Off</option></select><span><code>block + ${g.offset}</code></span></label>`).join('');
+  const dcaRows=[...layout.dcas.map(g=>['dcas',g]),...layout.muteGroups.map(g=>['muteGroups',g])].map(([list,g])=>`<label class="config-row" data-flag-list="${list}" data-flag="${escapeHtml(g.name)}"><strong>${escapeHtml(g.name)}</strong><select><option value="1">Assigned</option><option value="0">Off</option></select><span><code>block + ${g.offset}</code></span></label>`).join('');
   panel.innerHTML=`<div class="manager-head inline"><h2>CH ${ch.channel} sends</h2><span class="confidence verified">VERIFIED WRITE</span></div>
     <p>Level −39…+10 dB or −∞ (<code>int16 / 256</code>, <code>8001</code> = −∞), On (<code>01</code>) and Pre (<code>01</code>) / Post (<code>00</code>). Stereo send pan uses the input-pan coordinate (<code>00</code> L, <code>25</code> C, <code>4A</code> R).</p>
     <div class="config-table">${rows}</div>
     <h3>Main and group assigns</h3><div class="config-table">
       <label class="config-row" data-main-on><strong>Main send</strong><select><option value="1">On</option><option value="0">Off</option></select><span><code>block + ${layout.section}</code> level = Fader, pan = Pan above</span></label>
-      ${groups}</div>`;
+      ${groups}</div>
+    <h3>DCA and mute group assigns</h3><div class="config-table">${dcaRows}</div>`;
   stack.insertBefore(panel,stack.children[1]||null);
 
   for(const row of panel.querySelectorAll('[data-send]')){
@@ -128,6 +139,11 @@ function injectInputSendsUi(){
     sel.value=String(dat[base+g.offset]);
     sel.onchange=()=>{if(setInputGroupAssign(channel,name,sel.value==='1'))renderChannelState();else toast(`${name} assign write blocked.`,true);};
   }
+  for(const row of panel.querySelectorAll('[data-flag]')){
+    const list=row.dataset.flagList,name=row.dataset.flag,g=layout[list].find(x=>x.name===name),sel=row.querySelector('select');
+    sel.value=String(dat[base+g.offset]);
+    sel.onchange=()=>{if(setInputSectionFlag(channel,list,name,sel.value==='1'))renderChannelState();else toast(`${name} assign write blocked.`,true);};
+  }
 }
 
 const renderChannelStateBeforeSends=renderChannelState;
@@ -136,6 +152,8 @@ renderChannelState=function(){renderChannelStateBeforeSends();injectInputSendsUi
 if(typeof PARAMETER_MAP!=='undefined'){
   const rows=[
     ['input-group-assign','Group assign','block + (group index)','one byte per mono then stereo group; 00 Off, 01 Assigned'],
+    ['input-dca-assign','DCA assign','channel section + 15 + (DCA−1)','24 bytes, 00 Off, 01 Assigned'],
+    ['input-mutegroup-assign','Mute group assign','channel section + 39 + (group−1)','8 bytes, 00 Off, 01 Assigned'],
     ['input-main-send-on','Main send On','channel section + 0','01 On, 00 Off; level = input fader (+3), pan = input pan (+5)'],
     ['input-send-on','Send On','entry + 0','01 On, 00 Off'],
     ['input-send-pre','Send Pre/Post','entry + 1','01 Pre, 00 Post'],

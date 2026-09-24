@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Input DCA and mute group assigns** (`RevEngRouting`): DCA 1–24 and Mute Group 1–8 assign bytes found in the Input Mixer channel section (`+15…+38`, `+39…+46`) and made writable in the Sends panel; `dlive_re.py` labels them. Channel Mapper (source socket, Insert A/B) findings are recorded read-only in `docs/channel-mapper.md`.
+
 ## v2.6
 
 - **Promoted anchor-only fields to continuous writers wherever the anchors matched an already-proven canonical coordinate.** Several controls that are physically continuous (frequencies, gains, times) had been left as `<select>` dropdowns with only 4–9 discrete choices, exposing far less range than Director actually allows. Every promoted field was verified first: its existing controlled-scene anchors were checked against the coordinate's formula, and only promoted when the match was exact or within the same small typed-entry rounding noise (±1–3 raw units, ≤0.012 dB / a fraction of a Hz) already accepted elsewhere in the format.
