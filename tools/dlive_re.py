@@ -118,7 +118,7 @@ def scan_records(data: bytes) -> list[Record]:
     prefixes = (
         b"AHFX Manager", b"Parametric EQ", b"Graphic EQ", b"Compressor,", b"SCF Compressor",
         b"Compressor side chain source", b"Gate,", b"SCF Gate", b"Gate side chain source",
-        b"Delay,", b"Input Mixer", b"Highpass Filter", b"Lowpass Filter", b"Digital Attenuator",
+        b"Delay,", b"Mix Delay", b"Input Mixer", b"Highpass Filter", b"Lowpass Filter", b"Digital Attenuator",
         b"Stereo Image", b"StageBox Analogue Input", b"Preamp Model", b"Send Source Select",
         b"Levels and Mutes", b"AutoMicMixer",
     )
@@ -250,7 +250,21 @@ def load_mixconfig(path: str | Path) -> bytes:
     with tarfile.open(path, "r:gz") as t:
         return t.extractfile("Show/MixConfig/MixConfig.dat").read()
 
+BUS_RECORD_RE = re.compile(r"(Compressor|Parametric EQ|Mix Delay), (Mono|Stereo) (Group|Aux|Matrix) Channel (\d+)(?: (Left|Right))?$")
+
 def known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> dict[str, Any] | None:
+    """Group/Aux/Matrix Compressor, Parametric EQ and Mix Delay records share the input layouts
+    (confirmed on Mono Aux 1, Mono Group 1, Mono Matrix 1 and Stereo Aux 1), so reuse those maps."""
+    m = BUS_RECORD_RE.match(record.label.strip())
+    if m:
+        kind = {"Compressor": "Compressor, Input Channel", "Parametric EQ": "Parametric EQ, Input Channel", "Mix Delay": "Delay, Input Channel"}[m.group(1)]
+        f = _known_field(dataclasses.replace(record, label=kind), rel_start, rel_end, data)
+        if f:
+            f = {**f, "name": f"{m.group(2)} {m.group(3)} {int(m.group(4))}{' ' + m.group(5) if m.group(5) else ''} {f['name']}"}
+        return f
+    return _known_field(record, rel_start, rel_end, data)
+
+def _known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> dict[str, Any] | None:
     label = record.label.strip()
 
     if label.startswith("Input Mixer"):
