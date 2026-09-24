@@ -68,6 +68,22 @@ function parseInputGates(dat){
   return out;
 }
 
+const IP_DIRECT_OUT_MIN_DB=-39,IP_DIRECT_OUT_MAX_DB=10;
+const IP_DIRECT_OUT_SOURCE_LABELS=new Map([[0,'Post Preamp'],[1,'Post LPF'],[2,'Post Gate'],[3,'Post Ins A Ret'],[4,'Post PEQ'],[5,'Post Comp'],[6,'Post Ins B Ret'],[7,'Post Delay']]);
+function parseInputDirectOutputs(dat){
+  const out=[];
+  for(let channel=1;channel<=128;channel++){
+    const r=ipParseRecord(dat,`Direct Output, Input Channel ${String(channel).padStart(2,'0')}`,3);if(!r)continue;
+    const s=r.stateStart,levelRaw=readI16BE(dat,s+1);
+    out.push({...r,channel,discriminator:dat[s],levelOffset:s+1,levelRaw,infinite:levelRaw===IP_SEND_NEG_INF_RAW,levelDb:levelRaw===IP_SEND_NEG_INF_RAW?null:levelRaw/256,writableShape:dat[s]===0x01});
+  }
+  return out;
+}
+function parseGlobalDirectOutputs(dat){
+  const r=ipParseRecord(dat,'Global Direct Outputs',6);if(!r)return null;
+  const s=r.stateStart;return {...r,sourceOffset:s+1,sourceRaw:dat[s+1],sourceLabel:IP_DIRECT_OUT_SOURCE_LABELS.get(dat[s+1])||`Unknown 0x${hexByte(dat[s+1])}`,sourceKnown:IP_DIRECT_OUT_SOURCE_LABELS.has(dat[s+1]),writableShape:dat[s]===0x02};
+}
+
 function parseInputDelays(dat){
   const out=[];
   for(let channel=1;channel<=128;channel++){
@@ -123,13 +139,17 @@ function ensureInputProcessing(){
   const stage=state.current?.stage;if(!stage)return null;
   if(!stage.inputGates)stage.inputGates=parseInputGates(stage.datBytes);
   if(!stage.inputDelays)stage.inputDelays=parseInputDelays(stage.datBytes);
+  if(!stage.inputDirectOutputs)stage.inputDirectOutputs=parseInputDirectOutputs(stage.datBytes);
+  if(stage.globalDirectOutputs===undefined)stage.globalDirectOutputs=parseGlobalDirectOutputs(stage.datBytes);
   if(!stage.inputAttenuators)stage.inputAttenuators=parseInputAttenuators(stage.datBytes);
   if(!stage.inputStereoImages)stage.inputStereoImages=parseInputStereoImages(stage.datBytes);
   if(!stage.stageBoxAnalogueInputs)stage.stageBoxAnalogueInputs=parseStageBoxAnalogueInputs(stage.datBytes);
-  return {gates:stage.inputGates,delays:stage.inputDelays,attenuators:stage.inputAttenuators,stereoImages:stage.inputStereoImages,analogueInputs:stage.stageBoxAnalogueInputs};
+  return {gates:stage.inputGates,delays:stage.inputDelays,directOutputs:stage.inputDirectOutputs,globalDirectOutputs:stage.globalDirectOutputs,attenuators:stage.inputAttenuators,stereoImages:stage.inputStereoImages,analogueInputs:stage.stageBoxAnalogueInputs};
 }
 function getInputGate(channel){return ensureInputProcessing()?.gates?.find(x=>x.channel===Number(channel))||null;}
 function getInputDelay(channel){return ensureInputProcessing()?.delays?.find(x=>x.channel===Number(channel))||null;}
+function getInputDirectOutput(channel){return ensureInputProcessing()?.directOutputs?.find(x=>x.channel===Number(channel))||null;}
+function getGlobalDirectOutputs(){return ensureInputProcessing()?.globalDirectOutputs||null;}
 function getInputAttenuator(channel){return ensureInputProcessing()?.attenuators?.find(x=>x.channel===Number(channel))||null;}
 function getInputStereoImage(channel){return ensureInputProcessing()?.stereoImages?.find(x=>x.channel===Number(channel))||null;}
 function getStageBoxAnalogueInput(socket){return ensureInputProcessing()?.analogueInputs?.find(x=>x.socket===Number(socket))||null;}
@@ -146,6 +166,16 @@ function setInputGateTime(channel,kind,msValue){
   markStageDirty();return true;
 }
 
+// Level is int16/256 dB, -39…+10 (typed -40 or below stores 0x8001 = -inf; +20 clamps to +10). Typed entries carry the same ~+0.012 dB noise as sends.
+function setInputDirectOutLevel(channel,db){
+  const d=getInputDirectOutput(channel);if(!d?.writableShape)return false;
+  let raw;if(db===null||db==='-inf'||db==='')raw=IP_SEND_NEG_INF_RAW;else{const v=Number(db);if(!Number.isFinite(v))return false;raw=Math.round(Math.max(IP_DIRECT_OUT_MIN_DB,Math.min(IP_DIRECT_OUT_MAX_DB,v))*256);}
+  writeI16BE(state.current.stage.datBytes,d.levelOffset,raw);d.levelRaw=raw;d.infinite=raw===IP_SEND_NEG_INF_RAW;d.levelDb=d.infinite?null:raw/256;markStageDirty();return true;
+}
+function setGlobalDirectOutSource(rawValue){
+  const g=getGlobalDirectOutputs(),raw=Number(rawValue);if(!g?.writableShape||!IP_DIRECT_OUT_SOURCE_LABELS.has(raw))return false;
+  state.current.stage.datBytes[g.sourceOffset]=raw;g.sourceRaw=raw;g.sourceLabel=IP_DIRECT_OUT_SOURCE_LABELS.get(raw);g.sourceKnown=true;markStageDirty();return true;
+}
 function setInputDelayActive(channel,on){const d=getInputDelay(channel);if(!d?.writableShape)return false;const raw=on?0:1;state.current.stage.datBytes[d.bypassOffset]=raw;d.bypassRaw=raw;d.active=!!on;markStageDirty();return true;}
 function setInputDelayMs(channel,ms){const d=getInputDelay(channel);if(!d?.writableShape)return false;let v=Number(ms);if(!Number.isFinite(v))return false;v=Math.max(IP_DELAY_MIN_MS,Math.min(IP_DELAY_MAX_MS,v));const raw=Math.round(v*96);ipWriteU16(state.current.stage.datBytes,d.delayOffset,raw);d.delayRaw=raw;d.delayMs=raw/96;markStageDirty();return true;}
 

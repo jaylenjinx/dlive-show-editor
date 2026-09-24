@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Input direct out** (`RevEngRouting`): per-input direct-out level (`Direct Output, Input Channel NN` `+1..2`, int16/256, −39…+10 dB, −∞) and the global direct-out source (`Global Direct Outputs` `+1`, eight tap points) are writable in the Console UI Routing view, and labelled in `dlive_re.py`. See `docs/direct-output.md`.
+
 ## v2.6
 
 - **Promoted anchor-only fields to continuous writers wherever the anchors matched an already-proven canonical coordinate.** Several controls that are physically continuous (frequencies, gains, times) had been left as `<select>` dropdowns with only 4–9 discrete choices, exposing far less range than Director actually allows. Every promoted field was verified first: its existing controlled-scene anchors were checked against the coordinate's formula, and only promoted when the match was exact or within the same small typed-entry rounding noise (±1–3 raw units, ≤0.012 dB / a fraction of a Hz) already accepted elsewhere in the format.

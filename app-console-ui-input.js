@@ -94,3 +94,18 @@ function renderRoutingConsole(root,channel){
   shell.querySelector('[data-k="a1-pre"]').appendChild(makeToggle(r.aux1.pre?'Pre':'Post',r.aux1.pre,disabled||!r.aux1.prepostKnown,()=>{if(setControlledAux1Pre(channel,!r.aux1.pre))triggerConsoleRerender();}));
   for(const [key,kind] of [['a1-level','aux1'],['a2-level','aux2'],['sa1-level','stereoAux1']]){const input=shell.querySelector(`[data-k="${key}"]`);input.disabled=disabled;input.onchange=()=>{if(setControlledSendLevel(channel,kind,input.value===''?'-inf':input.value))triggerConsoleRerender();};}
 }
+
+const renderRoutingConsoleBeforeDirectOut=renderRoutingConsole;
+renderRoutingConsole=function(root,channel){
+  renderRoutingConsoleBeforeDirectOut(root,channel);
+  const d=getInputDirectOutput(channel),g=getGlobalDirectOutputs();if(!d&&!g)return;
+  const shell=document.createElement('section');shell.className='dlive-console-frame directout-console';
+  shell.innerHTML=`<div class="console-section-head"><div><span class="console-kicker">INPUT DIRECT OUT</span><strong>CH ${channel}${channelName(channel)?` · ${safeText(channelName(channel))}`:''}</strong></div><span class="confidence verified">VERIFIED WRITE</span></div>
+    <div class="console-routing-grid">
+      ${d?`<section class="console-processing-card"><div class="console-subhead"><span>Level</span></div>${ipConsoleField('Level','do-level',d.infinite?'':d.levelDb.toFixed(2),'dB',IP_DIRECT_OUT_MIN_DB,IP_DIRECT_OUT_MAX_DB,.1)}<small class="console-inline-note">−39…+10 dB; empty = −∞.</small></section>`:''}
+      ${g?`<section class="console-processing-card"><div class="console-subhead"><span>Global source</span></div><label>Tap point<select data-k="do-source">${[...IP_DIRECT_OUT_SOURCE_LABELS].map(([raw,label])=>`<option value="${raw}">${safeText(label)}</option>`).join('')}</select></label><small class="console-inline-note">One setting for all input direct outs.</small></section>`:''}
+    </div>`;
+  root.appendChild(shell);
+  const lvl=shell.querySelector('[data-k="do-level"]');if(lvl){lvl.disabled=!d.writableShape;lvl.placeholder='−∞';lvl.onchange=()=>{if(setInputDirectOutLevel(channel,lvl.value===''?null:lvl.value))triggerConsoleRerender();else toast('Direct out level write blocked.',true);};}
+  const src=shell.querySelector('[data-k="do-source"]');if(src){if(g.sourceKnown)src.value=String(g.sourceRaw);else injectCurrentOption(src,g.sourceLabel);src.disabled=!g.writableShape;src.onchange=()=>{if(setGlobalDirectOutSource(src.value))triggerConsoleRerender();else toast('Direct out source write blocked.',true);};}
+};
