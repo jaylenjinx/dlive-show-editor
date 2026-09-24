@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Compressor ratio**: the editor and Console UI exposed only 7 of Director's ratios. `state +15` is a 41-step table (1:1 … ∞:1); every step was swept and is now writable for Manual RMS and Manual Peak. See `docs/reverse-engineer-ratio1.md`.
+
 ## v2.6
 
 - **Promoted anchor-only fields to continuous writers wherever the anchors matched an already-proven canonical coordinate.** Several controls that are physically continuous (frequencies, gains, times) had been left as `<select>` dropdowns with only 4–9 discrete choices, exposing far less range than Director actually allows. Every promoted field was verified first: its existing controlled-scene anchors were checked against the coordinate's formula, and only promoted when the match was exact or within the same small typed-entry rounding noise (±1–3 raw units, ≤0.012 dB / a fraction of a Hz) already accepted elsewhere in the format.
