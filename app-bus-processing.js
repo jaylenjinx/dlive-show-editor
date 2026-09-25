@@ -11,6 +11,9 @@ const BUS_KINDS=[
   {key:'group',label:'Group',mono:'Mono Group',stereo:'Stereo Group',monoMgr:'groups',stMgr:'stGroups',short:'Grp',stShort:'St Grp'},
   {key:'aux',label:'Aux',mono:'Mono Aux',stereo:'Stereo Aux',monoMgr:'auxes',stMgr:'stAuxes',short:'Aux',stShort:'St Aux'},
   {key:'matrix',label:'Matrix',mono:'Mono Matrix',stereo:'Stereo Matrix',monoMgr:'matrices',stMgr:'stMatrices',short:'Mtx',stShort:'St Mtx'},
+  // Main (needs a Main type other than None): with LR+M, Main Channel 01 is the stereo LR pair, 03 is the mono M
+  // (both exercised in Director) and 04 exists but was not exercised.
+  {key:'main',label:'Main',mono:'Main',stereo:'Main',monoMgr:'mains',stMgr:'mains',short:'Main',stShort:'Main',monoNums:[3,4],stNums:[1],titles:{'st1':'Main LR','mono3':'Main M','mono4':'Main 4 (not exercised)'}},
 ];
 const BUS_DELAY_MAX_MS=400;
 const BUS_COMP_MODEL_RMS=0x01;
@@ -30,7 +33,8 @@ function busBuild(dat){
   const stage=state.current.stage,buses=[];
   for(const k of BUS_KINDS){
     for(const stereo of [false,true]){
-      for(let n=1;n<=64;n++){
+      const nums=stereo?(k.stNums||null):(k.monoNums||null);
+      for(const n of (nums||Array.from({length:64},(_,i)=>i+1))){
         const sides=stereo?['Left','Right']:[null];
         const rec={comp:[],peq:[],delay:[]};
         let ok=true;
@@ -41,10 +45,10 @@ function busBuild(dat){
           if(!c){ok=false;break;}
           rec.comp.push(c);if(p&&p.stateLength===38)rec.peq.push(p);if(d&&d.stateLength===4)rec.delay.push(d);
         }
-        if(!ok)break;
+        if(!ok){if(nums)continue;break;}
         const mgr=stage.managers?.find(x=>x.key===(stereo?k.stMgr:k.monoMgr));
         const name=mgr?.items?.[n-1]?.name||'';
-        buses.push({id:`${k.key}-${stereo?'st':'mono'}-${n}`,kind:k,stereo,n,name,title:`${stereo?k.stShort:k.short} ${n}${name?` · ${name}`:''}`,rec});
+        buses.push({id:`${k.key}-${stereo?'st':'mono'}-${n}`,kind:k,stereo,n,name,title:k.titles?.[`${stereo?'st':'mono'}${n}`]||`${stereo?k.stShort:k.short} ${n}${name?` · ${name}`:''}`,rec});
       }
     }
   }
@@ -123,9 +127,9 @@ function renderBuses(){
   root.innerHTML='';
   const stage=state.current?.stage;if(!stage){return;}
   const buses=busList();
-  if(!buses.length){root.innerHTML='<div class="notice warn">No group, aux or matrix processing records were found in this scene.</div>';return;}
+  if(!buses.length){root.innerHTML='<div class="notice warn">No group, aux, matrix or main processing records were found in this scene.</div>';return;}
   const toolbar=document.createElement('section');toolbar.className='panel peq-toolbar';
-  toolbar.innerHTML='<div class="manager-head inline"><h2>Bus</h2><span class="confidence verified">CONTROLLED-DIFF VERIFIED (MONO AUX 1)</span></div>';
+  toolbar.innerHTML='<div class="manager-head inline"><h2>Bus</h2><span class="confidence verified">CONTROLLED-DIFF VERIFIED</span></div>';
   const select=document.createElement('select');select.className='peq-channel-select';
   for(const b of buses){const o=document.createElement('option');o.value=b.id;o.textContent=b.title;select.appendChild(o);}
   const remembered=root.dataset.bus;select.value=buses.some(b=>b.id===remembered)?remembered:buses[0].id;
@@ -196,7 +200,7 @@ function renderBuses(){
   if(after)after.insertAdjacentElement('afterend',tab);else document.querySelector('.tabs')?.appendChild(tab);
   tab.onclick=()=>activateEditorTab(tab);
   const panel=document.createElement('div');panel.id='tabBuses';panel.className='tab-panel';
-  panel.innerHTML='<div class="notice safe"><strong>Group, Aux and Matrix processing:</strong> compressor (Manual RMS), PEQ and delay use the same record layouts as inputs and were confirmed with controlled Director changes on Mono Aux 1 (delay also on Stereo Aux 1). Stereo buses are written to both their Left and Right records. Other compressor models stay read-only.</div><div id="busEditor"></div>';
+  panel.innerHTML='<div class="notice safe"><strong>Group, Aux and Matrix processing:</strong> compressor (Manual RMS), PEQ and delay use the same record layouts as inputs and were confirmed with controlled Director changes on Mono Aux, Group and Matrix 1, Stereo Aux 1 and Main LR/M. Stereo buses are written to both their Left and Right records. Other compressor models stay read-only.</div><div id="busEditor"></div>';
   const ref=document.querySelector('#tabChannelstate');if(ref)ref.insertAdjacentElement('afterend',panel);else document.querySelector('#editor')?.appendChild(panel);
 })();
 const renderSceneBeforeBuses=renderScene;

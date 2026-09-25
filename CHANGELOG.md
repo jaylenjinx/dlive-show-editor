@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Group, Aux and Matrix processing** (`RevEngBus`): new **Buses** tab. Their Compressor, Parametric EQ and Mix Delay records share the input layouts (confirmed with controlled Director changes on Mono Aux/Group/Matrix 1 and Stereo Aux 1), so compressor (Manual RMS), PEQ and delay (0–400 ms) are writable per bus; stereo buses write both Left and Right records. `dlive_re.py` labels these records. See `docs/bus-processing.md`.
+- **Group, Aux and Matrix processing** (`RevEngBus`): new **Buses** tab. Their Compressor, Parametric EQ and Mix Delay records share the input layouts (confirmed with controlled Director changes on Mono Aux/Group/Matrix 1, Stereo Aux 1 and Main LR/M), so compressor (Manual RMS), PEQ and delay (0–400 ms) are writable per bus; stereo buses (and Main LR) write both Left and Right records; Main appears when the mixer config's Main type is not None. `dlive_re.py` labels these records. See `docs/bus-processing.md`.
 
 ## v2.6
 
