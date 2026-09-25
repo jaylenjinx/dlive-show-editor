@@ -31,7 +31,29 @@ The library holds 12 presets covering 11 models (Ducker and Ducker Slow share `0
 | Dual Expander | `02` |
 | Source Expander | `03` |
 
-Threshold (`+2..3`), depth (`+8..9`), hold (`+10..11`), release (`+13..14`), attack (`+15..16`) and enable (`+18`) sit at the same offsets for every gate model in the recalled presets (Ducker stores its threshold/depth as `F9 00`, i.e. −7 dB); the presets differ in their default values and in a few unmapped bytes (`+4..7`, `+12`, `+17`).
+Depth (`+8..9`, 0…60 dB), release (`+13..14`), attack (`+15..16`) and enable (`+18`) sit at the same offsets for every model. **Threshold does not**: Gate and Ducker use `+2..3`, Dual Expander and Source Expander use `+4..5`.
+
+### Gate model parameters (`RevEngGateModels`, input 13, scenes 300–390)
+
+Each numeric readout was typed at two normal values plus out-of-range values (to find Director's clamps), and each button clicked.
+
+| Model | Control | Offset | Finding |
+|---|---|---|---|
+| Gate (`00`), Ducker (`01`) | Threshold | `+2..3` | int16/256, −72…+12 dB |
+| | Hold | `+10..11` | `time_log`, 10 ms…5 s |
+| | Release | `+13..14` | `time_log`, 10 ms…1 s |
+| | Attack | `+15..16` | `time_log`, 50 µs…300 ms |
+| | Depth | `+8..9` | int16/256, 0…60 dB |
+| Dual Expander (`02`) | Upper threshold | `+4..5` | int16/256, −70…+12 dB |
+| | Lower threshold | `+6..7` | int16/256, −72…+10 dB |
+| | Depth | `+8..9` | 0…60 dB |
+| | Attack / Release | `+15..16` / `+13..14` | `time_log`, 50 µs…300 ms / 10 ms…1 s |
+| | LIN button | `+12` | `00` Log, `01` Lin |
+| Source Expander (`03`) | Threshold | `+4..5` | int16/256, −56…+12 dB |
+| | Depth | `+8..9` | 0…60 dB |
+| | Slow / Medium / Fast | `+17` | `00` / `01` / `02` |
+
+Ducker (gate) stores its recalled −7 dB threshold at `+2..3` (as `F9 00`). The typed values landed exactly on the shared time anchors (10 ms `5D18`, 100 ms `745E`, 500 ms `84A2`, 1 s `8BA3`). The editor previously wrote threshold at `+2..3` regardless of model, which would have written the wrong byte on an expander; it now uses the model's own offset and clamps.
 
 ## Model parameters found so far (Main LR, `RevEngModels`)
 

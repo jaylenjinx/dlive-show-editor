@@ -22,11 +22,13 @@ function renderGateConsole(root,gate){
     <div class="console-gate-main">
       <section class="console-transfer-panel"><div class="console-subhead"><span>Transfer</span><span class="confidence verified">CONTROLLED-DIFF VERIFIED</span></div><svg class="console-gate-svg"></svg></section>
       <section class="console-gate-controls">
-        ${ipConsoleField('Threshold','gate-threshold',gate.thresholdDb.toFixed(2),'dB',IP_GATE_THRESHOLD_MIN_DB,IP_GATE_THRESHOLD_MAX_DB,.1)}
+        ${ipConsoleField(gate.modelRaw===2?'Upper threshold':'Threshold','gate-threshold',gate.thresholdDb.toFixed(2),'dB',IP_GATE_THRESHOLD_MIN_BY_MODEL[gate.modelRaw]??IP_GATE_THRESHOLD_MIN_DB,IP_GATE_THRESHOLD_MAX_DB,.1)}
+        ${gate.modelRaw===2?ipConsoleField('Lower threshold','gate-lower',gate.lowerThresholdDb.toFixed(2),'dB',IP_GATE_LOWER_MIN_DB,IP_GATE_LOWER_MAX_DB,.1)+`<label>Curve<select data-k="gate-lin"><option value="0">Log</option><option value="1">Lin</option></select></label>`:''}
+        ${gate.modelRaw===3?`<label>Speed<select data-k="gate-speed">${[...IP_GATE_SPEED_LABELS].map(([r,l])=>`<option value="${r}">${l}</option>`).join('')}</select></label>`:''}
         ${ipConsoleField('Depth','gate-depth',gate.depthDb.toFixed(2),'dB',IP_GATE_DEPTH_MIN_DB,IP_GATE_DEPTH_MAX_DB,.1)}
-        ${ipConsoleField('Attack','gate-attack',Number(gate.attackMs.toPrecision(4)),'ms',IP_GATE_ATTACK_MIN_MS,IP_GATE_ATTACK_MAX_MS,0.01)}
-        ${ipConsoleField('Hold','gate-hold',Number(gate.holdMs.toPrecision(4)),'ms',IP_GATE_HOLD_MIN_MS,IP_GATE_HOLD_MAX_MS,1)}
-        ${ipConsoleField('Release','gate-release',Number(gate.releaseMs.toPrecision(4)),'ms',IP_GATE_RELEASE_MIN_MS,IP_GATE_RELEASE_MAX_MS,1)}
+        ${gate.modelRaw===3?'':ipConsoleField('Attack','gate-attack',Number(gate.attackMs.toPrecision(4)),'ms',IP_GATE_ATTACK_MIN_MS,IP_GATE_ATTACK_MAX_MS,0.01)}
+        ${IP_GATE_EXPANDER_MODELS.has(gate.modelRaw)?'':ipConsoleField('Hold','gate-hold',Number(gate.holdMs.toPrecision(4)),'ms',IP_GATE_HOLD_MIN_MS,IP_GATE_HOLD_MAX_MS,1)}
+        ${gate.modelRaw===3?'':ipConsoleField('Release','gate-release',Number(gate.releaseMs.toPrecision(4)),'ms',IP_GATE_RELEASE_MIN_MS,IP_GATE_RELEASE_MAX_MS,1)}
       </section>
     </div>
     <div class="console-note">Threshold and Depth use the verified signed /256 dB format. Attack/Hold/Release are continuous over their tested ranges using the canonical log-time coordinate.</div>`;
@@ -36,10 +38,14 @@ function renderGateConsole(root,gate){
   th.onchange=()=>{if(setInputGateThreshold(gate.channel,th.value))triggerConsoleRerender();else toast('Gate threshold write blocked.',true);};
   depth.onchange=()=>{if(setInputGateDepth(gate.channel,depth.value))triggerConsoleRerender();else toast('Gate depth write blocked.',true);};
   const atk=shell.querySelector('[data-k="gate-attack"]'),hold=shell.querySelector('[data-k="gate-hold"]'),rel=shell.querySelector('[data-k="gate-release"]');
-  atk.disabled=hold.disabled=rel.disabled=!gate.writableShape;
-  atk.onchange=()=>{if(setInputGateTime(gate.channel,'attack',atk.value))triggerConsoleRerender();else toast('Gate attack write blocked.',true);};
-  hold.onchange=()=>{if(setInputGateTime(gate.channel,'hold',hold.value))triggerConsoleRerender();else toast('Gate hold write blocked.',true);};
-  rel.onchange=()=>{if(setInputGateTime(gate.channel,'release',rel.value))triggerConsoleRerender();else toast('Gate release write blocked.',true);};
+  const lower=shell.querySelector('[data-k="gate-lower"]'),lin=shell.querySelector('[data-k="gate-lin"]'),speed=shell.querySelector('[data-k="gate-speed"]');
+  if(lower){lower.disabled=!gate.writableShape;lower.onchange=()=>{if(setInputGateLowerThreshold(gate.channel,lower.value))triggerConsoleRerender();else toast('Lower threshold write blocked.',true);};}
+  if(lin){lin.value=gate.lin?'1':'0';lin.disabled=!gate.writableShape;lin.onchange=()=>{if(setInputGateLin(gate.channel,lin.value==='1'))triggerConsoleRerender();};}
+  if(speed){speed.value=String(gate.speedRaw);speed.disabled=!gate.writableShape;speed.onchange=()=>{if(setInputGateSpeed(gate.channel,speed.value))triggerConsoleRerender();};}
+  for(const el of [atk,hold,rel])if(el)el.disabled=!gate.writableShape;
+  if(atk)atk.onchange=()=>{if(setInputGateTime(gate.channel,'attack',atk.value))triggerConsoleRerender();else toast('Gate attack write blocked.',true);};
+  if(hold)hold.onchange=()=>{if(setInputGateTime(gate.channel,'hold',hold.value))triggerConsoleRerender();else toast('Gate hold write blocked.',true);};
+  if(rel)rel.onchange=()=>{if(setInputGateTime(gate.channel,'release',rel.value))triggerConsoleRerender();else toast('Gate release write blocked.',true);};
 }
 
 function renderPreampConsole(root,channel){

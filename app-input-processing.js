@@ -8,8 +8,15 @@
 // Gate state +1 selects the gate model (Director's Gate Libraries): 00 Gate, 01 Ducker / Ducker Slow, 02 Dual Expander, 03 Source Expander.
 // Recalling a library preset also rewrites the model's default parameters, so the model byte stays read-only.
 const IP_GATE_MODEL_LABELS=new Map([[0,'Gate'],[1,'Ducker'],[2,'Dual Expander'],[3,'Source Expander']]);
+// Threshold sits at +2..3 for Gate and Ducker but at +4..5 for Dual Expander and Source Expander (model sweeps, input 13).
+// Dual Expander also has a lower threshold (+6..7, −72…+10 dB) and a LIN switch (+12); Source Expander has a speed selector (+17: 0 Slow, 1 Medium, 2 Fast).
+// Director clamps: Gate/Ducker −72…+12, Dual upper −70…+12, Source −56…+12.
 const IP_GATE_THRESHOLD_MIN_DB=-72;
 const IP_GATE_THRESHOLD_MAX_DB=12;
+const IP_GATE_EXPANDER_MODELS=new Set([2,3]);
+const IP_GATE_THRESHOLD_MIN_BY_MODEL={0:-72,1:-72,2:-70,3:-56};
+const IP_GATE_LOWER_MIN_DB=-72,IP_GATE_LOWER_MAX_DB=10;
+const IP_GATE_SPEED_LABELS=new Map([[0,'Slow'],[1,'Medium'],[2,'Fast']]);
 const IP_GATE_DEPTH_MIN_DB=0;
 const IP_GATE_DEPTH_MAX_DB=60;
 const IP_TRIM_MIN_DB=-24;
@@ -58,10 +65,11 @@ function parseInputGates(dat){
     const label=`Gate, Input Channel ${String(channel).padStart(2,'0')}`;
     const r=ipParseRecord(dat,label,19);if(!r)continue;
     const s=r.stateStart;
-    const thresholdRaw=readI16BE(dat,s+2),depthRaw=readI16BE(dat,s+8);
+    const thrOff=IP_GATE_EXPANDER_MODELS.has(dat[s+1])?s+4:s+2;
+    const thresholdRaw=readI16BE(dat,thrOff),depthRaw=readI16BE(dat,s+8);
     const holdRaw=ipReadU16(dat,s+10),releaseRaw=ipReadU16(dat,s+13),attackRaw=ipReadU16(dat,s+15);
     const enableRaw=dat[s+18],writableShape=dat[s]===0x03&&(enableRaw===0||enableRaw===1);
-    out.push({...r,channel,discriminator:dat[s],modelRaw:dat[s+1],modelLabel:IP_GATE_MODEL_LABELS.get(dat[s+1])||`Unknown 0x${hexByte(dat[s+1])}`,thresholdOffset:s+2,thresholdRaw,thresholdDb:thresholdRaw/256,
+    out.push({...r,channel,discriminator:dat[s],modelRaw:dat[s+1],modelLabel:IP_GATE_MODEL_LABELS.get(dat[s+1])||`Unknown 0x${hexByte(dat[s+1])}`,thresholdOffset:thrOff,thresholdRaw,thresholdDb:thresholdRaw/256,lowerThresholdOffset:s+6,lowerThresholdDb:readI16BE(dat,s+6)/256,linOffset:s+12,lin:dat[s+12]===1,speedOffset:s+17,speedRaw:dat[s+17],
       depthOffset:s+8,depthRaw,depthDb:depthRaw/256,
       holdOffset:s+10,holdRaw,holdMs:ipTimeMsFromRaw(holdRaw),
       releaseOffset:s+13,releaseRaw,releaseMs:ipTimeMsFromRaw(releaseRaw),
@@ -138,10 +146,14 @@ function getInputStereoImage(channel){return ensureInputProcessing()?.stereoImag
 function getStageBoxAnalogueInput(socket){return ensureInputProcessing()?.analogueInputs?.find(x=>x.socket===Number(socket))||null;}
 
 function setInputGateActive(channel,on){const g=getInputGate(channel);if(!g?.writableShape)return false;const raw=on?1:0;state.current.stage.datBytes[g.enableOffset]=raw;g.enableRaw=raw;g.active=!!on;markStageDirty();return true;}
-function setInputGateThreshold(channel,db){const g=getInputGate(channel);if(!g?.writableShape)return false;let v=Number(db);if(!Number.isFinite(v))return false;v=Math.max(IP_GATE_THRESHOLD_MIN_DB,Math.min(IP_GATE_THRESHOLD_MAX_DB,v));const raw=Math.round(v*256);writeI16BE(state.current.stage.datBytes,g.thresholdOffset,raw);g.thresholdRaw=raw;g.thresholdDb=raw/256;markStageDirty();return true;}
+function setInputGateThreshold(channel,db){const g=getInputGate(channel);if(!g?.writableShape)return false;let v=Number(db);if(!Number.isFinite(v))return false;v=Math.max(IP_GATE_THRESHOLD_MIN_BY_MODEL[g.modelRaw]??IP_GATE_THRESHOLD_MIN_DB,Math.min(IP_GATE_THRESHOLD_MAX_DB,v));const raw=Math.round(v*256);writeI16BE(state.current.stage.datBytes,g.thresholdOffset,raw);g.thresholdRaw=raw;g.thresholdDb=raw/256;markStageDirty();return true;}
+function setInputGateLowerThreshold(channel,db){const g=getInputGate(channel);if(!g?.writableShape||g.modelRaw!==2)return false;let v=Number(db);if(!Number.isFinite(v))return false;v=Math.max(IP_GATE_LOWER_MIN_DB,Math.min(IP_GATE_LOWER_MAX_DB,v));const raw=Math.round(v*256);writeI16BE(state.current.stage.datBytes,g.lowerThresholdOffset,raw);g.lowerThresholdDb=raw/256;markStageDirty();return true;}
+function setInputGateLin(channel,on){const g=getInputGate(channel);if(!g?.writableShape||g.modelRaw!==2)return false;state.current.stage.datBytes[g.linOffset]=on?1:0;g.lin=!!on;markStageDirty();return true;}
+function setInputGateSpeed(channel,raw){const g=getInputGate(channel);raw=Number(raw);if(!g?.writableShape||g.modelRaw!==3||!IP_GATE_SPEED_LABELS.has(raw))return false;state.current.stage.datBytes[g.speedOffset]=raw;g.speedRaw=raw;markStageDirty();return true;}
 function setInputGateDepth(channel,db){const g=getInputGate(channel);if(!g?.writableShape)return false;let v=Number(db);if(!Number.isFinite(v))return false;v=Math.max(IP_GATE_DEPTH_MIN_DB,Math.min(IP_GATE_DEPTH_MAX_DB,v));const raw=Math.round(v*256);writeI16BE(state.current.stage.datBytes,g.depthOffset,raw);g.depthRaw=raw;g.depthDb=raw/256;markStageDirty();return true;}
 function setInputGateTime(channel,kind,msValue){
   const g=getInputGate(channel);if(!g?.writableShape)return false;let ms=Number(msValue);if(!Number.isFinite(ms))return false;
+  if(g.modelRaw===3||(IP_GATE_EXPANDER_MODELS.has(g.modelRaw)&&kind==='hold'))return false;
   const range=kind==='attack'?[IP_GATE_ATTACK_MIN_MS,IP_GATE_ATTACK_MAX_MS]:kind==='hold'?[IP_GATE_HOLD_MIN_MS,IP_GATE_HOLD_MAX_MS]:kind==='release'?[IP_GATE_RELEASE_MIN_MS,IP_GATE_RELEASE_MAX_MS]:null;if(!range)return false;
   ms=Math.max(range[0],Math.min(range[1],ms));const raw=ipTimeRawFromMs(ms);
   const off=kind==='attack'?g.attackOffset:kind==='hold'?g.holdOffset:g.releaseOffset;ipWriteU16(state.current.stage.datBytes,off,raw);
