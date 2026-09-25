@@ -5,6 +5,9 @@
 // validated before writes and time/routing values expose only directly tested
 // anchors/configurations where the continuous transform is not proven.
 
+// Gate state +1 selects the gate model (Director's Gate Libraries): 00 Gate, 01 Ducker / Ducker Slow, 02 Dual Expander, 03 Source Expander.
+// Recalling a library preset also rewrites the model's default parameters, so the model byte stays read-only.
+const IP_GATE_MODEL_LABELS=new Map([[0,'Gate'],[1,'Ducker'],[2,'Dual Expander'],[3,'Source Expander']]);
 const IP_GATE_THRESHOLD_MIN_DB=-72;
 const IP_GATE_THRESHOLD_MAX_DB=12;
 const IP_GATE_DEPTH_MIN_DB=0;
@@ -58,7 +61,7 @@ function parseInputGates(dat){
     const thresholdRaw=readI16BE(dat,s+2),depthRaw=readI16BE(dat,s+8);
     const holdRaw=ipReadU16(dat,s+10),releaseRaw=ipReadU16(dat,s+13),attackRaw=ipReadU16(dat,s+15);
     const enableRaw=dat[s+18],writableShape=dat[s]===0x03&&(enableRaw===0||enableRaw===1);
-    out.push({...r,channel,discriminator:dat[s],thresholdOffset:s+2,thresholdRaw,thresholdDb:thresholdRaw/256,
+    out.push({...r,channel,discriminator:dat[s],modelRaw:dat[s+1],modelLabel:IP_GATE_MODEL_LABELS.get(dat[s+1])||`Unknown 0x${hexByte(dat[s+1])}`,thresholdOffset:s+2,thresholdRaw,thresholdDb:thresholdRaw/256,
       depthOffset:s+8,depthRaw,depthDb:depthRaw/256,
       holdOffset:s+10,holdRaw,holdMs:ipTimeMsFromRaw(holdRaw),
       releaseOffset:s+13,releaseRaw,releaseMs:ipTimeMsFromRaw(releaseRaw),

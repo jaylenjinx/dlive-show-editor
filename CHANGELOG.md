@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Compressor and gate models**: recalled every preset in Director's Deep Compressor Libraries (12 presets, 11 models — all match the existing model labels) and Gate Libraries (Gate `00`, Ducker `01`, Dual Expander `02`, Source Expander `03`). The gate model is now decoded, shown in the Console UI and labelled in `dlive_re.py`. See `docs/compressor-gate-models.md`.
+
+## Unreleased
+
 - **Compressor ratio**: the editor and Console UI exposed only 7 of Director's ratios. `state +15` is a 41-step table (1:1 … ∞:1); every step was swept and is now writable for Manual RMS and Manual Peak. See `docs/reverse-engineer-ratio1.md`.
 
 ## v2.6
