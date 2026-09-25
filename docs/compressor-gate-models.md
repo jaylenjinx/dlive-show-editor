@@ -43,3 +43,16 @@ Changing a control on a recalled preset and diffing the scene gave these layouts
 - Threshold on the 16T/16VU/Mighty side panel is display-only (typing did not change any byte); CompStortion, PeakLimiter76 and OptTronik expose no typeable control, so their parameters need knob sweeps and are not mapped.
 
 The editor's Buses tab writes the Ducker fields and the output gain above. Other model parameters stay read-only.
+
+## Peak Limiter 76 (`06`) — knob positions only
+
+The plug-in GUI has no numeric readouts, so its controls were dragged to their end stops on input 13 and the changed bytes read back (scenes 300–308):
+
+| Control | Offset | End-stop values |
+|---|---|---|
+| Input knob | `+34` (int8) | min `D8` (−40), max `12` (+18); recalled default `FA` (−6) |
+| Output knob | `+36` (int8) | min `B0` (−80), max `12` (+18); default `06` |
+| Attack knob | `+28..29` (uint16) | min `A9E9`, max `C481`; default `B58D`… |
+| Release knob | `+30..31` (uint16) | min `73DD`, max `94E4` |
+
+Only end stops were captured. The int8 interpretation of Input/Output is the best fit to the values, not a proven dB scale, and the attack/release words do not fit the shared `time_log` coordinate (they decode to implausible milliseconds), so their unit is unknown. The ratio buttons (20/12/8/4/All), Gain Link, meter and Unit switches were not swept. The editor does not write any of these.
