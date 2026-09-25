@@ -311,7 +311,7 @@ def _known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> d
 
     if label.startswith("Gate, Input Channel"):
         fields = [
-            (2,3,"Gate threshold","i16_div256"),(8,9,"Gate depth","i16_div256"),
+            (1,1,"Gate model","enum"),(2,3,"Gate threshold","i16_div256"),(8,9,"Gate depth","i16_div256"),
             (10,11,"Gate hold","time_log"),(13,14,"Gate release","time_log"),
             (15,16,"Gate attack","time_log"),(18,18,"Gate On/Off","toggle_01_on"),
         ]

@@ -18,7 +18,7 @@ function renderGateConsole(root,gate){
   if(!gate){root.insertAdjacentHTML('beforeend','<div class="notice warn">No Gate record found for this input.</div>');return;}
   const shell=document.createElement('section');shell.className='dlive-console-frame gate-console';
   shell.innerHTML=`
-    <div class="console-section-head"><div><span class="console-kicker">INPUT GATE</span><strong>CH ${gate.channel}${channelName(gate.channel)?` · ${safeText(channelName(gate.channel))}`:''}</strong></div><div data-k="gate-toggle"></div></div>
+    <div class="console-section-head"><div><span class="console-kicker">INPUT GATE</span><strong>CH ${gate.channel}${channelName(gate.channel)?` · ${safeText(channelName(gate.channel))}`:''}</strong></div><div class="console-head-cluster"><span class="console-model">${safeText(gate.modelLabel)}</span><div data-k="gate-toggle"></div></div></div>
     <div class="console-gate-main">
       <section class="console-transfer-panel"><div class="console-subhead"><span>Transfer</span><span class="confidence verified">CONTROLLED-DIFF VERIFIED</span></div><svg class="console-gate-svg"></svg></section>
       <section class="console-gate-controls">

@@ -92,6 +92,34 @@ function setBusCompMakeup(bus,db){
 }
 function setBusCompKnee(bus,raw){raw=Number(raw);if(raw!==0&&raw!==1)return false;return busCompWriteBytes(bus,(d,s)=>{d[s+18]=raw;});}
 
+// ---- other compressor models (Director library presets; controlled changes on Main LR) ----
+// Ducker (model 05): threshold +8..9 (int16/256, −46…+18), attack +10..11, release +12..13, hold +25..26 (time_log),
+// depth +23..24 (int16/256, 0…60 dB). Gain (+16..17, int16/256) is the output gain on 16T (−18…+18), 16VU and Mighty (−10…+18).
+const BUS_DUCKER_MODEL=0x05;
+const BUS_GAIN_RANGES={0x03:[-18,18],0x04:[-10,18],0x07:[-10,18]};
+const BUS_DUCKER_LIMITS={attack:[0.03,300],hold:[10,5000],release:[50,2000],threshold:[-46,18],depth:[0,60]};
+function busOtherCompView(bus){
+  const dat=state.current.stage.datBytes,c=bus.rec.comp[0],s=c.stateStart;
+  if(c.stateLength!==127||dat[s]!==0x08)return null;
+  const model=dat[s+1],shape=dat[s+2]===0||dat[s+2]===1;if(!shape)return null;
+  if(model===BUS_DUCKER_MODEL)return {kind:'ducker',thresholdDb:readI16BE(dat,s+8)/256,attackMs:compTimeEstimateMs(readU16BE(dat,s+10)),releaseMs:compTimeEstimateMs(readU16BE(dat,s+12)),depthDb:readI16BE(dat,s+23)/256,holdMs:compTimeEstimateMs(readU16BE(dat,s+25))};
+  if(BUS_GAIN_RANGES[model])return {kind:'gain',range:BUS_GAIN_RANGES[model],gainDb:readI16BE(dat,s+16)/256};
+  return null;
+}
+function busOtherCompWrite(bus,fn){if(!busOtherCompView(bus))return false;const dat=state.current.stage.datBytes;for(const c of bus.rec.comp)fn(dat,c.stateStart);markStageDirty();return true;}
+function setBusDucker(bus,field,value){
+  const v=busOtherCompView(bus);if(v?.kind!=='ducker')return false;const x=Number(value);if(!Number.isFinite(x))return false;
+  const [lo,hi]=BUS_DUCKER_LIMITS[field],c=Math.max(lo,Math.min(hi,x));
+  if(field==='threshold'){const raw=Math.round(c*256);return busOtherCompWrite(bus,(d,s)=>writeI16BE(d,s+8,raw));}
+  if(field==='depth'){const raw=Math.round(c*256);return busOtherCompWrite(bus,(d,s)=>writeI16BE(d,s+23,raw));}
+  const raw=compTimeRawFromMs(c),off={attack:10,release:12,hold:25}[field];
+  return busOtherCompWrite(bus,(d,s)=>writeU16BE(d,s+off,raw));
+}
+function setBusModelGain(bus,db){
+  const v=busOtherCompView(bus);if(v?.kind!=='gain')return false;const x=Number(db);if(!Number.isFinite(x))return false;
+  const raw=Math.round(Math.max(v.range[0],Math.min(v.range[1],x))*256);return busOtherCompWrite(bus,(d,s)=>writeI16BE(d,s+16,raw));
+}
+
 // ---- PEQ (state: count byte, 4 × [gain i16, freq u16, width u16, 3 state bytes], bypass byte) ----
 function busPeqView(bus){
   const p=bus.rec.peq[0];if(!p)return null;const dat=state.current.stage.datBytes,s=p.stateStart;
@@ -150,6 +178,23 @@ function renderBuses(){
       ${busField('Gain',`${COMP_MAKEUP_MIN_VERIFIED_DB}…${COMP_MAKEUP_MAX_VERIFIED_DB} dB`,`<input data-k="gain" type="number" step="0.1" min="${COMP_MAKEUP_MIN_VERIFIED_DB}" max="${COMP_MAKEUP_MAX_VERIFIED_DB}"><b>dB</b>`)}
       ${busField('Knee','',`<select data-k="knee"><option value="0">Normal</option><option value="1">Soft</option></select>`)}`;
     body.appendChild(compPanel);
+    const oc=c.writable?null:busOtherCompView(bus);
+    if(oc){
+      const op=document.createElement('section');op.className='panel';
+      op.innerHTML=oc.kind==='ducker'
+        ?`<div class="manager-head inline"><h2>${escapeHtml(bus.title)} ducker</h2><span class="confidence verified">VERIFIED WRITE</span></div>
+          ${['attack','hold','release'].map(k=>busField(k[0].toUpperCase()+k.slice(1),`${BUS_DUCKER_LIMITS[k][0]}…${BUS_DUCKER_LIMITS[k][1]} ms`,`<input data-k="dk-${k}" type="number" step="0.1" min="${BUS_DUCKER_LIMITS[k][0]}" max="${BUS_DUCKER_LIMITS[k][1]}"><b>ms</b>`)).join('')}
+          ${busField('Threshold','−46…+18 dB',`<input data-k="dk-threshold" type="number" step="0.1" min="-46" max="18"><b>dB</b>`)}
+          ${busField('Depth','0…60 dB',`<input data-k="dk-depth" type="number" step="0.1" min="0" max="60"><b>dB</b>`)}`
+        :`<div class="manager-head inline"><h2>${escapeHtml(bus.title)} ${escapeHtml(compressorModelLabel(c.model))} gain</h2><span class="confidence verified">VERIFIED WRITE</span></div>
+          ${busField('Output gain',`${oc.range[0]}…${oc.range[1]} dB`,`<input data-k="mg" type="number" step="0.1" min="${oc.range[0]}" max="${oc.range[1]}"><b>dB</b>`)}`;
+      body.appendChild(op);
+      const oq=k=>op.querySelector(`[data-k="${k}"]`);
+      if(oc.kind==='ducker'){
+        const vals={attack:oc.attackMs,hold:oc.holdMs,release:oc.releaseMs,threshold:oc.thresholdDb,depth:oc.depthDb};
+        for(const k of Object.keys(vals)){oq(`dk-${k}`).value=String(Number(vals[k].toPrecision(4)));oq(`dk-${k}`).onchange=()=>redraw(setBusDucker(bus,k,oq(`dk-${k}`).value));}
+      }else{oq('mg').value=oc.gainDb.toFixed(2);oq('mg').onchange=()=>redraw(setBusModelGain(bus,oq('mg').value));}
+    }
     const q=k=>compPanel.querySelector(`[data-k="${k}"]`);
     q('on').value=c.active?'1':'0';q('thr').value=c.thresholdDb.toFixed(2);
     if(COMP_RATIO_RAW_TO_LABEL.has(c.ratioRaw))q('ratio').value=String(c.ratioRaw);else{const o=document.createElement('option');o.value='';o.textContent=`Raw 0x${hexByte(c.ratioRaw)}`;o.selected=true;q('ratio').prepend(o);}

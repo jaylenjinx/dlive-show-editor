@@ -5,7 +5,7 @@
 const COMP_MANUAL_PEAK_MODEL=0x00;
 const COMP_MP_THRESHOLD_MIN_DB=-40;
 const COMP_MP_THRESHOLD_MAX_DB=0;
-const COMP_MP_RATIO_RAW_TO_LABEL=new Map([[0x10,'2:1'],[0x26,'20:1']]);
+const COMP_MP_RATIO_RAW_TO_LABEL=COMP_RATIO_RAW_TO_LABEL; // Manual Peak uses the same 41-entry table (2:1=10, 20:1=26 cross-checked)
 const COMP_MP_ATTACK_RAW_TO_MS=new Map([[0x2261,0.03],[0x745E,100]]);
 const COMP_MP_RELEASE_RAW_TO_MS=new Map([[0x6D5C,50],[0x8BA3,1000]]);
 const COMP_MP_GAIN_MIN_DB=0;
