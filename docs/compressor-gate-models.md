@@ -38,11 +38,11 @@ Threshold (`+2..3`), depth (`+8..9`), hold (`+10..11`), release (`+13..14`), att
 Changing a control on a recalled preset and diffing the scene gave these layouts (same coordinates as the input compressor):
 
 - **Ducker (`05`)**: threshold `+8..9` (int16/256, −46…+18 dB), attack `+10..11` (30 µs…300 ms), release `+12..13` (50 ms…2 s), hold `+25..26` (10 ms…5 s) — all `time_log` for the times — and depth `+23..24` (int16/256, 0…60 dB). Values written match the anchors exactly (e.g. 10 ms → `5D18`, 100 ms → `745E`, 500 ms → `84A2`).
-- **Output gain `+16..17`** (int16/256): 16T (`03`, −18…+18 dB), 16VU (`04`) and Mighty (`07`) (both −10…+18 dB).
+- **Output gain `+16..17`** (int16/256, −18…+18 dB) on 16T (`03`), 16VU (`04`, labelled Gain) and Mighty (`07`). (An earlier note gave −10 for the low end; the knob sweeps show −18 — the typed readout was misread.)
 - **Ratio**: 16T and 16VU store ratio at `+15` but in their own tables (16T: 2:1 → `08`, 6:1 → `19`; 16VU: 2:1 → `06`, 6:1 → `1C`), not the 41-step Manual RMS/Peak table.
 - Threshold on the 16T/16VU/Mighty side panel is display-only (typing did not change any byte); CompStortion, PeakLimiter76 and OptTronik expose no typeable control, so their parameters need knob sweeps and are not mapped.
 
-The editor's Buses tab writes the Ducker fields and the output gain above. Other model parameters stay read-only.
+The editor's Buses tab writes the Ducker fields and the controls in the tables below.
 
 ## Peak Limiter 76 (`06`) — knob sweeps (scenes 300–359, input 13)
 
@@ -60,3 +60,34 @@ The plug-in GUI has no numeric readouts, so knobs were dragged to their end stop
 | GR / OUT / OUT+8 meter buttons | — | change no scene byte |
 
 The attack/release words fit the shared `time_log` coordinate exactly at both ends (attack 19 980 ns, release 95.1 ms), which is why they are treated as continuous. The dB meaning of the Input/Output bytes is inferred from the printed knob scales, not read from a display. The Buses tab writes these controls, flagged "end stops swept".
+
+## Knob-swept models (`RevEngModels`, input 13, scenes 300–494)
+
+Each knob was dragged to its minimum, stepped up six times, then dragged to its maximum; each button was clicked once. Ranges below are the swept end stops. No model except those above has on-screen numeric readouts, so scales between the end stops are the raw coordinate, not verified detents.
+
+| Model | Control | Offset | Finding |
+|---|---|---|---|
+| 16T (`03`) | Threshold | `+8..9` | int16/256, −46…+18 dB (exactly the printed scale) |
+| | Ratio knob | `+15` | continuous 0…40 (own table; `08` ≈ 2:1, `19` ≈ 6:1 from typed entries) |
+| | Output | `+16..17` | int16/256, −18…+18 dB |
+| | Knee | `+18` | `00`/`01` |
+| 16VU (`04`) | Threshold | `+8..9` | int16/256, −46…+18 dB |
+| | Compression knob | `+15` | continuous 0…40 (`06` ≈ 2:1, `1C` ≈ 6:1) |
+| | Gain | `+16..17` | int16/256, −18…+18 dB |
+| Mighty (`07`) | Threshold | `+39..40` | int16/256, −36…+18 |
+| | Release | `+41..42` | `time_log` word in ms, ~5 ms…1.4 s (the printed 0.05–5 "sec/20dB" scale is not the same units) |
+| | Output | `+16..17` | int16/256, −18…+18 dB |
+| | Detector pk/avg | `+38` | `00`/`01` |
+| OptTronik (`08`) | Peak reduction | `+47` | 0…100 |
+| | Gain | `+49` | 0…100 |
+| | Limit / Compress | `+45` | `00`/`01` |
+| | Unit A/B | `+33` | `00`/`01` |
+| CompStortion (`0A`) | Ratio buttons | `+58` | 0 2:1, 1 3:1, 2 4:1, 3 6:1, 4 10:1, 5 20:1, 6 Smash, 7 Brit |
+| | Attack | `+60` | 0…100 |
+| | Release | `+62` | 0…100 |
+| | Input | `+63..64` | int16/256, −66…+15.5 dB |
+| | Output | `+65..66` | int16/256, −75…+30 dB |
+| | Distortion button | `+67` | `00`/`01` |
+| | Detector button | `+68` | `00`/`01` (also changes SC filter bytes `+107..117`) |
+
+Not mapped: OptTronik's Emphasis selector (`+44`, moves a group of side-chain bytes), its Output +4/+10 switch (no scene change found), and the 16T *In* button (no scene change).

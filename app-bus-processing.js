@@ -94,16 +94,14 @@ function setBusCompKnee(bus,raw){raw=Number(raw);if(raw!==0&&raw!==1)return fals
 
 // ---- other compressor models (Director library presets; controlled changes on Main LR) ----
 // Ducker (model 05): threshold +8..9 (int16/256, −46…+18), attack +10..11, release +12..13, hold +25..26 (time_log),
-// depth +23..24 (int16/256, 0…60 dB). Gain (+16..17, int16/256) is the output gain on 16T (−18…+18), 16VU and Mighty (−10…+18).
+// depth +23..24 (int16/256, 0…60 dB).
 const BUS_DUCKER_MODEL=0x05;
-const BUS_GAIN_RANGES={0x03:[-18,18],0x04:[-10,18],0x07:[-10,18]};
 const BUS_DUCKER_LIMITS={attack:[0.03,300],hold:[10,5000],release:[50,2000],threshold:[-46,18],depth:[0,60]};
 function busOtherCompView(bus){
   const dat=state.current.stage.datBytes,c=bus.rec.comp[0],s=c.stateStart;
   if(c.stateLength!==127||dat[s]!==0x08)return null;
   const model=dat[s+1],shape=dat[s+2]===0||dat[s+2]===1;if(!shape)return null;
   if(model===BUS_DUCKER_MODEL)return {kind:'ducker',thresholdDb:readI16BE(dat,s+8)/256,attackMs:compTimeEstimateMs(readU16BE(dat,s+10)),releaseMs:compTimeEstimateMs(readU16BE(dat,s+12)),depthDb:readI16BE(dat,s+23)/256,holdMs:compTimeEstimateMs(readU16BE(dat,s+25))};
-  if(BUS_GAIN_RANGES[model])return {kind:'gain',range:BUS_GAIN_RANGES[model],gainDb:readI16BE(dat,s+16)/256};
   return null;
 }
 function busOtherCompWrite(bus,fn){if(!busOtherCompView(bus))return false;const dat=state.current.stage.datBytes;for(const c of bus.rec.comp)fn(dat,c.stateStart);markStageDirty();return true;}
@@ -115,9 +113,31 @@ function setBusDucker(bus,field,value){
   const raw=compTimeRawFromMs(c),off={attack:10,release:12,hold:25}[field];
   return busOtherCompWrite(bus,(d,s)=>writeU16BE(d,s+off,raw));
 }
-function setBusModelGain(bus,db){
-  const v=busOtherCompView(bus);if(v?.kind!=='gain')return false;const x=Number(db);if(!Number.isFinite(x))return false;
-  const raw=Math.round(Math.max(v.range[0],Math.min(v.range[1],x))*256);return busOtherCompWrite(bus,(d,s)=>writeI16BE(d,s+16,raw));
+// ---- knob-swept models: 16T (03), 16VU (04), Mighty (07), OptTronik (08), CompStortion (0A) ----
+// Offsets and end-stop ranges from knob/button sweeps on input 13 (no on-screen readouts, so ranges are the swept end stops).
+// kind: i16 = int16/256 dB, u8 = byte, time = time_log word (ms), bool = 00/01, enum = listed values.
+const BUS_MODEL_CONTROLS={
+  0x03:[{k:'thr',l:'Threshold',off:8,kind:'i16',min:-46,max:18,u:'dB'},{k:'ratio',l:'Ratio knob position',off:15,kind:'u8',min:0,max:40},{k:'out',l:'Output',off:16,kind:'i16',min:-18,max:18,u:'dB'},{k:'knee',l:'Knee',off:18,kind:'bool'}],
+  0x04:[{k:'thr',l:'Threshold',off:8,kind:'i16',min:-46,max:18,u:'dB'},{k:'ratio',l:'Compression knob position',off:15,kind:'u8',min:0,max:40},{k:'gain',l:'Gain',off:16,kind:'i16',min:-18,max:18,u:'dB'}],
+  0x07:[{k:'thr',l:'Threshold',off:39,kind:'i16',min:-36,max:18,u:'dBv'},{k:'rel',l:'Release (time_log word)',off:41,kind:'time',min:5,max:1400,u:'ms'},{k:'out',l:'Output',off:16,kind:'i16',min:-18,max:18,u:'dB'},{k:'det',l:'Detector avg',off:38,kind:'bool'}],
+  0x08:[{k:'peak',l:'Peak reduction',off:47,kind:'u8',min:0,max:100},{k:'gain',l:'Gain',off:49,kind:'u8',min:0,max:100},{k:'limit',l:'Limit (off = Compress)',off:45,kind:'bool'},{k:'unit',l:'Unit B',off:33,kind:'bool'}],
+  0x0A:[{k:'ratio',l:'Ratio',off:58,kind:'enum',opts:[[0,'2:1'],[1,'3:1'],[2,'4:1'],[3,'6:1'],[4,'10:1'],[5,'20:1'],[6,'Smash'],[7,'Brit']]},{k:'att',l:'Attack',off:60,kind:'u8',min:0,max:100},{k:'rel',l:'Release',off:62,kind:'u8',min:0,max:100},{k:'in',l:'Input',off:63,kind:'i16',min:-66,max:15.5,u:'dB'},{k:'out',l:'Output',off:65,kind:'i16',min:-75,max:30,u:'dB'},{k:'dist',l:'Distortion',off:67,kind:'bool'},{k:'det',l:'Detector',off:68,kind:'bool'}],
+};
+function busModelView(bus){
+  const dat=state.current.stage.datBytes,c=bus.rec.comp[0],s=c.stateStart;
+  if(c.stateLength!==127||dat[s]!==0x08)return null;const list=BUS_MODEL_CONTROLS[dat[s+1]];if(!list)return null;
+  return {model:dat[s+1],list,values:Object.fromEntries(list.map(d=>[d.k,d.kind==='i16'?readI16BE(dat,s+d.off)/256:d.kind==='time'?compTimeEstimateMs(readU16BE(dat,s+d.off)):dat[s+d.off]]))};
+}
+function setBusModelControl(bus,key,value){
+  const v=busModelView(bus);const d=v?.list.find(x=>x.k===key);if(!d)return false;const x=Number(value);if(!Number.isFinite(x))return false;
+  const dat=state.current.stage.datBytes;let apply;
+  if(d.kind==='i16'){const r=Math.round(Math.max(d.min,Math.min(d.max,x))*256);apply=(b,s)=>writeI16BE(b,s+d.off,r);}
+  else if(d.kind==='time'){const r=compTimeRawFromMs(Math.max(d.min,Math.min(d.max,x)));apply=(b,s)=>writeU16BE(b,s+d.off,r);}
+  else if(d.kind==='u8'){const r=Math.round(Math.max(d.min,Math.min(d.max,x)));apply=(b,s)=>{b[s+d.off]=r;};}
+  else if(d.kind==='bool'){const r=x?1:0;apply=(b,s)=>{b[s+d.off]=r;};}
+  else if(d.kind==='enum'){if(!d.opts.some(o=>o[0]===x))return false;apply=(b,s)=>{b[s+d.off]=x;};}
+  else return false;
+  for(const c of bus.rec.comp)apply(dat,c.stateStart);markStageDirty();return true;
 }
 
 // ---- Peak Limiter 76 (model 06) ----
@@ -226,33 +246,24 @@ function renderBuses(){
     const oc=c.writable||pl?null:busOtherCompView(bus);
     if(oc){
       const op=document.createElement('section');op.className='panel';
-      op.innerHTML=oc.kind==='ducker'
-        ?`<div class="manager-head inline"><h2>${escapeHtml(bus.title)} ducker</h2><span class="confidence verified">VERIFIED WRITE</span></div>
+      op.innerHTML=`<div class="manager-head inline"><h2>${escapeHtml(bus.title)} ducker</h2><span class="confidence verified">VERIFIED WRITE</span></div>
           ${['attack','hold','release'].map(k=>busField(k[0].toUpperCase()+k.slice(1),`${BUS_DUCKER_LIMITS[k][0]}…${BUS_DUCKER_LIMITS[k][1]} ms`,`<input data-k="dk-${k}" type="number" step="0.1" min="${BUS_DUCKER_LIMITS[k][0]}" max="${BUS_DUCKER_LIMITS[k][1]}"><b>ms</b>`)).join('')}
           ${busField('Threshold','−46…+18 dB',`<input data-k="dk-threshold" type="number" step="0.1" min="-46" max="18"><b>dB</b>`)}
-          ${busField('Depth','0…60 dB',`<input data-k="dk-depth" type="number" step="0.1" min="0" max="60"><b>dB</b>`)}`
-        :`<div class="manager-head inline"><h2>${escapeHtml(bus.title)} ${escapeHtml(compressorModelLabel(c.model))} gain</h2><span class="confidence verified">VERIFIED WRITE</span></div>
-          ${busField('Output gain',`${oc.range[0]}…${oc.range[1]} dB`,`<input data-k="mg" type="number" step="0.1" min="${oc.range[0]}" max="${oc.range[1]}"><b>dB</b>`)}`;
+          ${busField('Depth','0…60 dB',`<input data-k="dk-depth" type="number" step="0.1" min="0" max="60"><b>dB</b>`)}`;
       body.appendChild(op);
       const oq=k=>op.querySelector(`[data-k="${k}"]`);
-      if(oc.kind==='ducker'){
-        const vals={attack:oc.attackMs,hold:oc.holdMs,release:oc.releaseMs,threshold:oc.thresholdDb,depth:oc.depthDb};
-        for(const k of Object.keys(vals)){oq(`dk-${k}`).value=String(Number(vals[k].toPrecision(4)));oq(`dk-${k}`).onchange=()=>redraw(setBusDucker(bus,k,oq(`dk-${k}`).value));}
-      }else{oq('mg').value=oc.gainDb.toFixed(2);oq('mg').onchange=()=>redraw(setBusModelGain(bus,oq('mg').value));}
+      const vals={attack:oc.attackMs,hold:oc.holdMs,release:oc.releaseMs,threshold:oc.thresholdDb,depth:oc.depthDb};
+      for(const k of Object.keys(vals)){oq(`dk-${k}`).value=String(Number(vals[k].toPrecision(4)));oq(`dk-${k}`).onchange=()=>redraw(setBusDucker(bus,k,oq(`dk-${k}`).value));}
     }
-    const q=k=>compPanel.querySelector(`[data-k="${k}"]`);
-    q('on').value=c.active?'1':'0';q('thr').value=c.thresholdDb.toFixed(2);
-    if(COMP_RATIO_RAW_TO_LABEL.has(c.ratioRaw))q('ratio').value=String(c.ratioRaw);else{const o=document.createElement('option');o.value='';o.textContent=`Raw 0x${hexByte(c.ratioRaw)}`;o.selected=true;q('ratio').prepend(o);}
-    q('att').value=String(Number(compTimeEstimateMs(c.attackRaw).toPrecision(4)));q('rel').value=String(Number(compTimeEstimateMs(c.releaseRaw).toPrecision(4)));
-    q('gain').value=c.makeupDb.toFixed(2);q('knee').value=String(c.kneeRaw===1?1:0);
-    if(!c.writable)for(const el of compPanel.querySelectorAll('select,input'))el.disabled=true;
-    q('on').onchange=()=>redraw(setBusCompActive(bus,q('on').value==='1'));
-    q('thr').onchange=()=>redraw(setBusCompThreshold(bus,q('thr').value));
-    q('ratio').onchange=()=>redraw(q('ratio').value!==''&&setBusCompRatio(bus,q('ratio').value));
-    q('att').onchange=()=>redraw(setBusCompTime(bus,'attack',q('att').value));
-    q('rel').onchange=()=>redraw(setBusCompTime(bus,'release',q('rel').value));
-    q('gain').onchange=()=>redraw(setBusCompMakeup(bus,q('gain').value));
-    q('knee').onchange=()=>redraw(setBusCompKnee(bus,q('knee').value));
+    const mv=c.writable||pl||oc?null:busModelView(bus);
+    if(mv){
+      const mp=document.createElement('section');mp.className='panel';
+      mp.innerHTML=`<div class="manager-head inline"><h2>${escapeHtml(bus.title)} ${escapeHtml(compressorModelLabel(mv.model))}</h2><span class="confidence decoded">END STOPS SWEPT</span></div>
+        <div class="notice warn">This model has no numeric readouts in Director. Ranges are the swept knob end stops; values between them are the continuous coordinate, not verified detents. Controls not listed here are unmapped.</div>
+        ${mv.list.map(d=>busField(d.l,d.kind==='bool'?'':d.kind==='enum'?'':`${d.min}…${d.max}${d.u?' '+d.u:''}`,d.kind==='bool'?`<select data-k="m-${d.k}"><option value="0">Off</option><option value="1">On</option></select>`:d.kind==='enum'?`<select data-k="m-${d.k}">${d.opts.map(([r,l])=>`<option value="${r}">${l}</option>`).join('')}</select>`:`<input data-k="m-${d.k}" type="number" step="${d.kind==='u8'?1:0.1}" min="${d.min}" max="${d.max}">`)).join('')}`;
+      body.appendChild(mp);
+      for(const d of mv.list){const el=mp.querySelector(`[data-k="m-${d.k}"]`),val=mv.values[d.k];el.value=d.kind==='bool'||d.kind==='enum'||d.kind==='u8'?String(val):String(Number(val.toPrecision(4)));el.onchange=()=>redraw(setBusModelControl(bus,d.k,el.value));}
+    }
 
     const peqPanel=document.createElement('section');peqPanel.className='panel';
     if(peq){
