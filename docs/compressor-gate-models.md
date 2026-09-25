@@ -44,15 +44,19 @@ Changing a control on a recalled preset and diffing the scene gave these layouts
 
 The editor's Buses tab writes the Ducker fields and the output gain above. Other model parameters stay read-only.
 
-## Peak Limiter 76 (`06`) — knob positions only
+## Peak Limiter 76 (`06`) — knob sweeps (scenes 300–359, input 13)
 
-The plug-in GUI has no numeric readouts, so its controls were dragged to their end stops on input 13 and the changed bytes read back (scenes 300–308):
+The plug-in GUI has no numeric readouts, so knobs were dragged to their end stops and stepped, and buttons clicked one at a time, reading the changed bytes.
 
-| Control | Offset | End-stop values |
+| Control | Offset | Finding |
 |---|---|---|
-| Input knob | `+34` (int8) | min `D8` (−40), max `12` (+18); recalled default `FA` (−6) |
-| Output knob | `+36` (int8) | min `B0` (−80), max `12` (+18); default `06` |
-| Attack knob | `+28..29` (uint16) | min `A9E9`, max `C481`; default `B58D`… |
-| Release knob | `+30..31` (uint16) | min `73DD`, max `94E4` |
+| Input knob | `+34` (int8) | continuous, −40…+18 (`D8`…`12`); steps seen `DA, EE, F8, FF, 06, 0D, 10, 12` |
+| Output knob | `+36` (int8) | −80 (`B0`, the ∞ end)…+18 |
+| Attack knob | `+28..29` | `time_log` word in **nanoseconds**: `A9E9` = 20 µs … `C481` = 277.5 µs (stepping the knob gave a smooth monotonic sequence) |
+| Release knob | `+30..31` | `time_log` word in ms: `73DD` = 95 ms … `94E4` = 2497 ms |
+| Ratio buttons | `+27` | `00` All, `01` 4, `02` 8, `03` 12, `04` 20 |
+| Gain Link | `+32` | `00`/`01` |
+| Unit switch | `+33` | `00` = unit 1, `01` = unit 2 |
+| GR / OUT / OUT+8 meter buttons | — | change no scene byte |
 
-Only end stops were captured. The int8 interpretation of Input/Output is the best fit to the values, not a proven dB scale, and the attack/release words do not fit the shared `time_log` coordinate (they decode to implausible milliseconds), so their unit is unknown. The ratio buttons (20/12/8/4/All), Gain Link, meter and Unit switches were not swept. The editor does not write any of these.
+The attack/release words fit the shared `time_log` coordinate exactly at both ends (attack 19 980 ns, release 95.1 ms), which is why they are treated as continuous. The dB meaning of the Input/Output bytes is inferred from the printed knob scales, not read from a display. The Buses tab writes these controls, flagged "end stops swept".

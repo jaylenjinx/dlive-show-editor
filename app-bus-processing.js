@@ -120,6 +120,33 @@ function setBusModelGain(bus,db){
   const raw=Math.round(Math.max(v.range[0],Math.min(v.range[1],x))*256);return busOtherCompWrite(bus,(d,s)=>writeI16BE(d,s+16,raw));
 }
 
+// ---- Peak Limiter 76 (model 06) ----
+// Knob sweeps on input 13: Input +34 and Output +36 are signed bytes (Input −40…+18, Output −80 (∞)…+18), Attack +28..29 is a
+// time_log word in nanoseconds (20…277.5 µs), Release +30..31 a time_log word in ms (95…2497 ms), Ratio +27 (00 All, 01 4, 02 8,
+// 03 12, 04 20), Gain Link +32, Unit +33 (01 = unit 2, 00 = unit 1).
+const BUS_PL76_MODEL=0x06;
+const BUS_PL76_RATIOS=new Map([[0,'All'],[1,'4'],[2,'8'],[3,'12'],[4,'20']]);
+const BUS_PL76_LIMITS={input:[-40,18],output:[-80,18],attack:[19.98,277.5],release:[95.1,2497]};
+function busPl76View(bus){
+  const dat=state.current.stage.datBytes,c=bus.rec.comp[0],s=c.stateStart;
+  if(c.stateLength!==127||dat[s]!==0x08||dat[s+1]!==BUS_PL76_MODEL)return null;
+  const i8=b=>b>127?b-256:b;
+  return {input:i8(dat[s+34]),output:i8(dat[s+36]),attackUs:Math.pow(10,(readU16BE(dat,s+28)-17874)/5958)/1000,releaseMs:compTimeEstimateMs(readU16BE(dat,s+30)),ratio:dat[s+27],link:dat[s+32]===1,unit2:dat[s+33]===1};
+}
+function busPl76Write(bus,fn){if(!busPl76View(bus))return false;const dat=state.current.stage.datBytes;for(const c of bus.rec.comp)fn(dat,c.stateStart);markStageDirty();return true;}
+function setBusPl76(bus,field,value){
+  const x=Number(value);if(field!=='link'&&field!=='unit2'&&!Number.isFinite(x))return false;
+  const clamp=k=>Math.max(BUS_PL76_LIMITS[k][0],Math.min(BUS_PL76_LIMITS[k][1],x));
+  if(field==='input'){const v=Math.round(clamp('input'))&255;return busPl76Write(bus,(d,s)=>{d[s+34]=v;});}
+  if(field==='output'){const v=Math.round(clamp('output'))&255;return busPl76Write(bus,(d,s)=>{d[s+36]=v;});}
+  if(field==='attack'){const raw=Math.round(17874+5958*Math.log10(clamp('attack')*1000));return busPl76Write(bus,(d,s)=>writeU16BE(d,s+28,raw));}
+  if(field==='release'){const raw=compTimeRawFromMs(clamp('release'));return busPl76Write(bus,(d,s)=>writeU16BE(d,s+30,raw));}
+  if(field==='ratio'){if(!BUS_PL76_RATIOS.has(x))return false;return busPl76Write(bus,(d,s)=>{d[s+27]=x;});}
+  if(field==='link')return busPl76Write(bus,(d,s)=>{d[s+32]=value?1:0;});
+  if(field==='unit2')return busPl76Write(bus,(d,s)=>{d[s+33]=value?1:0;});
+  return false;
+}
+
 // ---- PEQ (state: count byte, 4 × [gain i16, freq u16, width u16, 3 state bytes], bypass byte) ----
 function busPeqView(bus){
   const p=bus.rec.peq[0];if(!p)return null;const dat=state.current.stage.datBytes,s=p.stateStart;
@@ -178,7 +205,25 @@ function renderBuses(){
       ${busField('Gain',`${COMP_MAKEUP_MIN_VERIFIED_DB}…${COMP_MAKEUP_MAX_VERIFIED_DB} dB`,`<input data-k="gain" type="number" step="0.1" min="${COMP_MAKEUP_MIN_VERIFIED_DB}" max="${COMP_MAKEUP_MAX_VERIFIED_DB}"><b>dB</b>`)}
       ${busField('Knee','',`<select data-k="knee"><option value="0">Normal</option><option value="1">Soft</option></select>`)}`;
     body.appendChild(compPanel);
-    const oc=c.writable?null:busOtherCompView(bus);
+    const pl=c.writable?null:busPl76View(bus);
+    if(pl){
+      const pp=document.createElement('section');pp.className='panel';
+      pp.innerHTML=`<div class="manager-head inline"><h2>${escapeHtml(bus.title)} Peak Limiter 76</h2><span class="confidence decoded">END STOPS SWEPT</span></div>
+        <div class="notice warn">Knob scales were inferred from end-stop and step sweeps (no on-screen readouts); values between are the continuous coordinate, not verified detents.</div>
+        ${busField('Input','signed byte −40…+18',`<input data-k="pl-input" type="number" step="1" min="-40" max="18">`)}
+        ${busField('Output','signed byte −80 (∞)…+18',`<input data-k="pl-output" type="number" step="1" min="-80" max="18">`)}
+        ${busField('Attack','20–277.5 µs',`<input data-k="pl-attack" type="number" step="0.1" min="19.98" max="277.5"><b>µs</b>`)}
+        ${busField('Release','95–2497 ms',`<input data-k="pl-release" type="number" step="1" min="95.1" max="2497"><b>ms</b>`)}
+        ${busField('Ratio','',`<select data-k="pl-ratio">${[...BUS_PL76_RATIOS].map(([r,l])=>`<option value="${r}">${l}</option>`).join('')}</select>`)}
+        ${busField('Gain link','',`<select data-k="pl-link"><option value="0">Off</option><option value="1">On</option></select>`)}
+        ${busField('Unit','',`<select data-k="pl-unit"><option value="0">1</option><option value="1">2</option></select>`)}`;
+      body.appendChild(pp);const pq=k=>pp.querySelector(`[data-k="${k}"]`);
+      pq('pl-input').value=String(pl.input);pq('pl-output').value=String(pl.output);pq('pl-attack').value=pl.attackUs.toFixed(1);pq('pl-release').value=String(Math.round(pl.releaseMs));
+      pq('pl-ratio').value=String(pl.ratio);pq('pl-link').value=pl.link?'1':'0';pq('pl-unit').value=pl.unit2?'1':'0';
+      for(const [k,f] of [['pl-input','input'],['pl-output','output'],['pl-attack','attack'],['pl-release','release'],['pl-ratio','ratio']])pq(k).onchange=()=>redraw(setBusPl76(bus,f,pq(k).value));
+      pq('pl-link').onchange=()=>redraw(setBusPl76(bus,'link',pq('pl-link').value==='1'));pq('pl-unit').onchange=()=>redraw(setBusPl76(bus,'unit2',pq('pl-unit').value==='1'));
+    }
+    const oc=c.writable||pl?null:busOtherCompView(bus);
     if(oc){
       const op=document.createElement('section');op.className='panel';
       op.innerHTML=oc.kind==='ducker'
