@@ -80,7 +80,8 @@ const softKeyEntry={
 
 function setSoftKeys(list){
   const surface=state.current?.surface;if(!surface)return false;
-  const sk=parseSoftKeys(surface.datBytes);if(!sk||!sk.valid)return false;
+  // The whole record is replaced, so it is rewritable even when it holds functions this module cannot parse.
+  const sk=softkeyFind(surface.datBytes);if(!sk)return false;
   const entries=Array.from({length:SOFTKEY_COUNT},(_,i)=>list[i]||softKeyEntry.unused());
   if(entries.some(e=>!SOFTKEY_ENTRY_LEN[e[0]]||SOFTKEY_ENTRY_LEN[e[0]]!==e.length))return false;
   const label=asciiBytes(SOFTKEY_LABEL);
