@@ -58,6 +58,12 @@ class CheckerTests(unittest.TestCase):
         self.assertEqual(dl.known_field(rec,1,2,bytes(3))['name'],'Direct out level')
         g=dl.Record(0,2,20,'Global Direct Outputs',20,26)
         self.assertEqual(dl.known_field(g,1,1,bytes(6))['name'],'Global direct-out source')
+    def test_bus_record_labels_reuse_input_layouts(self):
+        for label,rel,name in [('Compressor, Mono Aux Channel 01',(15,15),'Mono Aux 1 Compressor ratio'),
+                               ('Parametric EQ, Stereo Group Channel 03 Left',(3,4),'Stereo Group 3 Left PEQ band 1 frequency'),
+                               ('Mix Delay, Mono Matrix Channel 01',(1,2),'Mono Matrix 1 Input delay')]:
+            rec=dl.Record(0,2,50,label+' ',20,60)
+            self.assertEqual(dl.known_field(rec,rel[0],rel[1],bytes(80))['name'],name)
 
     def test_decode_mixconfig(self):
         a=dl.decode_mixconfig(bytes.fromhex('01 02 07 06 03 04 05 01 01 01 08 02 17'))
