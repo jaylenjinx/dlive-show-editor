@@ -32,7 +32,7 @@ RECORD_LABEL_RE = re.compile(
     r"(Name Colour Manager|AHFX Manager|Parametric EQ|Graphic EQ|Compressor|Gate|Delay|"
     r"Send Source Select|Mixer|Preamp Model|Stereo Image|Soft Controls|Bank Switcher|"
     r"Rotaries Control Manager|Levels and Mutes|AutoMicMixer|Highpass Filter|Lowpass Filter|"
-    r"Digital Attenuator|StageBox Analogue Input|SCF|side chain source)", re.I
+    r"Direct Output|Digital Attenuator|StageBox Analogue Input|SCF|side chain source)", re.I
 )
 
 @dataclasses.dataclass
@@ -120,7 +120,7 @@ def scan_records(data: bytes) -> list[Record]:
         b"Compressor side chain source", b"Gate,", b"SCF Gate", b"Gate side chain source",
         b"Delay,", b"Mix Delay", b"Input Mixer", b"Highpass Filter", b"Lowpass Filter", b"Digital Attenuator",
         b"Stereo Image", b"StageBox Analogue Input", b"Preamp Model", b"Send Source Select",
-        b"Levels and Mutes", b"AutoMicMixer",
+        b"Levels and Mutes", b"AutoMicMixer", b"Direct Output", b"Global Direct Outputs",
     )
     out: list[Record] = []
     seen: set[int] = set()
@@ -330,6 +330,12 @@ def _known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> d
 
     if label.startswith("Gate side chain source, Input Channel"):
         return exact(1,2,"Gate sidechain source","source_pair")
+
+    if label.startswith("Direct Output, Input Channel"):
+        return exact(1,2,"Direct out level","i16_div256")
+
+    if label == "Global Direct Outputs":
+        return exact(1,1,"Global direct-out source","enum")
 
     if label.startswith("Delay, Input Channel"):
         return exact(1,2,"Input delay","delay_96") or exact(3,3,"Input delay In/Out","toggle_00_on")
