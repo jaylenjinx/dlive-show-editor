@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 2.7
 
+- **Input DCA and mute group assigns** (`RevEngRouting`): DCA 1–24 and Mute Group 1–8 assign bytes found in the Input Mixer channel section (`+15…+38`, `+39…+46`) and made writable in the Sends panel; `dlive_re.py` labels them. Channel Mapper (source socket, Insert A/B) findings are recorded read-only in `docs/channel-mapper.md`.
 - **Input direct out** (`RevEngRouting`): per-input direct-out level (`Direct Output, Input Channel NN` `+1..2`, int16/256, −39…+10 dB, −∞) and the global direct-out source (`Global Direct Outputs` `+1`, eight tap points) are writable in the Console UI Routing view, and labelled in `dlive_re.py`. See `docs/direct-output.md`.
 - **Gate models** (`RevEngGateModels`): swept Ducker, Dual Expander and Source Expander. Threshold sits at `+4..5` (not `+2..3`) on both expanders — the gate editor now uses the model's own offset and clamp, and adds Dual Expander lower threshold and Log/Lin, and Source Expander Slow/Medium/Fast. See `docs/compressor-gate-models.md`.
 - **Group, Aux and Matrix processing** (`RevEngBus`): new **Buses** tab. Their Compressor, Parametric EQ and Mix Delay records share the input layouts (confirmed with controlled Director changes on Mono Aux/Group/Matrix 1, Stereo Aux 1 and Main LR/M), so compressor (Manual RMS), PEQ and delay (0–400 ms) are writable per bus; stereo buses (and Main LR) write both Left and Right records; Main appears when the mixer config's Main type is not None. `dlive_re.py` labels these records. See `docs/bus-processing.md`.

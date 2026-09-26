@@ -227,6 +227,14 @@ def input_mixer_field(record: Record, rel_start: int, rel_end: int, data: bytes)
              or (hit(o + 4, o + 4, f"{name} send pan", "u8_direct") if width == 5 else None))
         if f:
             return f
+    for i in range(24):
+        f = hit(section + 15 + i, section + 15 + i, f"DCA {i + 1} assign", "toggle_01_on")
+        if f:
+            return f
+    for i in range(8):
+        f = hit(section + 39 + i, section + 39 + i, f"Mute Group {i + 1} assign", "toggle_01_on")
+        if f:
+            return f
     return (hit(section, section, "Main send On", "toggle_01_on")
             or hit(section + 3, section + 4, "Main send level (fader)", "i16_div256")
             or hit(section + 5, section + 5, "Main send pan", "u8_direct"))

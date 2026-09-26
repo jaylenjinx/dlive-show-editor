@@ -332,3 +332,16 @@ Each apparent mono-Aux entry occupies four bytes and looks like:
 `flagB` varies and may represent source/pre-post/on state, but its meaning is not yet proved.
 
 This matches the general rule above. `flagA`/`flagB` are the On and Pre bytes. With 10 group bytes and no mono FX, Aux 1's level lands at `+12`.
+
+## DCA and mute group assigns — verified write
+
+Toggling one assign on input 13 in Director's Routing page changes exactly one byte in the input's channel section (the 47-byte section that starts with the Main send; it sits `blockSize − 87` bytes into the block for version-3 headers):
+
+| Field | Offset from section start | From block end (208-byte block) |
+|---|---:|---:|
+| DCA 1 … DCA 24 | `+15 … +38` | `−72 … −49` |
+| Mute Group 1 … 8 | `+39 … +46` | `−48 … −41` |
+
+Each byte is `00` (not assigned) or `01` (assigned). Evidence (RevEngRouting, scenes 181–190): DCA1/2/3/13/24 and Mute Group 1/2/8 each toggled alone; every scene differs from the baseline in one byte, at the stride above. The eight bytes after the mute groups are the UFX sends already mapped.
+
+Strip Mute, Mix and PAFL buttons did not change either the StageBox or Surface scene file, so those states are not stored in scenes.
