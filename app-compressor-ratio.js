@@ -1,14 +1,48 @@
 'use strict';
 
-// Controlled dLive 2.12 CH16 Manual RMS ratio scenes isolate compressor state +15.
-// The raw byte behaves as a discrete ratio table/index. Only directly observed
-// ratio choices are writable; untested intermediate raw values remain preserved.
+// Compressor state +15 is an index into Director's 41-entry ratio table (1:1 … ∞:1).
+// Every entry was swept (RevEngRatio, scenes 50–98) by typing values into Director's
+// ratio field and reading back the stored byte; it is a stepped table, not a continuous scale.
 const COMP_RATIO_MODEL_VERIFIED=0x01; // Manual RMS
 const COMP_RATIO_RAW_TO_LABEL=new Map([
   [0x00,'1:1'],
+  [0x01,'1.03:1'],
+  [0x02,'1.05:1'],
+  [0x03,'1.07:1'],
+  [0x04,'1.1:1'],
+  [0x05,'1.15:1'],
+  [0x06,'1.2:1'],
+  [0x07,'1.25:1'],
+  [0x08,'1.3:1'],
+  [0x09,'1.35:1'],
+  [0x0A,'1.4:1'],
+  [0x0B,'1.5:1'],
+  [0x0C,'1.6:1'],
+  [0x0D,'1.7:1'],
+  [0x0E,'1.8:1'],
+  [0x0F,'1.9:1'],
   [0x10,'2:1'],
+  [0x11,'2.3:1'],
+  [0x12,'2.5:1'],
+  [0x13,'2.7:1'],
+  [0x14,'3:1'],
+  [0x15,'3.3:1'],
+  [0x16,'3.5:1'],
+  [0x17,'3.7:1'],
   [0x18,'4:1'],
+  [0x19,'4.3:1'],
+  [0x1A,'4.5:1'],
+  [0x1B,'4.7:1'],
+  [0x1C,'5:1'],
+  [0x1D,'5.3:1'],
+  [0x1E,'5.5:1'],
+  [0x1F,'5.7:1'],
+  [0x20,'6:1'],
+  [0x21,'7:1'],
+  [0x22,'8:1'],
+  [0x23,'10:1'],
   [0x24,'12:1'],
+  [0x25,'16:1'],
   [0x26,'20:1'],
   [0x27,'40:1'],
   [0x28,'∞:1'],
@@ -57,7 +91,7 @@ function injectCompressorRatioUi(){
   const row=document.createElement('div');row.className='peq-field';
   const options=[...COMP_RATIO_RAW_TO_LABEL.entries()].map(([raw,label])=>`<option value="${raw}">${label}</option>`).join('');
   row.innerHTML=`
-    <span>Compressor ratio <small>Manual RMS verified choices only</small></span>
+    <span>Compressor ratio <small>full 41-step ratio table</small></span>
     <select data-k="comp-ratio">${options}</select>
     <code>${comp.ratioRaw==null?'—':hexByte(comp.ratioRaw)}</code>`;
   (thresholdRow||compRow)?.insertAdjacentElement('afterend',row) || panel.appendChild(row);
@@ -72,7 +106,7 @@ function injectCompressorRatioUi(){
   }
   select.onchange=()=>{
     if(setInputCompressorRatioRaw(channel,select.value))renderChannelState();
-    else toast('Compressor ratio write blocked: only the controlled Manual RMS ratio choices are enabled.',true);
+    else toast('Compressor ratio write blocked for this model.',true);
   };
 
   const table=panel.querySelector('.config-table');
@@ -85,7 +119,7 @@ function injectCompressorRatioUi(){
   const evidence=root.querySelector('.details-stack > .panel:last-child');
   if(evidence&&evidence!==panel&&!evidence.querySelector('.comp-ratio-evidence')){
     const p=document.createElement('p');p.className='comp-ratio-evidence';
-    p.innerHTML='Controlled Manual RMS ratio scenes isolate <code>state +15</code>: <code>1:1→00</code>, <code>2:1→10</code>, <code>4:1→18</code>, <code>12:1→24</code>, <code>20:1→26</code>, <code>40:1→27</code>, <code>∞:1→28</code>. Every adjacent pair changes only this byte outside scene-label bytes.';
+    p.innerHTML='Compressor <code>state +15</code> is an index into the 41-step Director ratio table (<code>00</code>=1:1 … <code>28</code>=∞:1). Every step was swept; stored bytes read back match the table in order.';
     evidence.appendChild(p);
   }
 }
@@ -97,28 +131,20 @@ if(typeof PARAMETER_MAP!=='undefined'&&!PARAMETER_MAP.some(x=>x.id==='input-comp
   PARAMETER_MAP.push({
     id:'input-comp-ratio',area:'Input compressor',record:'Compressor, Input Channel NN',payload:'Manual RMS model 0x01, current-format 127-byte state',
     field:'Compressor ratio',offset:'state + 15',datatype:'uint8 discrete table/index',
-    transform:'verified anchors: 00=1:1, 10=2:1, 18=4:1, 24=12:1, 26=20:1, 27=40:1, 28=∞:1',
+    transform:'index 00…28 into the 41-step table: 1, 1.03, 1.05, 1.07, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2, 2.3, 2.5, 2.7, 3, 3.3, 3.5, 3.7, 4, 4.3, 4.5, 4.7, 5, 5.3, 5.5, 5.7, 6, 7, 8, 10, 12, 16, 20, 40, ∞ (:1)',
     confidence:'verified',write:true,
-    evidence:'Controlled CH16 Manual RMS scenes Rat 1, Rat 2, Rat 4, Rat 12, Rat 20, Rat 40, Rat Inf. Every adjacent scene changes only state +15 outside scene-label bytes.',
-    notes:'Writer deliberately exposes only the seven directly tested ratios. Intermediate raw table entries are not guessed. Other compressor models remain ratio read-only.'
+    evidence:'RevEngRatio: 48 automated Director scenes (50–98) typing values into the ratio field of Manual RMS on input 13; stored byte +15 reads 00…28 in table order. Manual Peak cross-checks 2:1=10 and 20:1=26 against the same table.',
+    notes:'Manual RMS and Manual Peak use this table; Opto uses its own (see Opto ratio).'
   });
 }
 
 if(typeof DOC_SECTIONS!=='undefined'){
   const sec=DOC_SECTIONS.find(s=>s.id==='channel-state');
-  if(sec&&!sec.html.includes('Compressor ratio — verified restricted write')){
+  if(sec&&!sec.html.includes('Compressor ratio — full table')){
     sec.html+=`
-      <h2>Compressor ratio — verified restricted write</h2>
-      <p>Controlled Manual RMS (<code>model 01</code>) scenes isolate one byte at <code>state +15</code>:</p>
-      <table class="docs-table"><thead><tr><th>Ratio</th><th>Raw</th></tr></thead><tbody>
-        <tr><td>1:1</td><td><code>00</code></td></tr>
-        <tr><td>2:1</td><td><code>10</code></td></tr>
-        <tr><td>4:1</td><td><code>18</code></td></tr>
-        <tr><td>12:1</td><td><code>24</code></td></tr>
-        <tr><td>20:1</td><td><code>26</code></td></tr>
-        <tr><td>40:1</td><td><code>27</code></td></tr>
-        <tr><td>∞:1</td><td><code>28</code></td></tr>
-      </tbody></table>
-      <p>The coordinate is clearly a discrete table/index rather than a simple linear ratio value. The editor therefore writes only these seven directly observed choices and preserves all untested intermediate table values.</p>`;
+      <h2>Compressor ratio — full table</h2>
+      <p>Compressor <code>state +15</code> indexes Director's 41-step ratio table:</p>
+      <table class="docs-table"><thead><tr><th>Ratio</th><th>Raw</th></tr></thead><tbody><tr><td>1:1</td><td><code>00</code></td></tr><tr><td>1.03:1</td><td><code>01</code></td></tr><tr><td>1.05:1</td><td><code>02</code></td></tr><tr><td>1.07:1</td><td><code>03</code></td></tr><tr><td>1.1:1</td><td><code>04</code></td></tr><tr><td>1.15:1</td><td><code>05</code></td></tr><tr><td>1.2:1</td><td><code>06</code></td></tr><tr><td>1.25:1</td><td><code>07</code></td></tr><tr><td>1.3:1</td><td><code>08</code></td></tr><tr><td>1.35:1</td><td><code>09</code></td></tr><tr><td>1.4:1</td><td><code>0A</code></td></tr><tr><td>1.5:1</td><td><code>0B</code></td></tr><tr><td>1.6:1</td><td><code>0C</code></td></tr><tr><td>1.7:1</td><td><code>0D</code></td></tr><tr><td>1.8:1</td><td><code>0E</code></td></tr><tr><td>1.9:1</td><td><code>0F</code></td></tr><tr><td>2:1</td><td><code>10</code></td></tr><tr><td>2.3:1</td><td><code>11</code></td></tr><tr><td>2.5:1</td><td><code>12</code></td></tr><tr><td>2.7:1</td><td><code>13</code></td></tr><tr><td>3:1</td><td><code>14</code></td></tr><tr><td>3.3:1</td><td><code>15</code></td></tr><tr><td>3.5:1</td><td><code>16</code></td></tr><tr><td>3.7:1</td><td><code>17</code></td></tr><tr><td>4:1</td><td><code>18</code></td></tr><tr><td>4.3:1</td><td><code>19</code></td></tr><tr><td>4.5:1</td><td><code>1A</code></td></tr><tr><td>4.7:1</td><td><code>1B</code></td></tr><tr><td>5:1</td><td><code>1C</code></td></tr><tr><td>5.3:1</td><td><code>1D</code></td></tr><tr><td>5.5:1</td><td><code>1E</code></td></tr><tr><td>5.7:1</td><td><code>1F</code></td></tr><tr><td>6:1</td><td><code>20</code></td></tr><tr><td>7:1</td><td><code>21</code></td></tr><tr><td>8:1</td><td><code>22</code></td></tr><tr><td>10:1</td><td><code>23</code></td></tr><tr><td>12:1</td><td><code>24</code></td></tr><tr><td>16:1</td><td><code>25</code></td></tr><tr><td>20:1</td><td><code>26</code></td></tr><tr><td>40:1</td><td><code>27</code></td></tr><tr><td>∞:1</td><td><code>28</code></td></tr></tbody></table>
+      <p>The coordinate is clearly a discrete table/index rather than a simple linear ratio value. The editor exposes every step.</p>`;
   }
 }

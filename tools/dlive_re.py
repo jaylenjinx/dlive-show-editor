@@ -32,7 +32,7 @@ RECORD_LABEL_RE = re.compile(
     r"(Name Colour Manager|AHFX Manager|Parametric EQ|Graphic EQ|Compressor|Gate|Delay|"
     r"Send Source Select|Mixer|Preamp Model|Stereo Image|Soft Controls|Bank Switcher|"
     r"Rotaries Control Manager|Levels and Mutes|AutoMicMixer|Highpass Filter|Lowpass Filter|"
-    r"Digital Attenuator|StageBox Analogue Input|SCF|side chain source)", re.I
+    r"Direct Output|Digital Attenuator|StageBox Analogue Input|SCF|side chain source)", re.I
 )
 
 @dataclasses.dataclass
@@ -118,9 +118,9 @@ def scan_records(data: bytes) -> list[Record]:
     prefixes = (
         b"AHFX Manager", b"Parametric EQ", b"Graphic EQ", b"Compressor,", b"SCF Compressor",
         b"Compressor side chain source", b"Gate,", b"SCF Gate", b"Gate side chain source",
-        b"Delay,", b"Input Mixer", b"Highpass Filter", b"Lowpass Filter", b"Digital Attenuator",
+        b"Delay,", b"Mix Delay", b"Input Mixer", b"Highpass Filter", b"Lowpass Filter", b"Digital Attenuator",
         b"Stereo Image", b"StageBox Analogue Input", b"Preamp Model", b"Send Source Select",
-        b"Levels and Mutes", b"AutoMicMixer",
+        b"Levels and Mutes", b"AutoMicMixer", b"Direct Output", b"Global Direct Outputs",
     )
     out: list[Record] = []
     seen: set[int] = set()
@@ -258,7 +258,21 @@ def load_mixconfig(path: str | Path) -> bytes:
     with tarfile.open(path, "r:gz") as t:
         return t.extractfile("Show/MixConfig/MixConfig.dat").read()
 
+BUS_RECORD_RE = re.compile(r"(Compressor|Parametric EQ|Mix Delay), (Mono|Stereo) (Group|Aux|Matrix) Channel (\d+)(?: (Left|Right))?$")
+
 def known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> dict[str, Any] | None:
+    """Group/Aux/Matrix Compressor, Parametric EQ and Mix Delay records share the input layouts
+    (confirmed on Mono Aux 1, Mono Group 1, Mono Matrix 1 and Stereo Aux 1), so reuse those maps."""
+    m = BUS_RECORD_RE.match(record.label.strip())
+    if m:
+        kind = {"Compressor": "Compressor, Input Channel", "Parametric EQ": "Parametric EQ, Input Channel", "Mix Delay": "Delay, Input Channel"}[m.group(1)]
+        f = _known_field(dataclasses.replace(record, label=kind), rel_start, rel_end, data)
+        if f:
+            f = {**f, "name": f"{m.group(2)} {m.group(3)} {int(m.group(4))}{' ' + m.group(5) if m.group(5) else ''} {f['name']}"}
+        return f
+    return _known_field(record, rel_start, rel_end, data)
+
+def _known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> dict[str, Any] | None:
     label = record.label.strip()
 
     if label.startswith("Input Mixer"):
@@ -305,7 +319,7 @@ def known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> di
 
     if label.startswith("Gate, Input Channel"):
         fields = [
-            (2,3,"Gate threshold","i16_div256"),(8,9,"Gate depth","i16_div256"),
+            (1,1,"Gate model","enum"),(2,3,"Gate threshold","i16_div256"),(4,5,"Expander threshold (Dual/Source Expander)","i16_div256"),(6,7,"Dual Expander lower threshold","i16_div256"),(12,12,"Dual Expander LIN","enum"),(17,17,"Source Expander speed","enum"),(8,9,"Gate depth","i16_div256"),
             (10,11,"Gate hold","time_log"),(13,14,"Gate release","time_log"),
             (15,16,"Gate attack","time_log"),(18,18,"Gate On/Off","toggle_01_on"),
         ]
@@ -324,6 +338,12 @@ def known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> di
 
     if label.startswith("Gate side chain source, Input Channel"):
         return exact(1,2,"Gate sidechain source","source_pair")
+
+    if label.startswith("Direct Output, Input Channel"):
+        return exact(1,2,"Direct out level","i16_div256")
+
+    if label == "Global Direct Outputs":
+        return exact(1,1,"Global direct-out source","enum")
 
     if label.startswith("Delay, Input Channel"):
         return exact(1,2,"Input delay","delay_96") or exact(3,3,"Input delay In/Out","toggle_00_on")
