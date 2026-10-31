@@ -71,6 +71,19 @@ Source types (stereo sources use index `2×(n−1) + side`, 0 = Left, 1 = Right)
 
 Mono groups were not available in the test configuration; by the order of the other types they are probably `0C`, but that is not verified.
 
+## Inserts
+
+Insert returns are two more 128-entry tables of `[type][index u16]`, using the input-source types: Insert A at state `+2564 + 3×(ch−1)`, Insert B at `+2948 + 3×(ch−1)`. A Rack FX return uses type `1C` with index `2×(unit−1)` (Left).
+
+The insert send is written into the *destination's* table, as type `08` (Insert A send) or `09` (Insert B send) with index = input − 1:
+
+- MixRack socket send → that local output socket's entry (send 20 → `+6689 = 08 00 00` for input 1).
+- Rack FX send → both inputs of the unit in the Rack FX input table at `+6731`, 6 bytes per unit (L, R). Those inputs normally hold their FX send (`1D 00 nn`).
+
+`Insert 1|2, Input Channel NN` state `+1` is `00` while an insert is assigned and `01` when it is not. Unassigning sets the return and send entries back to `14` (unassigned).
+
+Checked with three controlled Director operations on input 1 (Insert A socket send 20 / return 40, Insert B Rack FX 3, Insert B unassign); `setInputInsert(ch, 'A'|'B', target)` reproduces all three byte-for-byte. Assigning a socket return in Director also sets that socket's preamp to 20 dB with pad on; the editor does not touch preamps.
+
 ## Not in Channel Mapper
 
 Preamp gain, pad and 48 V are per socket in `StageBox Analogue Input, Number NN` and trim/polarity per input in `Digital Attenuator Input Channel NN`; both were already mapped (see `input-processing.md`) and were re-confirmed in this session: gain `+1..2` as dB×256 (range 5…60 dB, Director stores the gain before the −20 dB pad), pad `+3`, 48 V `+4`; trim range ±24 dB.

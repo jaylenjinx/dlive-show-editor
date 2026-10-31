@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Patching**: decoded the `Channel Mapper` record. New **Patching** tab writes each input's source (MixRack sockets, surface, I/O ports, DX, Rack FX, unassigned) and the MixRack local output patch (groups, auxes, mains, matrices, direct outs, PAFL, wedge/IEM, Rack FX, UltraFX). Other output banks are decoded read-only. See `docs/patching.md`.
+- **Patching**: decoded the `Channel Mapper` record. New **Patching** tab writes each input's source (MixRack sockets, surface, I/O ports, DX, Rack FX, unassigned) and the MixRack local output patch (groups, auxes, mains, matrices, direct outs, PAFL, wedge/IEM, Rack FX, UltraFX). Input Insert A/B (MixRack socket or Rack FX send/return) is writable via `setInputInsert` and shown in the input table. Other output banks are decoded read-only. See `docs/patching.md`.
 
 ## 2.7
 

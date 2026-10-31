@@ -109,6 +109,54 @@ function setOutputPatch(bankKey,socket,type,n,side){
   const d=state.current.stage.datBytes;d[out.offset]=type;writeU16BE(d,out.offset+1,idx);markStageDirty();return true;
 }
 
+// ---- Inserts ----
+// Insert A/B return sources: 128-entry tables of [type][index u16] (same types as input sources;
+// Rack FX return index = 2×(unit−1) + side). Insert sends are written into the destination's
+// table as type 08 (Insert A send) / 09 (Insert B send) with index = input − 1: an output socket
+// for socket inserts, or both inputs of a Rack FX unit (table at +6731, L/R per unit, normally
+// fed by FX sends, type 1D). `Insert N, Input Channel NN` +1 is 00 when assigned, 01 when not.
+const CM_INSERT_RETURN_BASE={A:2564,B:2948};
+const CM_INSERT_SEND_TYPE={A:0x08,B:0x09};
+const CM_RACKFX_INPUT_BASE=6731,CM_RACKFX_UNITS=16;
+function cmInsertState(ch,slot){
+  const r=cmRecord();if(!r||!CM_INSERT_RETURN_BASE[slot]||ch<1||ch>CM_INPUT_COUNT)return null;
+  const o=r.stateStart+CM_INSERT_RETURN_BASE[slot]+(ch-1)*3;
+  return {returnOffset:o,returnType:r.dat[o],returnIndex:readU16BE(r.dat,o+1)};
+}
+function cmInsertSendSlots(){
+  const r=cmRecord();if(!r)return [];
+  const out=[];for(let s=1;s<=CM_OUTPUT_BANKS[0].count;s++)out.push(r.stateStart+CM_OUTPUT_BANKS[0].base+(s-1)*3);
+  for(let u=0;u<CM_RACKFX_UNITS*2;u++)out.push(r.stateStart+CM_RACKFX_INPUT_BASE+u*3);
+  return out;
+}
+// target: null (unassign), {kind:'socket',send:n,ret:m} (MixRack output n / input socket m) or {kind:'rackfx',unit:u}
+function setInputInsert(ch,slot,target){
+  const st=cmInsertState(ch,slot);if(!st)return false;
+  const d=state.current.stage.datBytes,ty=CM_INSERT_SEND_TYPE[slot];
+  const ins=ipParseRecord(d,`Insert ${slot==='A'?1:2}, Input Channel ${String(ch).padStart(2,'0')}`,3);if(!ins)return false;
+  if(target&&target.kind==='socket'&&!(target.send>=1&&target.send<=CM_OUTPUT_BANKS[0].count&&target.ret>=1&&target.ret<=128))return false;
+  if(target&&target.kind==='rackfx'&&!(target.unit>=1&&target.unit<=CM_RACKFX_UNITS))return false;
+  if(target&&!['socket','rackfx'].includes(target.kind))return false;
+  // drop any existing send of this insert
+  for(const o of cmInsertSendSlots())if(d[o]===ty&&readU16BE(d,o+1)===ch-1){d[o]=CM_UNASSIGNED;writeU16BE(d,o+1,0);}
+  if(!target){d[st.returnOffset]=CM_UNASSIGNED;writeU16BE(d,st.returnOffset+1,0);d[ins.stateStart+1]=1;markStageDirty();return true;}
+  const r=cmRecord();
+  if(target.kind==='socket'){
+    const so=r.stateStart+CM_OUTPUT_BANKS[0].base+(target.send-1)*3;d[so]=ty;writeU16BE(d,so+1,ch-1);
+    d[st.returnOffset]=0x00;writeU16BE(d,st.returnOffset+1,target.ret-1);
+  }else{
+    for(const side of [0,1]){const so=r.stateStart+CM_RACKFX_INPUT_BASE+((target.unit-1)*2+side)*3;d[so]=ty;writeU16BE(d,so+1,ch-1);}
+    d[st.returnOffset]=0x1C;writeU16BE(d,st.returnOffset+1,(target.unit-1)*2);
+  }
+  d[ins.stateStart+1]=0;markStageDirty();return true;
+}
+
+function cmInsertLabel(ch,slot){
+  const st=cmInsertState(ch,slot);if(!st||st.returnType===CM_UNASSIGNED)return '—';
+  if(st.returnType===0x1C)return `Rack FX ${(st.returnIndex>>1)+1}`;
+  return escapeHtml(cmInputSourceLabel({type:st.returnType,index:st.returnIndex}))+' (return)';
+}
+
 // ---- UI ----
 function renderPatching(){
   const root=$('#patchEditor');if(!root)return;root.innerHTML='';
@@ -119,11 +167,11 @@ function renderPatching(){
   let rows='';
   for(let ch=1;ch<=CM_INPUT_COUNT;ch++){
     const s=cmInputSource(ch);if(!s)continue;
-    rows+=`<tr data-ch="${ch}"><td>${ch}</td><td>${escapeHtml(names[ch-1]?.name||'')}</td><td><select data-k="type">${typeOpts}</select></td><td><input data-k="sock" type="number" min="1" max="4096" step="1" style="width:5em"></td><td class="mono">${escapeHtml(cmInputSourceLabel(s))}</td></tr>`;
+    rows+=`<tr data-ch="${ch}"><td>${ch}</td><td>${escapeHtml(names[ch-1]?.name||'')}</td><td><select data-k="type">${typeOpts}</select></td><td><input data-k="sock" type="number" min="1" max="4096" step="1" style="width:5em"></td><td class="mono">${escapeHtml(cmInputSourceLabel(s))}</td><td class="mono">${cmInsertLabel(ch,'A')}</td><td class="mono">${cmInsertLabel(ch,'B')}</td></tr>`;
   }
   inPanel.innerHTML=`<div class="manager-head inline"><h2>Input sources</h2><span class="confidence verified">CONTROLLED-DIFF VERIFIED</span></div>
     <div class="notice">Source A per input (Processing › Preamp › Source Select). Surface sources share one type; the socket number is the raw surface index + 1. ABCD sources B–D are left unchanged.</div>
-    <div class="parameter-map-scroll patch-scroll"><table class="patch-table"><thead><tr><th>In</th><th>Name</th><th>Type</th><th>Socket</th><th>Now</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="parameter-map-scroll patch-scroll"><table class="patch-table"><thead><tr><th>In</th><th>Name</th><th>Type</th><th>Socket</th><th>Now</th><th>Ins A</th><th>Ins B</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   root.appendChild(inPanel);
   inPanel.querySelectorAll('tr[data-ch]').forEach(tr=>{
     const ch=Number(tr.dataset.ch),s=cmInputSource(ch),ty=tr.querySelector('[data-k="type"]'),so=tr.querySelector('[data-k="sock"]');
@@ -166,6 +214,7 @@ renderScene=function(){renderSceneBeforePatching();renderPatching();};
 if(typeof PARAMETER_MAP!=='undefined'){
   const rows=[
     {id:'cm-input-source',field:'Input source A (type + socket)',offset:'state +1+13×(ch−1): [ABCD][type][index u16] then sources B–D',transform:'types: 00 MixRack sockets, 01 surface (index ranges), 02–04 MixRack I/O Port 1–3, 05/06 MixRack DX 1/2 and 3/4, 1C Rack FX, 14 unassigned; index = socket − 1'},
+    {id:'cm-insert',field:'Input Insert A/B',offset:'return [type][index] at state +2564 (A) / +2948 (B) + 3×(ch−1); send written as type 08/09 into the destination output socket or Rack FX input pair (+6731)',transform:'index = input − 1; Insert N record +1: 00 assigned / 01 unassigned'},
     {id:'cm-output-patch',field:'Output socket source',offset:'MixRack Local output n at state +6632+3×(n−1): [type][index u16]',transform:'types: 00 socket tie, 07 direct out, 0D St Group, 0E Aux, 0F St Aux, 10 Main, 11 Matrix, 12 St Matrix, 13 PAFL, 14 unassigned, 1C Rack FX, 1E wedge, 21 IEM, 2D UltraFX; stereo index = 2×(n−1)+side'}
   ];
   for(const r of rows)if(!PARAMETER_MAP.some(x=>x.id===r.id))PARAMETER_MAP.push({id:r.id,area:'Patching',record:'Channel Mapper',payload:'10,380-byte state',field:r.field,offset:r.offset,datatype:'per-entry',transform:r.transform,confidence:'verified',write:true,evidence:'Controlled Director 2.12 changes (DM48/S5000): one source or patch change per stored scene, each changing only the named entry.',notes:'See docs/patching.md.'});
