@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Patching**: decoded the `Channel Mapper` record. New **Patching** tab writes each input's source (MixRack sockets, surface, I/O ports, DX, Rack FX, unassigned) and the MixRack local output patch (groups, auxes, mains, matrices, direct outs, PAFL, wedge/IEM, Rack FX, UltraFX). Other output banks are decoded read-only. See `docs/patching.md`.
+
 ## 2.7
 
 - **Input DCA and mute group assigns** (`RevEngRouting`): DCA 1–24 and Mute Group 1–8 assign bytes found in the Input Mixer channel section (`+15…+38`, `+39…+46`) and made writable in the Sends panel; `dlive_re.py` labels them. Channel Mapper (source socket, Insert A/B) findings are recorded read-only in `docs/channel-mapper.md`.
