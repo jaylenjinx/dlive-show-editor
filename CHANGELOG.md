@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Wedge / IEM names**: the `Monitor Channel Name Colour Manager` record (two entries, same 9-byte name + colour layout as the other managers) is now parsed, so the personal-monitoring mixes can be renamed and recoloured in Names & colours.
+
 ## 2.7
 
 - **Input DCA and mute group assigns** (`RevEngRouting`): DCA 1–24 and Mute Group 1–8 assign bytes found in the Input Mixer channel section (`+15…+38`, `+39…+46`) and made writable in the Sends panel; `dlive_re.py` labels them. Channel Mapper (source socket, Insert A/B) findings are recorded read-only in `docs/channel-mapper.md`.
