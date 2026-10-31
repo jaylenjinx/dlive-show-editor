@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Dynamics library presets**: every factory Deep Compressor and Gate library preset was recalled in Director and its record state captured, so the editor can now change a compressor or gate model by loading a preset, on inputs and on all buses (Dynamics library panel in the Buses tab). The In/Out switch is preserved. See `docs/compressor-gate-models.md`.
+
 ## 2.7
 
 - **Input DCA and mute group assigns** (`RevEngRouting`): DCA 1–24 and Mute Group 1–8 assign bytes found in the Input Mixer channel section (`+15…+38`, `+39…+46`) and made writable in the Sends panel; `dlive_re.py` labels them. Channel Mapper (source socket, Insert A/B) findings are recorded read-only in `docs/channel-mapper.md`.
