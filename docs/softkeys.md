@@ -23,9 +23,21 @@ Director writes the same 26 entries to both blocks. Soft 20–26 are unavailable
 | Tap Tempo | `0C 01 03 02 G U u R` | `G` Global, `U` UFX (0 = FX), `u` unit−1, `R` 1 = Left / 0 = Right |
 | Scene Go | `10 01 02 01 A` | `A` = Auto Increment |
 | Scene Store / New / Update / Next / Previous | `11 01 02 02 0/1/2/3/4` | |
-| Scene Specific Recall | `0D 01 02 01 00 00` | default only; scene number bytes not decoded |
+| Scene Specific Recall | `0D 01 02 01 SS SS` | `SSSS` = scene − 1 (u16) |
+| PAFL | `05 01 03 01 tt ii 02 00 00` | |
+| Level Up / Down | `07`/`08 01 02 01 tt ii 01 MIN MIN MAX MAX` | levels use the fader coordinate `0x8000 + dB×256`, −∞ = `0000` |
+| Set Level | `2F 01 04 01 00 00 01 tt ii LL LL` | |
+| Fader Start / Fader On-Off | `1A`/`19 01 01 01 tt ii` | |
+| MCA On/Off Specific DCA | `22 01 03 01 tt ii` | |
+| Talkback Assign | `0B 01 02 01 tt ii` | |
+| Talkback Group | `1F 01 00 02 gg LL` | `gg` = group − 1, `LL` latching (01 on) |
+| Send Level Up | `09 01 04 01 st si 01 MIN MIN MAX MAX 01 rt ri` | send channel `st si`, receiving mix `rt ri` |
+| Set Send Level | `30 01 04 01 rt ri 01 st si LL LL` | |
+| Set Bypass UFX | `34 01 02 01 uu 00` | `uu` = unit − 1 |
+| AMM Control (In/Out) | `18 01 02 01 00 nn 00` | `nn` = AMM − 1 |
+| Channel Processing | `2A 01 02 01 ff tt ii` | `ff` function (01 = Preamp Model In); other functions not decoded |
 
-Captured but not yet parameter-decoded (sizes known, so records containing them still parse): PAFL (`05`, 9 bytes), Level Up/Down (`07`/`08`, 11), Talkback Assign (`0B`), Talkback Group (`1F`), Fader On-Off (`19`), Fader Start (`1A`), Assign On/Off (`1D`), MCA On/Off Specific DCA (`22`), Set Level (`2F`).
+The second batch (scene recall number, PAFL, levels, talkback, send levels, UFX bypass, AMM, channel processing) was decoded on 2026-11-01 on an S5000 surface, which uses the same 26-entry record. Assign On/Off (`1D 01 04 01 st si 01 dt di`, 9 bytes) is decoded from its default only; its invert flag was not captured.
 
 Scenes stored for other surface types use additional function codes; those records fail to parse and are not written.
 

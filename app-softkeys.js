@@ -22,6 +22,7 @@ const SOFTKEY_ENTRY_LEN={
   0x08:11,  // Level Down
   0x0B:6,   // Talkback Assign
   0x0C:8,   // Tap Tempo
+  0x09:14,  // Send Level Up
   0x0D:6,   // Scene Controls: Specific Scene Recall
   0x0F:6,   // PAFL Clear
   0x10:5,   // Scene Controls: Go
@@ -29,14 +30,20 @@ const SOFTKEY_ENTRY_LEN={
   0x15:6,   // Mute Group
   0x16:6,   // Mute Group (invert on)
   0x17:4,   // DCA/MCA Spill Active
+  0x18:7,   // AMM Control
   0x19:6,   // Fader On-Off
   0x1A:6,   // Fader Start
   0x1C:4,   // Peak Hold Reset
   0x1D:9,   // Assign On/Off
   0x1F:6,   // Talkback Group
   0x22:6,   // MCA On/Off Specific DCA
-  0x2F:11   // Set Level
+  0x2A:7,   // Channel Processing
+  0x2F:11,  // Set Level
+  0x30:11,  // Set Send Level
+  0x34:6    // Set Bypass UFX
 };
+// Levels in softkey entries use the fader coordinate: raw = 0x8000 + round(dB×256), −∞ = 0x0000.
+function skLevel(db){if(db===null||db===-Infinity)return [0,0];const r=0x8000+Math.round(Math.max(-127,Math.min(10,Number(db)))*256);return [r>>8,r&255];}
 const SOFTKEY_SCENE_ACTIONS={store:0,new:1,update:2,next:3,previous:4};
 
 function softkeyFind(dat){
@@ -75,7 +82,22 @@ const softKeyEntry={
   dcaSpillActive:()=>skBytes([0x17,1,5,1]),
   tapTempo:(o)=>skBytes([0x0C,1,3,2,o.global?1:0,o.ufx?1:0,(o.unit||1)-1,o.right?0:1]),
   sceneGo:(autoIncrement)=>skBytes([0x10,1,2,1,autoIncrement?1:0]),
-  sceneAction:(action)=>skBytes([0x11,1,2,2,SOFTKEY_SCENE_ACTIONS[action]])
+  sceneAction:(action)=>skBytes([0x11,1,2,2,SOFTKEY_SCENE_ACTIONS[action]]),
+  sceneRecall:(scene)=>skBytes([0x0D,1,2,1,(scene-1)>>8,(scene-1)&255]),             // scene is 1-based
+  pafl:(type,index)=>skBytes([0x05,1,3,1,SOFTKEY_CH_TYPES[type],index,2,0,0]),
+  levelUp:(type,index,minDb,maxDb)=>skBytes([0x07,1,2,1,SOFTKEY_CH_TYPES[type],index,1,...skLevel(minDb),...skLevel(maxDb)]),
+  levelDown:(type,index,minDb,maxDb)=>skBytes([0x08,1,2,1,SOFTKEY_CH_TYPES[type],index,1,...skLevel(minDb),...skLevel(maxDb)]),
+  setLevel:(type,index,db)=>skBytes([0x2F,1,4,1,0,0,1,SOFTKEY_CH_TYPES[type],index,...skLevel(db)]),
+  faderStart:(type,index)=>skBytes([0x1A,1,1,1,SOFTKEY_CH_TYPES[type],index]),
+  faderOnOff:(type,index)=>skBytes([0x19,1,1,1,SOFTKEY_CH_TYPES[type],index]),
+  mcaSpecific:(type,index)=>skBytes([0x22,1,3,1,SOFTKEY_CH_TYPES[type],index]),
+  talkbackAssign:(type,index)=>skBytes([0x0B,1,2,1,SOFTKEY_CH_TYPES[type],index]),
+  talkbackGroup:(n,latching=true)=>skBytes([0x1F,1,0,2,n-1,latching?1:0]),
+  // send = channel feeding the send (e.g. an input), receive = the mix (e.g. a mono aux)
+  sendLevelUp:(sendType,sendIndex,rcvType,rcvIndex,minDb,maxDb)=>skBytes([0x09,1,4,1,SOFTKEY_CH_TYPES[sendType],sendIndex,1,...skLevel(minDb),...skLevel(maxDb),1,SOFTKEY_CH_TYPES[rcvType],rcvIndex]),
+  setSendLevel:(rcvType,rcvIndex,sendType,sendIndex,db)=>skBytes([0x30,1,4,1,SOFTKEY_CH_TYPES[rcvType],rcvIndex,1,SOFTKEY_CH_TYPES[sendType],sendIndex,...skLevel(db)]),
+  ufxBypass:(unit)=>skBytes([0x34,1,2,1,unit-1,0]),
+  ammInOut:(n)=>skBytes([0x18,1,2,1,0,n-1,0])
 };
 
 function setSoftKeys(list){
