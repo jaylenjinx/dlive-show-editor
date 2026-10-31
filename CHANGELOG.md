@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Bus graphic EQ**: decoded the 169-byte `Graphic EQ` record for groups, auxes, matrices and mains (28 band gains, In/Out, type incl. NEQ12 and its 12 bands' gain/frequency/Out). Editable in the Buses tab; stereo buses write both sides. See `docs/bus-processing.md`.
+
 ## 2.7
 
 - **Input DCA and mute group assigns** (`RevEngRouting`): DCA 1–24 and Mute Group 1–8 assign bytes found in the Input Mixer channel section (`+15…+38`, `+39…+46`) and made writable in the Sends panel; `dlive_re.py` labels them. Channel Mapper (source socket, Insert A/B) findings are recorded read-only in `docs/channel-mapper.md`.
