@@ -32,7 +32,7 @@ RECORD_LABEL_RE = re.compile(
     r"(Name Colour Manager|AHFX Manager|Parametric EQ|Graphic EQ|Compressor|Gate|Delay|"
     r"Send Source Select|Mixer|Preamp Model|Stereo Image|Soft Controls|Bank Switcher|"
     r"Rotaries Control Manager|Levels and Mutes|AutoMicMixer|Highpass Filter|Lowpass Filter|"
-    r"Direct Output|Digital Attenuator|StageBox Analogue Input|SCF|side chain source)", re.I
+    r"Direct Output|Digital Attenuator|StageBox Analogue Input|SCF|side chain source|Channel Mapper)", re.I
 )
 
 @dataclasses.dataclass
@@ -120,7 +120,7 @@ def scan_records(data: bytes) -> list[Record]:
         b"Compressor side chain source", b"Gate,", b"SCF Gate", b"Gate side chain source",
         b"Delay,", b"Mix Delay", b"Input Mixer", b"Highpass Filter", b"Lowpass Filter", b"Digital Attenuator",
         b"Stereo Image", b"StageBox Analogue Input", b"Preamp Model", b"Send Source Select",
-        b"Levels and Mutes", b"AutoMicMixer", b"Direct Output", b"Global Direct Outputs",
+        b"Levels and Mutes", b"AutoMicMixer", b"Direct Output", b"Global Direct Outputs", b"Channel Mapper",
     )
     out: list[Record] = []
     seen: set[int] = set()
@@ -134,7 +134,7 @@ def scan_records(data: bytes) -> list[Record]:
             if p<2 or p in seen: continue
             length=int.from_bytes(data[p-2:p],"big")
             # Input Mixer holds 128 per-input blocks (~26 KB); everything else is small.
-            if length<5 or length>(65535 if prefix==b"Input Mixer" else 8192): continue
+            if length<5 or length>(65535 if prefix in (b"Input Mixer", b"Channel Mapper") else 8192): continue
             frame_start=p-2; frame_end=frame_start+2+length
             if frame_end>n: continue
             nul=data.find(b"\0",p,min(frame_end,p+160))
@@ -353,6 +353,16 @@ def _known_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> d
 
     if label.startswith("Stereo Image Input Channel"):
         return exact(2,2,"Stereo width","u8_direct") or exact(3,3,"Stereo image mode","enum")
+
+    if label == "Channel Mapper":
+        if 1 <= rel_start and rel_end < 1 + 128 * 13 and (rel_start - 1) // 13 == (rel_end - 1) // 13:
+            ch = (rel_start - 1) // 13 + 1; pos = (rel_start - 1) % 13
+            part = "ABCD enable" if pos == 0 else f"source {'ABCD'[(pos - 1) // 3]} {'type' if (pos - 1) % 3 == 0 else 'index'}"
+            return {"name": f"Input {ch} {part}", "encoding": "enum" if pos == 0 or (pos - 1) % 3 == 0 else "u16", "field_start": rel_start, "field_end": rel_end}
+        if 6632 <= rel_start and rel_end < 6632 + 32 * 3 and (rel_start - 6632) // 3 == (rel_end - 6632) // 3:
+            sock = (rel_start - 6632) // 3 + 1
+            return {"name": f"MixRack local output {sock} source {'type' if (rel_start - 6632) % 3 == 0 else 'index'}", "encoding": "enum", "field_start": rel_start, "field_end": rel_end}
+        return None
 
     if label.startswith("StageBox Analogue Input, Number"):
         return (exact(1,2,"StageBox gain","i16_div256") or exact(3,3,"StageBox pad","toggle_01_on") or
