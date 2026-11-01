@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Bus graphic EQ**: decoded the 169-byte `Graphic EQ` record for groups, auxes, matrices and mains (28 band gains, In/Out, type incl. NEQ12 and its 12 bands' gain/frequency/Out). Editable in the Buses tab; stereo buses write both sides. See `docs/bus-processing.md`.
 - **Dynamics library presets**: every factory Deep Compressor and Gate library preset was recalled in Director and its record state captured, so the editor can now change a compressor or gate model by loading a preset, on inputs and on all buses (Dynamics library panel in the Buses tab). The In/Out switch is preserved. See `docs/compressor-gate-models.md`.
 - **Patching**: decoded the `Channel Mapper` record. New **Patching** tab writes each input's source (MixRack sockets, surface, I/O ports, DX, Rack FX, unassigned) and the MixRack local output patch (groups, auxes, mains, matrices, direct outs, PAFL, wedge/IEM, Rack FX, UltraFX). Input Insert A/B (MixRack socket or Rack FX send/return) is writable via `setInputInsert` and shown in the input table. Other output banks are decoded read-only. See `docs/patching.md`.
 
