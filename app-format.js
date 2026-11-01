@@ -18,6 +18,8 @@ const MANAGERS = [
   { key:'fxReturns', label:'RackExtra FX Returns', signature:'FX Return Channel Name Colour Manager', count:16 },
   { key:'ultraFxReturns', label:'RackUltra FX Returns', signature:'AHFX Return Channel Name Colour Manager', count:8 },
   { key:'dcas', label:'DCAs', signature:'DCA Channel Name Colour Manager', count:24 },
+  // Personal monitoring mixes (Wedge / IEM) — same 9-byte name + colour layout, two entries.
+  { key:'monitors', label:'Monitors (Wedge / IEM)', signature:'Monitor Channel Name Colour Manager', count:2 },
 ];
 
 const COLOURS = [
