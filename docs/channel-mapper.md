@@ -1,4 +1,6 @@
-# Channel Mapper (partially decoded, read-only)
+# Channel Mapper (partially decoded)
+
+> Update 2026-11-01: input source A and output socket patching are now decoded and writable — see [`patching.md`](patching.md). Insert A/B are decoded and writable too (same file); the notes below are the original partial findings.
 
 `Channel Mapper` is a ~10 KB record that holds each input's source patching and its Insert A / Insert B endpoints. Findings from controlled Director changes on input 13 (`RevEngRouting`, scenes 175–199); **nothing here is writable yet**.
 

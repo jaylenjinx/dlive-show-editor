@@ -130,4 +130,16 @@ class CheckerTests(unittest.TestCase):
         self.assertEqual(dl.decode_raw(bytes.fromhex('003C'),'bpm_60000'),1000)
         self.assertEqual(dl.encode_scene_value({'encoding':'bpm_60000'},'BPM 500',2),bytes.fromhex('0078'))
 
+    def test_channel_mapper_fields(self):
+        rec=dl.Record(0,0,10395,'Channel Mapper',0,10380)
+        data=bytes(10380)
+        f=dl.known_field(rec,4,4,data)
+        self.assertEqual(f['name'],'Input 1 source A index')
+        f=dl.known_field(rec,2,2,data)
+        self.assertEqual(f['name'],'Input 1 source A type')
+        f=dl.known_field(rec,17,17,data)
+        self.assertEqual(f['name'],'Input 2 source A index')
+        f=dl.known_field(rec,6650,6650,data)
+        self.assertEqual(f['name'],'MixRack local output 7 source type')
+
 if __name__=='__main__': unittest.main()
