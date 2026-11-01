@@ -6,7 +6,9 @@
 //   +1..56    28 graphic band gains, uint16 BE, raw = 0x8000 + dB×256 (31 Hz … 16 kHz, ±12 dB)
 //   +57       In/Out (00 In, 01 Out)
 //   +58       type: 00 Constant-Q, 01 Proportional-Q, 02 Digi-GEQ, 03 Hybrid, 04 NEQ12
-//   +59…      NEQ12: 12 bands × 9 bytes [gain int16 dB×256][freq u16 freq_log][width u8][3 unmapped][band Out u8]
+//   +59…      NEQ12: 12 bands × 9 bytes [gain int16 dB×256][freq u16 freq_log][width u8][?][shape u8][?][band Out u8]
+//             width = index into PEQ_WIDTH_TABLE (1.5 oct = 0 … 1/9 = 24; 1.5 is the NEQ12 maximum);
+//             shape on band 1: 00 bell, 01 first shape button, 04 12 dB slope (scenes 353–362)
 // Switching type to NEQ12 in Director zeroes the 28 graphic gains; the editor leaves them as they are.
 const GEQ_BANDS=['31','40','50','63','80','100','125','160','200','250','315','400','500','630','800','1k','1k25','1k6','2k','2k5','3k15','4k','5k','6k3','8k','10k','12k5','16k'];
 const GEQ_TYPES=new Map([[0,'Constant-Q'],[1,'Proportional-Q'],[2,'Digi-GEQ'],[3,'Hybrid'],[4,'NEQ12']]);
@@ -21,7 +23,7 @@ function busGeqView(bus){
   const recs=busGeqRecords(bus);if(!recs.length||recs.length!==(bus.stereo?2:1))return null;
   const dat=state.current.stage.datBytes,s=recs[0].stateStart;
   const gains=GEQ_BANDS.map((_,i)=>(readU16BE(dat,s+1+i*2)-0x8000)/256);
-  const neq=Array.from({length:12},(_,i)=>{const o=s+NEQ12_BASE+i*NEQ12_STRIDE;return {gainDb:readI16BE(dat,o)/256,freqHz:4*Math.pow(2,readU16BE(dat,o+2)/4608),width:dat[o+4],active:dat[o+8]===0};});
+  const neq=Array.from({length:12},(_,i)=>{const o=s+NEQ12_BASE+i*NEQ12_STRIDE;return {gainDb:readI16BE(dat,o)/256,freqHz:4*Math.pow(2,readU16BE(dat,o+2)/4608),width:dat[o+4],shape:dat[o+6],active:dat[o+8]===0};});
   return {active:dat[s+57]===0,type:dat[s+58],gains,neq};
 }
 function busGeqWrite(bus,fn){const recs=busGeqRecords(bus);if(!recs.length)return false;const d=state.current.stage.datBytes;for(const r of recs)fn(d,r.stateStart);markStageDirty();return true;}
@@ -37,6 +39,7 @@ function setBusNeq12Band(bus,band,field,value){
   if(field==='gain'){const v=Number(value);if(!Number.isFinite(v))return false;const raw=Math.round(Math.max(-15,Math.min(15,v))*256);return busGeqWrite(bus,(d,s)=>writeI16BE(d,s+off,raw));}
   if(field==='freq'){const hz=Number(value);if(!(hz>=20&&hz<=20000))return false;const raw=Math.floor(4608*Math.log2(hz/4));return busGeqWrite(bus,(d,s)=>writeU16BE(d,s+off+2,raw));}
   if(field==='active')return busGeqWrite(bus,(d,s)=>{d[s+off+8]=value?0:1;});
+  if(field==='width'){const w=Number(value);if(!(Number.isInteger(w)&&w>=0&&w<=24))return false;return busGeqWrite(bus,(d,s)=>{d[s+off+4]=w;});}
   return false;
 }
 
@@ -53,7 +56,7 @@ function renderBusGeq(){
   panel.innerHTML=`<div class="manager-head inline"><h2>${escapeHtml(bus.title)} graphic EQ</h2><span class="confidence verified">VERIFIED WRITE</span></div>
     ${busField('GEQ','',`<select data-k="in"><option value="1">In</option><option value="0">Out</option></select>`)}
     ${busField('Type','',`<select data-k="type">${[...GEQ_TYPES].map(([r,l])=>`<option value="${r}">${l}</option>`).join('')}</select>`)}
-    ${isNeq?v.neq.map((b,i)=>busField(`Band ${i+1}`,'width byte read only',`<select data-k="na${i}"><option value="1">In</option><option value="0">Out</option></select> <input data-k="nf${i}" type="number" min="20" max="20000" step="1" style="width:6em"><b>Hz</b> <input data-k="ng${i}" type="number" min="-15" max="15" step="0.1" style="width:5em"><b>dB</b>`)).join('')
+    ${isNeq?v.neq.map((b,i)=>busField(`Band ${i+1}`,'',`<select data-k="na${i}"><option value="1">In</option><option value="0">Out</option></select> <input data-k="nf${i}" type="number" min="20" max="20000" step="1" style="width:6em"><b>Hz</b> <input data-k="ng${i}" type="number" min="-15" max="15" step="0.1" style="width:5em"><b>dB</b> <select data-k="nw${i}">${PEQ_WIDTH_TABLE.map((n,j)=>`<option value="${j}">${escapeHtml(n)}</option>`).join('')}</select>`)).join('')
       :`<div class="geq-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">${GEQ_BANDS.map((n,i)=>`<label style="display:flex;flex-direction:column;font-size:11px">${n}<input data-k="g${i}" type="number" min="-12" max="12" step="0.5"></label>`).join('')}</div>`}`;
   root.querySelector('.details-stack')?.appendChild(panel);
   const q=k=>panel.querySelector(`[data-k="${k}"]`);
@@ -64,6 +67,7 @@ function renderBusGeq(){
     q(`na${i}`).onchange=()=>redraw(setBusNeq12Band(bus,i+1,'active',q(`na${i}`).value==='1'));
     q(`nf${i}`).onchange=()=>redraw(setBusNeq12Band(bus,i+1,'freq',q(`nf${i}`).value));
     q(`ng${i}`).onchange=()=>redraw(setBusNeq12Band(bus,i+1,'gain',q(`ng${i}`).value));
+    q(`nw${i}`).value=String(Math.min(24,b.width));q(`nw${i}`).onchange=()=>redraw(setBusNeq12Band(bus,i+1,'width',q(`nw${i}`).value));
   });
   else v.gains.forEach((g,i)=>{q(`g${i}`).value=g.toFixed(1);q(`g${i}`).onchange=()=>redraw(setBusGeqGain(bus,i+1,q(`g${i}`).value));});
 }
@@ -80,5 +84,5 @@ if(typeof PARAMETER_MAP!=='undefined'){
     ['bus-geq-type','Graphic EQ type','state +58','00 Constant-Q, 01 Proportional-Q, 02 Digi-GEQ, 03 Hybrid, 04 NEQ12'],
     ['bus-neq12-band','NEQ12 band gain/frequency/Out','state +59+9×(band−1): gain int16, freq u16, width u8, …, Out u8 (+8)','gain dB×256; freq_log; 00 In / 01 Out']
   ];
-  for(const [id,field,offset,transform] of rows)if(!PARAMETER_MAP.some(x=>x.id===id))PARAMETER_MAP.push({id,area:'Bus processing',record:'Graphic EQ, {Mono|Stereo} {Group|Aux|Matrix|Main} Channel NN [Left|Right]',payload:'169-byte state',field,offset,datatype:'per-field',transform,confidence:'verified',write:true,evidence:'Controlled Director changes on Mono Aux 1 NEQ (fader drags, type menu, In button, NEQ12 band fields).',notes:'Stereo buses write both records. NEQ12 width byte and three per-band bytes are unmapped.'});
+  for(const [id,field,offset,transform] of rows)if(!PARAMETER_MAP.some(x=>x.id===id))PARAMETER_MAP.push({id,area:'Bus processing',record:'Graphic EQ, {Mono|Stereo} {Group|Aux|Matrix|Main} Channel NN [Left|Right]',payload:'169-byte state',field,offset,datatype:'per-field',transform,confidence:'verified',write:true,evidence:'Controlled Director changes on Mono Aux 1 NEQ (fader drags, type menu, In button, NEQ12 band fields).',notes:'Stereo buses write both records. NEQ12 width uses the PEQ width-table index; the band shape byte is read-only.'});
 }
