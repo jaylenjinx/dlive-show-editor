@@ -20,3 +20,17 @@ Not mapped for buses: Graphic EQ (169-byte state), Digital Attenuator, Insert, C
 ## Main (master)
 
 With Main type **None** there are no Main processing records. After switching Director to **LR+M** they appear as `Main Channel 01 Left/Right` (the stereo LR pair), `Main Channel 03` (the mono M) and `Main Channel 04`, each with the same Compressor (127), Mix Delay (4), Graphic EQ (169), Digital Attenuator (5), Insert (3) and PEQ (38) states. Verified with changes on Main LR (comp ratio, threshold, PEQ band gain, delay — Left and Right changed together) and Main M (comp ratio, threshold, PEQ gain); `Main Channel 04` was not exercised. Main is reached in Director by assigning *Main (LR)* / *Main (M)* to a bank strip in Surface → Strip Assign.
+
+## Graphic EQ ("NEQ" tab) — verified write
+
+`Graphic EQ, {Mono|Stereo} {Group|Aux|Matrix|Main} Channel NN [Left|Right]`, 169-byte state. Decoded on Mono Aux 1 (2026-11-01, scenes 281–297): fader drags, the type menu, the In button and NEQ12 band fields.
+
+| Offset | Field | Encoding |
+|---|---|---|
+| `+0` | discriminator | `03` |
+| `+1..56` | 28 graphic band gains, 31 Hz … 16 kHz | uint16, `0x8000 + dB×256`, ±12 dB (+8.32 dB stored `8853`, +4.16 `8429`, −8.32 `77AD`) |
+| `+57` | In/Out | `00` In, `01` Out |
+| `+58` | Type | `00` Constant-Q, `01` Proportional-Q, `02` Digi-GEQ, `03` Hybrid, `04` NEQ12 |
+| `+59 + 9×(b−1)` | NEQ12 band `b` (1–12) | `[gain int16 dB×256][freq u16 freq_log][width u8][3 unmapped][Out u8]` |
+
+NEQ12 band gains use the signed PEQ coordinate (`0000` = 0 dB, −3 dB = `FCFD`), unlike the graphic bands. Band 1 width went `0D → 00` when 0.6 was typed as 2; the width table and the three per-band bytes before the Out flag (shape/slope) are not mapped. Selecting NEQ12 in Director zeroes the 28 graphic gains; the editor does not, so switch back and forth in Director if that matters.
