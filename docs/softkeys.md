@@ -35,9 +35,10 @@ Director writes the same 26 entries to both blocks. Soft 20–26 are unavailable
 | Set Send Level | `30 01 04 01 rt ri 01 st si LL LL` | |
 | Set Bypass UFX | `34 01 02 01 uu 00` | `uu` = unit − 1 |
 | AMM Control (In/Out) | `18 01 02 01 00 nn 00` | `nn` = AMM − 1 |
-| Channel Processing | `2A 01 02 01 ff tt ii` | `ff` function (01 = Preamp Model In); other functions not decoded |
+| Channel Processing | `2A 01 02 01 ff tt ii` | `ff`: 01 Preamp Model, 02 LPF, 03 HPF, 04 Gate, 05 Insert A, 06 Insert B, 07 Compressor, 08 PEQ (In/Out) |
+| Assign On/Off | `1D 01 04 01 st si 01 dt di` / inverted `23 01 01 01 st si 01 dt di` | source then destination |
 
-The second batch (scene recall number, PAFL, levels, talkback, send levels, UFX bypass, AMM, channel processing) was decoded on 2026-11-01 on an S5000 surface, which uses the same 26-entry record. Assign On/Off (`1D 01 04 01 st si 01 dt di`, 9 bytes) is decoded from its default only; its invert flag was not captured.
+The second batch (scene recall number, PAFL, levels, talkback, send levels, UFX bypass, AMM, channel processing) was decoded on 2026-11-01 on an S5000 surface, which uses the same 26-entry record.
 
 Scenes stored for other surface types use additional function codes; those records fail to parse and are not written.
 
