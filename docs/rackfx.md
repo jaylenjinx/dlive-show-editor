@@ -23,3 +23,11 @@ A recall rewrites only that unit's `FX Manager` record (full-scene diff), so wri
 ## Typed parameters (sample)
 
 SMR reverb pre-delay (unit 1, `+30..31`) moved `80F7 → 8280` when 15 ms was retyped as 40 ms: `raw = 0x8000 + ms×16`, the same coordinate as the RackUltra Spaces pre-delay. Most RackFX controls are knobs with no numeric entry in Director, so their scales are not mapped.
+
+# RackUltra (UltraFX) presets
+
+RackUltra units 1–8 are `AHFX Manager NN` records (246-byte state after the label: `06 03 00`, engine id at `+3..4`, 17-byte name at `+5`). All 101 factory RackUltra presets (Spaces Reverb, Plate Reverb, Vocal Tuner, Vocal Gridder, Vocal Shifter, Vocal Harmoniser 2/4, MIDI Harmoniser, Amp & Cab Distortion, Saturator, Rhythm Delay, Empty Rack) were recalled into units 1–8 (2026-11-02, scenes 323–337). A recall rewrites only that unit's record; it also leaves stale characters after the NUL in other units' name fields, which are harmless padding. Names longer than 17 characters are stored truncated, and the factory "Plate Gold" preset stores its name as "Plate Gold 1".
+
+User presets in the console's library were seen during capture and are deliberately not included.
+
+`loadUltraFxPreset(unit, name)` writes a captured state, switching the unit's engine, so the existing engine-specific editors (Spaces, Plate, Rhythm Delay) follow the new engine.
