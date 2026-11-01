@@ -113,3 +113,12 @@ Each knob was dragged to its minimum, stepped up six times, then dragged to its 
 | | Detector button | `+68` | `00`/`01` (also changes SC filter bytes `+107..117`) |
 
 Not mapped: OptTronik's Emphasis selector (`+44`, moves a group of side-chain bytes), its Output +4/+10 switch (no scene change found), and the 16T *In* button (no scene change).
+
+## Changing model by loading a library preset (writable)
+
+Director has no separate "model" control: a model is chosen by recalling a library preset, which rewrites the whole record. Every preset in both factory libraries was recalled on input 1 (2026-11-01, scenes 220–237) and the resulting states stored in `app-dynamics-library.js`:
+
+- **Compressor:** a recall rewrites only the 127-byte `Compressor, Input Channel NN` state (side-chain source and other records are untouched). The same template is valid for group, aux, matrix and main compressors, which share the layout; stereo buses get it in both Left and Right records.
+- **Gate:** a recall rewrites the 19-byte `Gate, Input Channel NN` state and the 23-byte `SCF Gate, Input Channel NN` state (the side-chain filter differs between the expanders and the other models).
+
+The editor writes the captured state but keeps the existing In/Out byte (compressor `+2`, gate `+18`), so loading a preset never switches a processor on or off. The **Dynamics library** panel at the top of the Buses tab does this for any input or bus.
