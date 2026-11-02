@@ -40,6 +40,27 @@ Director writes the same 26 entries to both blocks. Soft 20–26 are unavailable
 
 The second batch (scene recall number, PAFL, levels, talkback, send levels, UFX bypass, AMM, channel processing) was decoded on 2026-11-01 on an S5000 surface, which uses the same 26-entry record.
 
-Scenes stored for other surface types use additional function codes; those records fail to parse and are not written.
+Third batch (2026-11-03, S5000, scenes 113–140), default settings plus one variant where Director allowed it:
+
+| Function | Entry bytes | Notes |
+|---|---|---|
+| Send Level Down | `0A 01 04 01 st si 01 MIN MIN MAX MAX 01 rt ri` | same layout as Send Level Up |
+| Sel Mix PAFL Scene | `12 01 03 01 tt ii 02 00 00 00 SS SS` | `FFFF` = No Scene; other bytes not varied |
+| SIP | `1E 01 06 01` | |
+| MCA On/Off Selected DCAs / All DCAs | `20 01 03 01` / `21 01 04 01` | |
+| ABCD Set All | `24 01 02 01 S` | `S`: 00 Disable ABCD, 01–04 Source A–D |
+| ABCD Set Channel | `25 01 02 01 ii S` | input index zero-based |
+| PAFL - Surface Number | `26 01 03 01 nn` | PAFL − 1 |
+| ABCD Set Range | `28 01 02 01 start end S` | default only |
+| ABCD Set For DCA | `29 01 02 01 dd S` | default only |
+| Virtual Sound Check | `2B 01 02 01 M` | 00 Inactive, 02 Virtual SoundCheck (01 Record Send, not captured) |
+| USB Play/Record | `2C 01 02 01 M` | 00 Stop, 01 Play / Pause, 02 Record |
+| Talkback Additive Groups | `2D 01 02 01` | |
+| Assign Range | `2E 01 04 01 st start end 01 00 dt di` | sends `start`…`end` of type `st` → destination; a USB-corpus show uses inputs 1–47 → Mute Group 1 (`0D 18`) |
+| Channel Processing Range | `31 01 02 01 tt start end 01 02 ff` | `02` = Set Off (default mode); `ff` as for Channel Processing |
+
+Variable-length functions are recognised but not parsed: Custom MIDI (`0E`, MIDI bytes), Bookmark (`27`, a page path such as `Processing/Overview`), Strip Assign Recall (`32`, library names) and Action Recall (`33`, mode `00` Toggle / `02` Recall followed by two NUL-terminated action names in older shows; Director 2.12 adds 36 more bytes). A record containing one of these is read-only.
+
+Byte 4 of an entry is its format. Older shows store Tap Tempo with format `01` and no Left/Right byte (`0C 01 03 01 G U u`, 7 bytes). With that and the codes above, 1,413 of 1,555 softkey records from 66 real shows parse; the rest contain Action Recall or Bookmark entries.
 
 Editor API: `parseSoftKeys(dat)`, `softKeyEntry.*` builders and `setSoftKeys(list)` in `app-softkeys.js`.
