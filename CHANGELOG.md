@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **NEQ12 width**: bus NEQ12 band width is the PEQ width-table index (`+4` in each band) and is now editable.
 - **All output banks**: located the remaining output tables (Surface Local, I/O Port 4, USB; MixRack I/O Port 2, DX 3/4). The Patching tab now has a bank selector and writes every bank.
 - **Bus inserts and sidechain**: Insert A for mono auxes and Main LR (MixRack socket send/return) and the compressor sidechain source for every bus are writable from the Buses tab. See `docs/patching.md`.
 - **RackFX and RackUltra presets**: all 129 factory RackFX and 101 factory RackUltra library presets captured from Director; the FX tab can load any of them into RackFX units 1–16 (`FX Manager NN`) or UFX units 1–8 (`AHFX Manager NN`, switching the engine). See `docs/rackfx.md`.
