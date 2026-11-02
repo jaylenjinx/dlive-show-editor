@@ -36,19 +36,24 @@ On the S5000, surface sources share type `01` with these index starts: Surface S
 
 Each output socket is a 3-byte `[source type][source index u16 BE]` entry. MixRack Local output `n` is at state `+6632 + 3×(n−1)`; checked on sockets 1, 7, 10 and 17, and every socket 1–32 was matched against Director's per-socket "Information" readout.
 
-Other banks (offset of output 1, one MON 1 patch each):
+All output banks (offset of output 1; one controlled MON 1 patch each, sizes from how the tables tile):
 
-| Bank | Offset |
-|---|---:|
-| MixRack Local | 6632 |
-| MixRack I/O Port 1 | 6923 |
-| MixRack I/O Port 3 | 7691 (Port 2 presumably 7307) |
-| MixRack DX 1/2 | 8075 |
-| MixRack ME | 8267 |
-| Surface DX 5/6 | 3380 |
-| Surface I/O Port 5 | 3860 |
+| Bank | Offset | Sockets |
+|---|---:|---:|
+| Surface Local | 3332 | 16 |
+| Surface DX 5/6 | 3380 | 32 |
+| Surface I/O Port 4 | 3476 | 128 |
+| Surface I/O Port 5 | 3860 | 128 |
+| Surface USB | 4244 | 2 (assumed) |
+| MixRack Local | 6632 | 32 |
+| MixRack I/O Port 1 | 6923 | 128 |
+| MixRack I/O Port 2 | 7307 | 128 |
+| MixRack I/O Port 3 | 7691 | 128 |
+| MixRack DX 1/2 | 8075 | 32 |
+| MixRack DX 3/4 | 8171 | 32 |
+| MixRack ME | 8267 | 40 (assumed) |
 
-DX 3/4 is unavailable on a DM48, and the surface local, I/O Port 4 and USB tables were not located.
+Surface Local sockets 1–2 are unavailable on the S5000 used, so socket 3 (`+3338`) located the table. The writer reproduces Director's bytes for I/O Port 2, Surface I/O Port 4 and USB patches.
 
 Source types (stereo sources use index `2×(n−1) + side`, 0 = Left, 1 = Right):
 
@@ -89,3 +94,14 @@ Checked with three controlled Director operations on input 1 (Insert A socket se
 Preamp gain, pad and 48 V are per socket in `StageBox Analogue Input, Number NN` and trim/polarity per input in `Digital Attenuator Input Channel NN`; both were already mapped (see `input-processing.md`) and were re-confirmed in this session: gain `+1..2` as dB×256 (range 5…60 dB, Director stores the gain before the −20 dB pad), pad `+3`, 48 V `+4`; trim range ±24 dB.
 
 Editor API (`app-patching.js`): `cmInputSource(ch)`, `setInputSource(ch,type,socket)`, `cmOutput(bank,socket)`, `setOutputPatch(bank,socket,type,n,side)`.
+
+## Bus inserts and bus sidechain source
+
+Captured 2026-11-02 (scenes 338–346) on Mono Aux 1/2 and Main LR/C:
+
+- Bus insert returns are further `[type][index u16]` entries: Mono Aux n at state `+6038 + 3×(n−1)`, Main legs at `+6326 + 3×idx` (L 0, R 1, C 2 …).
+- The send goes into the destination output socket entry as type `17` (aux insert send, index aux − 1) or `19` (main insert send, index = leg).
+- `Insert, <bus> Channel NN` `+1` is `00` while assigned and `01` after unassign.
+- Bus compressor sidechain source records use the input encoding `01 TT II` (Aux 1 self `01 04 00`, Input 10 `01 01 09`).
+
+`setBusInsert({kind:'aux',n}|{kind:'main',legs}, [{send,ret}…]|null)` and `setBusSidechainSource(bus, type, n)` reproduce Director's Channel Mapper and record bytes exactly for an aux assign, a Main LR assign, an unassign and a sidechain change. Groups and matrices were not reachable on the test surface, so their insert tables are not written.

@@ -45,14 +45,21 @@ const CM_OUTPUT_SOURCE_TYPES=new Map([
   [0x2D,{label:'UltraFX output (2 per unit)',stereo:false}]
 ]);
 // Output tables: state offset of output 1 for each bank (each entry 3 bytes).
+// Every bank uses the same 3-byte [type][index] entries. Located with one controlled MON 1 patch per bank
+// (DM48 MixRack + S5000 surface); the tables tile contiguously, which fixes their sizes.
 const CM_OUTPUT_BANKS=[
   {key:'mrLocal',label:'MixRack Local',base:6632,count:32,verified:true},
-  {key:'mrIo1',label:'MixRack I/O Port 1',base:6923,count:128,verified:false},
-  {key:'mrIo3',label:'MixRack I/O Port 3',base:7691,count:128,verified:false},
-  {key:'mrDx12',label:'MixRack DX 1/2',base:8075,count:64,verified:false},
-  {key:'mrMe',label:'MixRack ME',base:8267,count:40,verified:false},
-  {key:'sfDx56',label:'Surface DX 5/6',base:3380,count:64,verified:false},
-  {key:'sfIo5',label:'Surface I/O Port 5',base:3860,count:128,verified:false}
+  {key:'mrIo1',label:'MixRack I/O Port 1',base:6923,count:128,verified:true},
+  {key:'mrIo2',label:'MixRack I/O Port 2',base:7307,count:128,verified:true},
+  {key:'mrIo3',label:'MixRack I/O Port 3',base:7691,count:128,verified:true},
+  {key:'mrDx12',label:'MixRack DX 1/2',base:8075,count:32,verified:true},
+  {key:'mrDx34',label:'MixRack DX 3/4',base:8171,count:32,verified:true},
+  {key:'mrMe',label:'MixRack ME',base:8267,count:40,verified:true},
+  {key:'sfLocal',label:'Surface Local',base:3332,count:16,verified:true},
+  {key:'sfDx56',label:'Surface DX 5/6',base:3380,count:32,verified:true},
+  {key:'sfIo4',label:'Surface I/O Port 4',base:3476,count:128,verified:true},
+  {key:'sfIo5',label:'Surface I/O Port 5',base:3860,count:128,verified:true},
+  {key:'sfUsb',label:'Surface USB',base:4244,count:2,verified:true}
 ];
 
 function cmRecord(){
@@ -180,14 +187,15 @@ function renderPatching(){
     ty.onchange=apply;so.onchange=apply;
   });
   const outPanel=document.createElement('section');outPanel.className='panel';
-  const b=CM_OUTPUT_BANKS[0];
+  const b=CM_OUTPUT_BANKS.find(x=>x.key===(root.dataset.bank||'mrLocal'))||CM_OUTPUT_BANKS[0];
   const oOpts=[...CM_OUTPUT_SOURCE_TYPES].map(([v,t])=>`<option value="${v}">${escapeHtml(t.label)}</option>`).join('');
   let orows='';
   for(let s=1;s<=b.count;s++){const o=cmOutput(b.key,s);orows+=`<tr data-s="${s}"><td>${s}</td><td><select data-k="type">${oOpts}</select></td><td><input data-k="n" type="number" min="1" max="128" step="1" style="width:4em"></td><td><select data-k="side"><option>L</option><option>R</option></select></td><td class="mono">${escapeHtml(cmOutputSourceLabel(o))}</td></tr>`;}
-  outPanel.innerHTML=`<div class="manager-head inline"><h2>MixRack local outputs</h2><span class="confidence verified">CONTROLLED-DIFF VERIFIED</span></div>
-    <div class="notice">Other output banks (I/O ports, DX, ME, surface) are decoded but read-only; see docs/patching.md.</div>
+  outPanel.innerHTML=`<div class="manager-head inline"><h2>Output patch</h2><span class="confidence verified">CONTROLLED-DIFF VERIFIED</span></div>
+    <div class="peq-field"><span>Bank</span><div><select id="cmBank">${CM_OUTPUT_BANKS.map(x=>`<option value="${x.key}">${escapeHtml(x.label)}</option>`).join('')}</select></div></div>
     <div class="parameter-map-scroll patch-scroll"><table class="patch-table"><thead><tr><th>Socket</th><th>Source type</th><th>No.</th><th>Side</th><th>Now</th></tr></thead><tbody>${orows}</tbody></table></div>`;
   root.appendChild(outPanel);
+  const bs=outPanel.querySelector('#cmBank');bs.value=b.key;bs.onchange=()=>{root.dataset.bank=bs.value;renderPatching();};
   outPanel.querySelectorAll('tr[data-s]').forEach(tr=>{
     const s=Number(tr.dataset.s),o=cmOutput(b.key,s),ty=tr.querySelector('[data-k="type"]'),n=tr.querySelector('[data-k="n"]'),sd=tr.querySelector('[data-k="side"]');
     const t=CM_OUTPUT_SOURCE_TYPES.get(o.type);ty.value=String(o.type);
