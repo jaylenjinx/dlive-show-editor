@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Console UI**: the console tab gains Inputs / Buses / FX scopes. Inputs add name and colour in the toolbar, a Filters page (HPF frequency/slope/In, LPF frequency/In), a Source page (Channel Mapper source A plus the MixRack socket's gain, pad and 48V) and an Inserts page (Insert A/B to MixRack sockets or a Rack FX unit). The gate and compressor pages get a factory library preset picker. Buses show name and colour, compressor library and sidechain source, Insert A, and the graphic EQ as faders, or the NEQ12 bands. FX lists every RackFX and RackUltra unit with a factory preset loader. All controls use the existing verified writers.
 - **Direct out Follow options**: Follow Ch Fader (`+2`), Follow Ch Mute (`+3`) and Follow all (`+5`) in `Global Direct Outputs` are decoded and editable next to the direct-out tap point.
 - **Inserts on every bus**: Insert A can now be written on mono and stereo groups, stereo auxes and mono and stereo matrices, as well as mono auxes and Main. Bus return tables are 64 entries per mono bus type and 32 per stereo type (send types `15`–`1B`). A stereo bus uses one odd/even return socket pair and two sends. Checked against Director scenes 101–108. Mono groups (`0C` as an output source, `15` as an insert send) come from real shows that use them.
 - **Softkeys**: Assign On/Off invert (function `23`) and all eight Channel Processing In/Out functions decoded; builders added.
