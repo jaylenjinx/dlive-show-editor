@@ -61,6 +61,7 @@ Source types (stereo sources use index `2×(n−1) + side`, 0 = Left, 1 = Right)
 |---:|---|---|
 | `00` | MixRack input socket (tie line) | default on I/O port outputs |
 | `07` | Input direct out | input 1 → `07 00 00`, input 2 → `07 00 01` |
+| `0C` | Mono Group | Grp 1 → `0C 00 00` |
 | `0D` | Stereo Group | St Grp 1 L → `0D 00 00` |
 | `0E` | Mono Aux | Aux 2 → `0E 00 01` |
 | `0F` | Stereo Aux | St Aux 5 L → `0F 00 08` |
@@ -74,11 +75,11 @@ Source types (stereo sources use index `2×(n−1) + side`, 0 = Left, 1 = Right)
 | `21` | IEM monitor (stereo) | IEM 1 L → `21 00 00` |
 | `2D` | UltraFX output | unit 1 OP1 `00`, OP2 `01`, unit 2 OP1 `02` |
 
-Mono groups were not available in the test configuration; by the order of the other types they are probably `0C`, but that is not verified.
+Mono groups were not available in the Director test configuration. `0C` is taken from real shows that use mono groups: one patches Stereo Groups 1–2 L/R (`0D 00 00`…`0D 00 03`) followed by `0C 00 00` and `0C 00 01` on consecutive sockets, and `0C` sits between the insert sends and `0D` in the type order. Patches pointing at buses that no longer exist after a mixer reconfiguration are kept (several shows have `0C`/`0E` indices above their current bus counts).
 
 ## Inserts
 
-Insert returns are two more 128-entry tables of `[type][index u16]`, using the input-source types: Insert A at state `+2564 + 3×(ch−1)`, Insert B at `+2948 + 3×(ch−1)`. A Rack FX return uses type `1C` with index `2×(unit−1)` (Left).
+Input insert returns are two more 128-entry tables of `[type][index u16]`, using the input-source types: Insert A at state `+2564 + 3×(ch−1)`, Insert B at `+2948 + 3×(ch−1)`. A Rack FX return uses type `1C` with index `2×(unit−1)` (Left).
 
 The insert send is written into the *destination's* table, as type `08` (Insert A send) or `09` (Insert B send) with index = input − 1:
 
@@ -88,6 +89,22 @@ The insert send is written into the *destination's* table, as type `08` (Insert 
 `Insert 1|2, Input Channel NN` state `+1` is `00` while an insert is assigned and `01` when it is not. Unassigning sets the return and send entries back to `14` (unassigned).
 
 Checked with three controlled Director operations on input 1 (Insert A socket send 20 / return 40, Insert B Rack FX 3, Insert B unassign); `setInputInsert(ch, 'A'|'B', target)` reproduces all three byte-for-byte. Assigning a socket return in Director also sets that socket's preamp to 20 dB with pad on; the editor does not touch preamps.
+
+## Bus inserts
+
+Bus Insert A returns have their own tables: 64 entries for each mono bus type and 32 for each stereo bus type, tiling up to the MixRack Local output table:
+
+| Bus | Return table | Send type |
+|---|---:|---:|
+| Mono Group | 5750 | `15` |
+| Stereo Group | 5942 | `16` |
+| Mono Aux | 6038 | `17` |
+| Stereo Aux | 6230 | `18` |
+| Main (L, R, C, LFE, sL, sR) | 6326 + 3×leg | `19` |
+| Mono Matrix | 6344 | `1A` |
+| Stereo Matrix | 6536 | `1B` |
+
+Bus `n` returns at table + 3×(n−1). A stereo bus has one return entry, holding the odd socket of an odd/even pair (Director snaps an even socket down: return 50 is stored as 49 and uses 49/50), and two sends with index 2×(n−1) + side. Mains keep one return per leg. Verified on 2026-11-03 for stereo groups 1–2, stereo aux 1, mono matrices 1–2 and stereo matrix 1 (scenes 101–108); mono aux and Main on 2026-11-02; mono groups from shows that use them (Rack FX sends `15 00 nn`, returns at 5750+). `setBusInsert({kind, stereo, n}, [{send, ret}, {send}])` reproduces Director's Channel Mapper bytes for every captured step.
 
 ## Not in Channel Mapper
 
