@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Softkeys**: Assign On/Off invert (function `23`) and all eight Channel Processing In/Out functions decoded; builders added.
 - **NEQ12 width**: bus NEQ12 band width is the PEQ width-table index (`+4` in each band) and is now editable.
 - **All output banks**: located the remaining output tables (Surface Local, I/O Port 4, USB; MixRack I/O Port 2, DX 3/4). The Patching tab now has a bank selector and writes every bank.
 - **Bus inserts and sidechain**: Insert A for mono auxes and Main LR (MixRack socket send/return) and the compressor sidechain source for every bus are writable from the Buses tab. See `docs/patching.md`.

@@ -37,6 +37,7 @@ const SOFTKEY_ENTRY_LEN={
   0x1D:9,   // Assign On/Off
   0x1F:6,   // Talkback Group
   0x22:6,   // MCA On/Off Specific DCA
+  0x23:9,   // Assign On/Off (invert on)
   0x2A:7,   // Channel Processing
   0x2F:11,  // Set Level
   0x30:11,  // Set Send Level
@@ -44,6 +45,7 @@ const SOFTKEY_ENTRY_LEN={
 };
 // Levels in softkey entries use the fader coordinate: raw = 0x8000 + round(dB×256), −∞ = 0x0000.
 function skLevel(db){if(db===null||db===-Infinity)return [0,0];const r=0x8000+Math.round(Math.max(-127,Math.min(10,Number(db)))*256);return [r>>8,r&255];}
+const SOFTKEY_CP_FUNCTIONS={preampModel:1,lpf:2,hpf:3,gate:4,insertA:5,insertB:6,compressor:7,peq:8};
 const SOFTKEY_SCENE_ACTIONS={store:0,new:1,update:2,next:3,previous:4};
 
 function softkeyFind(dat){
@@ -97,7 +99,11 @@ const softKeyEntry={
   sendLevelUp:(sendType,sendIndex,rcvType,rcvIndex,minDb,maxDb)=>skBytes([0x09,1,4,1,SOFTKEY_CH_TYPES[sendType],sendIndex,1,...skLevel(minDb),...skLevel(maxDb),1,SOFTKEY_CH_TYPES[rcvType],rcvIndex]),
   setSendLevel:(rcvType,rcvIndex,sendType,sendIndex,db)=>skBytes([0x30,1,4,1,SOFTKEY_CH_TYPES[rcvType],rcvIndex,1,SOFTKEY_CH_TYPES[sendType],sendIndex,...skLevel(db)]),
   ufxBypass:(unit)=>skBytes([0x34,1,2,1,unit-1,0]),
-  ammInOut:(n)=>skBytes([0x18,1,2,1,0,n-1,0])
+  ammInOut:(n)=>skBytes([0x18,1,2,1,0,n-1,0]),
+  // Assign On/Off: source channel → destination mix; invert uses function 23 / class 01
+  assignOnOff:(srcType,srcIndex,dstType,dstIndex,invert)=>skBytes([invert?0x23:0x1D,1,invert?1:4,1,SOFTKEY_CH_TYPES[srcType],srcIndex,1,SOFTKEY_CH_TYPES[dstType],dstIndex]),
+  // Channel Processing In/Out toggle for one channel's processing block
+  channelProcessing:(type,index,fn)=>skBytes([0x2A,1,2,1,SOFTKEY_CP_FUNCTIONS[fn],SOFTKEY_CH_TYPES[type],index])
 };
 
 function setSoftKeys(list){
