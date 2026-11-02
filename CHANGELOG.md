@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Bus inserts and sidechain**: Insert A for mono auxes and Main LR (MixRack socket send/return) and the compressor sidechain source for every bus are writable from the Buses tab. See `docs/patching.md`.
+- **RackFX and RackUltra presets**: all 129 factory RackFX and 101 factory RackUltra library presets captured from Director; the FX tab can load any of them into RackFX units 1–16 (`FX Manager NN`) or UFX units 1–8 (`AHFX Manager NN`, switching the engine). See `docs/rackfx.md`.
 - **Speed**: opening a show and switching scenes dropped from ~1–1.2 s to ~30–40 ms, and edits from ~300 ms to a few ms. Record lookups now use a per-scene index of printable 4-byte windows instead of a linear scan of the ~400 KB scene for every label (returns exactly the same positions — checked on 32,640 searches), and only the visible tab re-renders; hidden tabs redraw when opened (`app-perf.js`).
 - **Wedge / IEM names**: the `Monitor Channel Name Colour Manager` record (two entries, same 9-byte name + colour layout as the other managers) is now parsed, so the personal-monitoring mixes can be renamed and recoloured in Names & colours.
 - **Bus graphic EQ**: decoded the 169-byte `Graphic EQ` record for groups, auxes, matrices and mains (28 band gains, In/Out, type incl. NEQ12 and its 12 bands' gain/frequency/Out). Editable in the Buses tab; stereo buses write both sides. See `docs/bus-processing.md`.
