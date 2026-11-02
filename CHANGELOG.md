@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Direct out Follow options**: Follow Ch Fader (`+2`), Follow Ch Mute (`+3`) and Follow all (`+5`) in `Global Direct Outputs` are decoded and editable next to the direct-out tap point.
+- **Inserts on every bus**: Insert A can now be written on mono and stereo groups, stereo auxes and mono and stereo matrices, as well as mono auxes and Main. Bus return tables are 64 entries per mono bus type and 32 per stereo type (send types `15`–`1B`). A stereo bus uses one odd/even return socket pair and two sends. Checked against Director scenes 101–108. Mono groups (`0C` as an output source, `15` as an insert send) come from real shows that use them.
 - **Softkeys**: Assign On/Off invert (function `23`) and all eight Channel Processing In/Out functions decoded; builders added.
 - **NEQ12 width**: bus NEQ12 band width is the PEQ width-table index (`+4` in each band) and is now editable.
 - **All output banks**: located the remaining output tables (Surface Local, I/O Port 4, USB; MixRack I/O Port 2, DX 3/4). The Patching tab now has a bank selector and writes every bank.

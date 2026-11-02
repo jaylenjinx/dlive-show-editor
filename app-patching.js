@@ -28,9 +28,11 @@ const CM_INPUT_SOURCE_TYPES=new Map([
 const CM_SURFACE_INDEX_BASES=[[0,'Surface Sockets'],[12,'Surface DX 5/6'],[44,'Surface I/O Port 4'],[172,'Surface I/O Port 5'],[300,'USB']];
 
 // Output source types. Stereo sources use index = 2×(n−1) + side (0 = Left, 1 = Right).
+// Mono Group 0x0C comes from shows that use it (Stereo Groups 1–2 L/R then 0C 00/01 on consecutive sockets).
 const CM_OUTPUT_SOURCE_TYPES=new Map([
   [0x00,{label:'MixRack socket (tie)',stereo:false}],
   [0x07,{label:'Input direct out',stereo:false}],
+  [0x0C,{label:'Mono Group',stereo:false}],
   [0x0D,{label:'Stereo Group',stereo:true}],
   [0x0E,{label:'Mono Aux',stereo:false}],
   [0x0F,{label:'Stereo Aux',stereo:true}],
