@@ -6,7 +6,7 @@
 // Loaded after app-console-ui-main.js (see app-ui.js) and wraps renderConsoleEditor.
 
 const CONSOLE_SCOPES=[['input','Inputs'],['bus','Buses'],['fx','FX'],['softkeys','Softkeys']];
-const CONSOLE_EXTRA_MODES=[['filters','Filters'],['source','Source'],['inserts','Inserts']];
+const CONSOLE_EXTRA_MODES=[['filters','Filters'],['source','Source'],['inserts','Inserts'],['safes','Safes']];
 
 function cuiCard(title,body,badge=''){
   return `<section class="console-processing-card"><div class="console-subhead"><span>${safeText(title)}</span>${badge}</div>${body}</section>`;
@@ -99,6 +99,18 @@ function renderInsertsConsole(root,ch){
     q(`ins-${slot}-a`).onclick=()=>cuiOk(setInputInsert(ch,slot,kind.value==='rackfx'?{kind:'rackfx',unit:+q(`ins-${slot}-u`).value}:{kind:'socket',send:+q(`ins-${slot}-s`).value,ret:+q(`ins-${slot}-r`).value}),`Insert ${slot}`);
     q(`ins-${slot}-x`).onclick=()=>cuiOk(setInputInsert(ch,slot,null),`Insert ${slot}`);
   }
+}
+
+// ---- Input: global scene safes (show-level file) ----
+function renderSafesConsole(root,ch){
+  const shell=document.createElement('section');shell.className='dlive-console-frame';
+  const v=typeof inputSafes==='function'?inputSafes(ch):null;
+  if(!v){shell.innerHTML=cuiHead('SCENE SAFES',`CH ${ch}`)+'<div class="notice warn">This show has no Director 2.12 StageBoxSceneSafes.dat (or an older format), so safes are not editable.</div>';root.appendChild(shell);return;}
+  shell.innerHTML=cuiHead('GLOBAL SCENE SAFES',`CH ${ch}${channelName(ch)?` · ${channelName(ch)}`:''}`)+`<div class="console-safes">${SAFES_INPUT_FIELDS.map(f=>`<span data-safe="${f.key}"></span>`).join('')}</div>
+    <div class="console-note">Safes are global for the show (not per scene). Routing is shown but not editable: its flags depend on which buses exist. Director's Processing safe also sets a few flags outside the input block that the editor leaves alone.</div>`;
+  root.appendChild(shell);
+  for(const f of SAFES_INPUT_FIELDS){const st=v[f.key];
+    shell.querySelector(`[data-safe="${f.key}"]`).appendChild(makeToggle(`${f.label}${st==='partial'?' (partial)':''}`,st==='on',!!f.readOnly,()=>cuiOk(setInputSafe(ch,f.key,st!=='on'),'Safe')));}
 }
 
 // ---- Library preset pickers on the gate and compressor pages ----
@@ -238,6 +250,7 @@ renderConsoleEditor=function(){
   if(mode==='filters')renderFiltersConsole(root,ch);
   else if(mode==='source')renderSourceConsole(root,ch);
   else if(mode==='inserts')renderInsertsConsole(root,ch);
+  else if(mode==='safes')renderSafesConsole(root,ch);
   else if(mode==='comp')cuiLibraryPicker(root,'comp',ch);
   else if(mode==='gate')cuiLibraryPicker(root,'gate',ch);
 };
