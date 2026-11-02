@@ -94,3 +94,14 @@ Checked with three controlled Director operations on input 1 (Insert A socket se
 Preamp gain, pad and 48 V are per socket in `StageBox Analogue Input, Number NN` and trim/polarity per input in `Digital Attenuator Input Channel NN`; both were already mapped (see `input-processing.md`) and were re-confirmed in this session: gain `+1..2` as dB×256 (range 5…60 dB, Director stores the gain before the −20 dB pad), pad `+3`, 48 V `+4`; trim range ±24 dB.
 
 Editor API (`app-patching.js`): `cmInputSource(ch)`, `setInputSource(ch,type,socket)`, `cmOutput(bank,socket)`, `setOutputPatch(bank,socket,type,n,side)`.
+
+## Bus inserts and bus sidechain source
+
+Captured 2026-11-02 (scenes 338–346) on Mono Aux 1/2 and Main LR/C:
+
+- Bus insert returns are further `[type][index u16]` entries: Mono Aux n at state `+6038 + 3×(n−1)`, Main legs at `+6326 + 3×idx` (L 0, R 1, C 2 …).
+- The send goes into the destination output socket entry as type `17` (aux insert send, index aux − 1) or `19` (main insert send, index = leg).
+- `Insert, <bus> Channel NN` `+1` is `00` while assigned and `01` after unassign.
+- Bus compressor sidechain source records use the input encoding `01 TT II` (Aux 1 self `01 04 00`, Input 10 `01 01 09`).
+
+`setBusInsert({kind:'aux',n}|{kind:'main',legs}, [{send,ret}…]|null)` and `setBusSidechainSource(bus, type, n)` reproduce Director's Channel Mapper and record bytes exactly for an aux assign, a Main LR assign, an unassign and a sidechain change. Groups and matrices were not reachable on the test surface, so their insert tables are not written.
