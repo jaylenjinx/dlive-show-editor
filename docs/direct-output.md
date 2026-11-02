@@ -21,4 +21,14 @@ Typed values carry the same ~+0.012 dB noise as sends (`FD`/`03` low byte); rang
 
 `state +1` holds the tap point for every input's direct out: `0` Post Preamp, `1` Post LPF, `2` Post Gate, `3` Post Ins A Ret, `4` Post PEQ, `5` Post Comp, `6` Post Ins B Ret, `7` Post Delay (default). Each option changes only this byte.
 
-Director's Routing page also lists *Follow DCA/Mutes*, *Follow Ch Fader* and *Follow Ch Mute* (shown as Off / Off / On). Their bytes among the remaining `00 01 00 00` were not isolated; they stay unmapped.
+## Global Follow Options — verified write
+
+Clicking the Ip Direct Out panel on the Routing page opens *Routing Options*, with three global switches. Each toggle changes one byte of `Global Direct Outputs` (2026-11-03, scenes 108–113):
+
+| Offset | Switch | Default |
+|---|---|---|
+| `+2` | Follow Ch Fader | `00` Off |
+| `+3` | Follow Ch Mute | `01` On |
+| `+5` | Follow all (DCA/Mutes, Ch Fader/Mute) | `00` Off |
+
+`+4` was not identified. Older shows store a 5-byte form starting `01` (`01 07 00 01 00`); the editor only writes the 6-byte `02` form.
