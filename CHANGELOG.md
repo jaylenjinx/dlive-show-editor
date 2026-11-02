@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **More softkey functions**: Send Level Down, Sel Mix PAFL Scene, SIP, MCA all/selected DCAs, the four ABCD functions, PAFL surface number, Virtual Sound Check, USB Play/Record, Talkback Additive Groups, Assign Range and Channel Processing Range are decoded, with builders for each. Older shows' 7-byte Tap Tempo now parses too, so 1,413 of 1,555 softkey records from 66 real shows parse.
 - **Softkeys**: Assign On/Off invert (function `23`) and all eight Channel Processing In/Out functions decoded; builders added.
 - **NEQ12 width**: bus NEQ12 band width is the PEQ width-table index (`+4` in each band) and is now editable.
 - **All output banks**: located the remaining output tables (Surface Local, I/O Port 4, USB; MixRack I/O Port 2, DX 3/4). The Patching tab now has a bank selector and writes every bank.
