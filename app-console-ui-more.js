@@ -5,7 +5,7 @@
 // consoles. Every control calls an existing verified writer; nothing here touches bytes directly.
 // Loaded after app-console-ui-main.js (see app-ui.js) and wraps renderConsoleEditor.
 
-const CONSOLE_SCOPES=[['input','Inputs'],['bus','Buses'],['fx','FX']];
+const CONSOLE_SCOPES=[['input','Inputs'],['bus','Buses'],['fx','FX'],['softkeys','Softkeys']];
 const CONSOLE_EXTRA_MODES=[['filters','Filters'],['source','Source'],['inserts','Inserts']];
 
 function cuiCard(title,body,badge=''){
@@ -165,6 +165,58 @@ function renderFxConsole(root){
   shell.querySelectorAll('[data-ufx]').forEach(s=>s.onchange=()=>{if(s.value)cuiOk(loadUltraFxPreset(+s.dataset.ufx,s.value),'UltraFX preset');});
 }
 
+// ---- Softkeys console ----
+// Functions offered for editing; `p` lists the parameters each builder takes.
+const CUI_SK_FUNCS=[
+  ['unused','Unused',[]],['mix','Mix','ch'],['mute','Mute','ch'],['sel','Sel','ch'],['pafl','PAFL','ch'],
+  ['faderStart','Fader Start','ch'],['muteGroup','Mute Group','n'],['sceneRecall','Recall Scene','n'],['sceneGo','Scene Go',[]],
+  ['sceneNext','Scene Next',[]],['scenePrev','Scene Previous',[]],['tapGlobal','Tap Tempo (global)',[]],['paflClear','PAFL Clear',[]],
+  ['dcaSpillActive','DCA/MCA Spill Active',[]],['peakHoldReset','Peak Hold Reset',[]],['ufxBypass','Bypass UFX','n'],
+  ['talkbackGroup','Talkback Group','n'],['sip','SIP',[]],['mcaAllDcas','MCA On/Off All DCAs',[]],
+  ['abcdA','ABCD Set All: A',[]],['abcdB','ABCD Set All: B',[]],['abcdOff','ABCD Set All: Disable',[]],
+  ['usbPlay','USB Play / Pause',[]],['usbRec','USB Record',[]],['vsc','Virtual Sound Check',[]]
+];
+const CUI_SK_TYPES=[['input','Input'],['monoGroup','Mono Group'],['stereoGroup','Stereo Group'],['monoAux','Mono Aux'],['stereoAux','Stereo Aux'],['monoMatrix','Mono Matrix'],['stereoMatrix','Stereo Matrix'],['main','Main'],['dca','DCA']];
+function cuiSkBuild(fn,type,n){
+  const E=softKeyEntry,i=Math.max(0,Number(n)-1);
+  switch(fn){
+    case 'unused':return E.unused();case 'mix':return E.mix(type,i);case 'mute':return E.mute(type,i,false);case 'sel':return E.sel(type,i);
+    case 'pafl':return E.pafl(type,i);case 'faderStart':return E.faderStart(type,i);case 'muteGroup':return E.muteGroup(i+1,false);
+    case 'sceneRecall':return E.sceneRecall(i+1);case 'sceneGo':return E.sceneGo(false);case 'sceneNext':return E.sceneAction('next');
+    case 'scenePrev':return E.sceneAction('previous');case 'tapGlobal':return E.tapTempo({global:true});case 'paflClear':return E.paflClear();
+    case 'dcaSpillActive':return E.dcaSpillActive();case 'peakHoldReset':return E.peakHoldReset();case 'ufxBypass':return E.ufxBypass(i+1);
+    case 'talkbackGroup':return E.talkbackGroup(i+1);case 'sip':return E.sip();case 'mcaAllDcas':return E.mcaAllDcas();
+    case 'abcdA':return E.abcdSetAll('A');case 'abcdB':return E.abcdSetAll('B');case 'abcdOff':return E.abcdSetAll('off');
+    case 'usbPlay':return E.usbPlayRecord('playPause');case 'usbRec':return E.usbPlayRecord('record');case 'vsc':return E.virtualSoundcheck('virtualSoundcheck');
+  }
+  return null;
+}
+function renderSoftkeysConsole(root){
+  const sf=state.current?.surface,shell=document.createElement('section');shell.className='dlive-console-frame softkey-console';
+  const sk=sf&&parseSoftKeys(sf.datBytes);
+  if(!sk){shell.innerHTML=cuiHead('SOFTKEYS','—')+'<div class="notice warn">No Surface Soft Controls record in this scene.</div>';root.appendChild(shell);return;}
+  const entries=sk.valid?sk.banks[0]:[];
+  shell.innerHTML=cuiHead('SOFTKEYS',`${sk.counts?.[0]||0} keys`,sk.valid?'<span class="confidence verified">VERIFIED WRITERS</span>':'<span class="confidence">READ-ONLY</span>')+
+    (sk.valid?'':`<div class="notice warn">This record holds a function the editor cannot parse (${safeText(sk.reason||'')}), so it is shown read-only.</div>`)+
+    `<div class="console-sk-grid">${entries.map((e,i)=>`<div class="console-sk${e[0]===0?' unused':''}"><b>Soft ${i+1}</b><span>${safeText(softkeyDescribe(e))}</span><button class="btn" type="button" data-sk-edit="${i}">Edit</button></div>`).join('')}</div>
+    <div class="console-sk-editor" hidden><div class="console-subhead"><span data-k="sk-title"></span></div>
+      <label>Function<select data-k="sk-fn">${CUI_SK_FUNCS.map(([id,l])=>`<option value="${id}">${safeText(l)}</option>`).join('')}</select></label>
+      <label data-k="sk-chrow">Channel<div class="console-value-row"><select data-k="sk-type">${CUI_SK_TYPES.map(([id,l])=>`<option value="${id}">${l}</option>`).join('')}</select>${cuiNum('sk-n',1,1,128)}</div></label>
+      <label data-k="sk-nrow">Number<div class="console-value-row">${cuiNum('sk-num',1,1,500)}</div></label>
+      <div class="console-button-pair"><button class="btn" type="button" data-k="sk-apply">Apply</button><button class="btn" type="button" data-k="sk-cancel">Cancel</button></div>
+      <small class="console-inline-note">Director writes the same 26 keys to both softkey banks; so does the editor.</small></div>`;
+  root.appendChild(shell);const q=k=>shell.querySelector(`[data-k="${k}"]`),ed=shell.querySelector('.console-sk-editor');
+  let idx=-1;const sync=()=>{const p=CUI_SK_FUNCS.find(f=>f[0]===q('sk-fn').value)?.[2];q('sk-chrow').hidden=p!=='ch';q('sk-nrow').hidden=p!=='n';};
+  q('sk-fn').onchange=sync;
+  shell.querySelectorAll('[data-sk-edit]').forEach(b=>{b.disabled=!sk.valid;b.onclick=()=>{idx=+b.dataset.skEdit;ed.hidden=false;q('sk-title').textContent=`Soft ${idx+1} — ${softkeyDescribe(entries[idx])}`;sync();ed.scrollIntoView({block:'nearest'});};});
+  q('sk-cancel').onclick=()=>{ed.hidden=true;};
+  q('sk-apply').onclick=()=>{
+    const p=CUI_SK_FUNCS.find(f=>f[0]===q('sk-fn').value)?.[2];
+    const e=cuiSkBuild(q('sk-fn').value,q('sk-type').value,p==='n'?q('sk-num').value:q('sk-n').value);if(!e||idx<0)return;
+    const list=entries.map(x=>x);list[idx]=e;cuiOk(setSoftKeys(list),'Softkey');
+  };
+}
+
 // ---- Wrap the console entry point ----
 const renderConsoleEditorBase=renderConsoleEditor;
 renderConsoleEditor=function(){
@@ -182,6 +234,7 @@ renderConsoleEditor=function(){
   if(scope!=='input'||extra){[...root.children].forEach(el=>{if(el!==tb)el.remove();});}
   if(scope==='bus'){tb?.querySelector('.console-processor-switch')?.remove();tb?.querySelector('.console-toolbar-channel')?.remove();renderBusConsole(root);return;}
   if(scope==='fx'){tb?.querySelector('.console-processor-switch')?.remove();tb?.querySelector('.console-toolbar-channel')?.remove();renderFxConsole(root);return;}
+  if(scope==='softkeys'){tb?.querySelector('.console-processor-switch')?.remove();tb?.querySelector('.console-toolbar-channel')?.remove();renderSoftkeysConsole(root);return;}
   if(mode==='filters')renderFiltersConsole(root,ch);
   else if(mode==='source')renderSourceConsole(root,ch);
   else if(mode==='inserts')renderInsertsConsole(root,ch);
