@@ -41,8 +41,30 @@ const SOFTKEY_ENTRY_LEN={
   0x2A:7,   // Channel Processing
   0x2F:11,  // Set Level
   0x30:11,  // Set Send Level
-  0x34:6    // Set Bypass UFX
+  0x34:6,   // Set Bypass UFX
+  // Decoded 2026-11-03 (Director 2.12, S5000, scenes 113–140):
+  0x0A:14,  // Send Level Down (same layout as Send Level Up)
+  0x12:12,  // Sel Mix PAFL Scene
+  0x1E:4,   // SIP
+  0x20:4,   // MCA On/Off Selected DCAs
+  0x21:4,   // MCA On/Off All DCAs
+  0x24:5,   // ABCD Set All
+  0x25:6,   // ABCD Set Channel
+  0x26:5,   // PAFL - Surface Number
+  0x28:7,   // ABCD Set Range
+  0x29:6,   // ABCD Set For DCA
+  0x2B:5,   // Virtual Sound Check
+  0x2C:5,   // USB Play/Record
+  0x2D:4,   // Talkback Additive Groups
+  0x2E:11,  // Assign Range
+  0x31:10   // Channel Processing Range
 };
+// Variable-length functions (not parsed; a record holding them stays read-only): 0x0E Custom MIDI,
+// 0x27 Bookmark, 0x32 Strip Assign Recall and 0x33 Action Recall carry MIDI bytes or NUL-terminated
+// names, and their Director 2.12 layout differs from older shows.
+const SOFTKEY_ABCD_SOURCES={off:0,A:1,B:2,C:3,D:4};
+const SOFTKEY_USB_MODES={stop:0,playPause:1,record:2};
+const SOFTKEY_VSC_MODES={inactive:0,recordSend:1,virtualSoundcheck:2};
 // Levels in softkey entries use the fader coordinate: raw = 0x8000 + round(dB×256), −∞ = 0x0000.
 function skLevel(db){if(db===null||db===-Infinity)return [0,0];const r=0x8000+Math.round(Math.max(-127,Math.min(10,Number(db)))*256);return [r>>8,r&255];}
 const SOFTKEY_CP_FUNCTIONS={preampModel:1,lpf:2,hpf:3,gate:4,insertA:5,insertB:6,compressor:7,peq:8};
@@ -54,6 +76,12 @@ function softkeyFind(dat){
   if(frameEnd>dat.length||dat[pos+sig.length]!==0)return null;
   return {frameStart,frameEnd,stateStart:pos+sig.length+1};
 }
+// Byte 4 of an entry is its format: older shows store Tap Tempo with format 01 and no Left/Right byte
+// (`0C 01 03 01 G U u`, 7 bytes); Director 2.12 writes format 02 (8 bytes). Checked on 1,413 USB-corpus records.
+function softkeyEntryLen(dat,p){
+  if(dat[p]===0x0C&&dat[p+3]===0x01)return 7;
+  return SOFTKEY_ENTRY_LEN[dat[p]];
+}
 function parseSoftKeys(dat){
   const f=softkeyFind(dat);if(!f)return null;
   let p=f.stateStart;const nBanks=dat[p++],counts=[];
@@ -62,7 +90,7 @@ function parseSoftKeys(dat){
   for(let b=0;b<nBanks;b++){
     const entries=[];
     for(let i=0;i<counts[b];i++){
-      const len=SOFTKEY_ENTRY_LEN[dat[p]];
+      const len=softkeyEntryLen(dat,p);
       if(!len||p+len>f.frameEnd)return {...f,valid:false,reason:`unknown softkey function 0x${(dat[p]||0).toString(16)} at entry ${i+1}`};
       entries.push(dat.slice(p,p+len));p+=len;
     }
@@ -103,7 +131,24 @@ const softKeyEntry={
   // Assign On/Off: source channel → destination mix; invert uses function 23 / class 01
   assignOnOff:(srcType,srcIndex,dstType,dstIndex,invert)=>skBytes([invert?0x23:0x1D,1,invert?1:4,1,SOFTKEY_CH_TYPES[srcType],srcIndex,1,SOFTKEY_CH_TYPES[dstType],dstIndex]),
   // Channel Processing In/Out toggle for one channel's processing block
-  channelProcessing:(type,index,fn)=>skBytes([0x2A,1,2,1,SOFTKEY_CP_FUNCTIONS[fn],SOFTKEY_CH_TYPES[type],index])
+  channelProcessing:(type,index,fn)=>skBytes([0x2A,1,2,1,SOFTKEY_CP_FUNCTIONS[fn],SOFTKEY_CH_TYPES[type],index]),
+  sendLevelDown:(sendType,sendIndex,rcvType,rcvIndex,minDb,maxDb)=>skBytes([0x0A,1,4,1,SOFTKEY_CH_TYPES[sendType],sendIndex,1,...skLevel(minDb),...skLevel(maxDb),1,SOFTKEY_CH_TYPES[rcvType],rcvIndex]),
+  sip:()=>skBytes([0x1E,1,6,1]),
+  mcaSelectedDcas:()=>skBytes([0x20,1,3,1]),
+  mcaAllDcas:()=>skBytes([0x21,1,4,1]),
+  talkbackAdditiveGroups:()=>skBytes([0x2D,1,2,1]),
+  // ABCD source: 'off' (Disable ABCD) or 'A'–'D'; channel indexes are zero-based
+  abcdSetAll:(src)=>skBytes([0x24,1,2,1,SOFTKEY_ABCD_SOURCES[src]]),
+  abcdSetChannel:(index,src)=>skBytes([0x25,1,2,1,index,SOFTKEY_ABCD_SOURCES[src]]),
+  abcdSetRange:(start,end,src)=>skBytes([0x28,1,2,1,start,end,SOFTKEY_ABCD_SOURCES[src]]),
+  abcdSetForDca:(dca,src)=>skBytes([0x29,1,2,1,dca,SOFTKEY_ABCD_SOURCES[src]]),
+  paflSurfaceNumber:(n)=>skBytes([0x26,1,3,1,n-1]),
+  usbPlayRecord:(mode)=>skBytes([0x2C,1,2,1,SOFTKEY_USB_MODES[mode]]),
+  virtualSoundcheck:(mode)=>skBytes([0x2B,1,2,1,SOFTKEY_VSC_MODES[mode]]),
+  // Assign Range: send channels start..end (zero-based) of one type → destination mix; mode byte 00 = Toggle
+  assignRange:(sendType,start,end,dstType,dstIndex)=>skBytes([0x2E,1,4,1,SOFTKEY_CH_TYPES[sendType],start,end,1,0,SOFTKEY_CH_TYPES[dstType],dstIndex]),
+  // Channel Processing Range: mode byte 02 = Set Off (Director's default); fn as for channelProcessing
+  channelProcessingRange:(type,start,end,fn)=>skBytes([0x31,1,2,1,SOFTKEY_CH_TYPES[type],start,end,1,2,SOFTKEY_CP_FUNCTIONS[fn]])
 };
 
 function setSoftKeys(list){
@@ -111,7 +156,7 @@ function setSoftKeys(list){
   // The whole record is replaced, so it is rewritable even when it holds functions this module cannot parse.
   const sk=softkeyFind(surface.datBytes);if(!sk)return false;
   const entries=Array.from({length:SOFTKEY_COUNT},(_,i)=>list[i]||softKeyEntry.unused());
-  if(entries.some(e=>!SOFTKEY_ENTRY_LEN[e[0]]||SOFTKEY_ENTRY_LEN[e[0]]!==e.length))return false;
+  if(entries.some(e=>!SOFTKEY_ENTRY_LEN[e[0]]||softkeyEntryLen(e,0)!==e.length))return false;
   const label=asciiBytes(SOFTKEY_LABEL);
   const body=[2,0,SOFTKEY_COUNT,0,SOFTKEY_COUNT];
   for(let b=0;b<2;b++)for(const e of entries)body.push(...e);
@@ -123,4 +168,37 @@ function setSoftKeys(list){
   out.set(old.subarray(sk.frameEnd),p);
   surface.datBytes=out;surface.banks=parseSurfaceBanks(out);surface.structure=findStructureLabels(out);
   markSurfaceDirty();return true;
+}
+
+// Plain-language description of one parsed entry (for read-only listings).
+const SOFTKEY_TYPE_NAMES={0x01:'Ip',0x02:'Grp',0x03:'St Grp',0x04:'Aux',0x05:'St Aux',0x08:'Main',0x0A:'Mtx',0x0B:'St Mtx',0x0D:'DCA'};
+function softkeyChannelName(t,i){
+  if(t===0x0D&&i>=0x18)return `Mute Group ${i-0x17}`;
+  return `${SOFTKEY_TYPE_NAMES[t]||`type ${t}`} ${i+1}`;
+}
+function softkeyLevelText(hi,lo){const r=(hi<<8)|lo;return r===0?'−∞':`${((r-0x8000)/256).toFixed(1)} dB`;}
+function softkeyDescribe(e){
+  const f=e[0],ch=(o)=>softkeyChannelName(e[o],e[o+1]),cp=Object.entries(SOFTKEY_CP_FUNCTIONS).find(([,v])=>v===e[e.length-1])?.[0];
+  const abcd=v=>v?`Source ${'ABCD'[v-1]}`:'Disable ABCD';
+  switch(f){
+    case 0x00:return 'Unused';
+    case 0x01:return `Mute ${ch(4)} (inverted)`;case 0x02:return `Mute ${ch(4)}`;case 0x03:return `Sel ${ch(4)}`;case 0x04:return `Mix ${ch(4)}`;
+    case 0x05:return `PAFL ${ch(4)}`;case 0x07:return `Level Up ${ch(4)}`;case 0x08:return `Level Down ${ch(4)}`;
+    case 0x09:return `Send Level Up ${ch(4)} → ${ch(12)}`;case 0x0A:return `Send Level Down ${ch(4)} → ${ch(12)}`;
+    case 0x0B:return `Talkback Assign ${ch(4)}`;case 0x0C:return e[3]===1?'Tap Tempo (older format)':`Tap Tempo ${e[4]?'Global':(e[5]?`UFX ${e[6]+1}`:`FX ${e[6]+1}`)}`;
+    case 0x0D:return `Recall Scene ${((e[4]<<8)|e[5])+1}`;case 0x0F:return 'PAFL Clear';case 0x10:return `Scene Go${e[4]?' (auto increment)':''}`;
+    case 0x11:return `Scene ${['Store','New','Update','Next','Previous'][e[4]]||e[4]}`;case 0x12:return `Sel Mix PAFL Scene ${ch(4)}`;
+    case 0x15:return `${ch(4)}`;case 0x16:return `${ch(4)} (inverted)`;case 0x17:return 'DCA/MCA Spill Active';case 0x18:return `AMM ${e[5]+1} In/Out`;
+    case 0x19:return `Fader On-Off ${ch(4)}`;case 0x1A:return `Fader Start ${ch(4)}`;case 0x1C:return 'Peak Hold Reset';
+    case 0x1D:return `Assign ${ch(4)} → ${ch(7)}`;case 0x23:return `Assign ${ch(4)} → ${ch(7)} (inverted)`;case 0x1E:return 'SIP';case 0x1F:return `Talkback Group ${e[4]+1}`;
+    case 0x20:return 'MCA On/Off Selected DCAs';case 0x21:return 'MCA On/Off All DCAs';case 0x22:return `MCA On/Off ${ch(4)}`;
+    case 0x24:return `ABCD Set All: ${abcd(e[4])}`;case 0x25:return `ABCD Set Ip ${e[4]+1}: ${abcd(e[5])}`;case 0x26:return `PAFL Surface Number ${e[4]+1}`;
+    case 0x28:return `ABCD Set Ip ${e[4]+1}–${e[5]+1}: ${abcd(e[6])}`;case 0x29:return `ABCD Set DCA ${e[4]+1}: ${abcd(e[5])}`;
+    case 0x2A:return `${cp||'Processing'} In/Out ${ch(5)}`;case 0x2B:return `Virtual Sound Check: ${['Inactive','Record Send','Virtual SoundCheck'][e[4]]||e[4]}`;
+    case 0x2C:return `USB ${['Stop','Play / Pause','Record'][e[4]]||e[4]}`;case 0x2D:return 'Talkback Additive Groups';
+    case 0x2E:return `Assign ${SOFTKEY_TYPE_NAMES[e[4]]||e[4]} ${e[5]+1}–${e[6]+1} → ${ch(9)}`;case 0x2F:return `Set Level ${ch(7)} ${softkeyLevelText(e[9],e[10])}`;
+    case 0x30:return `Set Send Level ${ch(7)} → ${ch(4)} ${softkeyLevelText(e[9],e[10])}`;case 0x31:return `${cp||'Processing'} Range ${SOFTKEY_TYPE_NAMES[e[4]]||''} ${e[5]+1}–${e[6]+1}`;
+    case 0x34:return `Bypass UFX ${e[4]+1}`;
+    default:return `Function 0x${f.toString(16).padStart(2,'0')}`;
+  }
 }

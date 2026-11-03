@@ -90,9 +90,14 @@ function parseInputDirectOutputs(dat){
   }
   return out;
 }
+const IP_DIRECT_OUT_FOLLOW_OFFSETS={fader:2,mute:3,all:5};
 function parseGlobalDirectOutputs(dat){
   const r=ipParseRecord(dat,'Global Direct Outputs',6);if(!r)return null;
-  const s=r.stateStart;return {...r,sourceOffset:s+1,sourceRaw:dat[s+1],sourceLabel:IP_DIRECT_OUT_SOURCE_LABELS.get(dat[s+1])||`Unknown 0x${hexByte(dat[s+1])}`,sourceKnown:IP_DIRECT_OUT_SOURCE_LABELS.has(dat[s+1]),writableShape:dat[s]===0x02};
+  const s=r.stateStart,v2=dat[s]===0x02;
+  // Global Follow Options (Routing › Routing Options), 2026-11-03 scenes 108–113: +2 Follow Ch Fader,
+  // +3 Follow Ch Mute, +5 Follow all (DCA/Mutes, Ch Fader/Mute); 00 Off / 01 On. +4 not identified.
+  const follow=v2?Object.fromEntries(Object.entries(IP_DIRECT_OUT_FOLLOW_OFFSETS).map(([k,o])=>[k,{offset:s+o,on:dat[s+o]===1,known:dat[s+o]<=1}])):null;
+  return {...r,sourceOffset:s+1,sourceRaw:dat[s+1],sourceLabel:IP_DIRECT_OUT_SOURCE_LABELS.get(dat[s+1])||`Unknown 0x${hexByte(dat[s+1])}`,sourceKnown:IP_DIRECT_OUT_SOURCE_LABELS.has(dat[s+1]),writableShape:v2,follow};
 }
 
 function parseInputDelays(dat){
@@ -190,6 +195,10 @@ function setInputDirectOutLevel(channel,db){
 function setGlobalDirectOutSource(rawValue){
   const g=getGlobalDirectOutputs(),raw=Number(rawValue);if(!g?.writableShape||!IP_DIRECT_OUT_SOURCE_LABELS.has(raw))return false;
   state.current.stage.datBytes[g.sourceOffset]=raw;g.sourceRaw=raw;g.sourceLabel=IP_DIRECT_OUT_SOURCE_LABELS.get(raw);g.sourceKnown=true;markStageDirty();return true;
+}
+function setGlobalDirectOutFollow(key,on){
+  const f=getGlobalDirectOutputs()?.follow?.[key];if(!f?.known)return false;
+  state.current.stage.datBytes[f.offset]=on?1:0;f.on=!!on;markStageDirty();return true;
 }
 function setInputDelayActive(channel,on){const d=getInputDelay(channel);if(!d?.writableShape)return false;const raw=on?0:1;state.current.stage.datBytes[d.bypassOffset]=raw;d.bypassRaw=raw;d.active=!!on;markStageDirty();return true;}
 function setInputDelayMs(channel,ms){const d=getInputDelay(channel);if(!d?.writableShape)return false;let v=Number(ms);if(!Number.isFinite(v))return false;v=Math.max(IP_DELAY_MIN_MS,Math.min(IP_DELAY_MAX_MS,v));const raw=Math.round(v*96);ipWriteU16(state.current.stage.datBytes,d.delayOffset,raw);d.delayRaw=raw;d.delayMs=raw/96;markStageDirty();return true;}

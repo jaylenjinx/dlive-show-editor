@@ -1,0 +1,11 @@
+/* Console pages added for later-mapped features (app-console-ui-more.js). */
+.console-scope-switch{display:flex;gap:4px;margin-right:10px}.console-scope-switch button{padding:6px 12px;border:1px solid #6b777b;background:#1d2629;color:#d4dddf;border-radius:3px;font-weight:700;cursor:pointer}.console-scope-switch button.active{background:#08c7ff;color:#04161d;border-color:#08c7ff}
+.console-toolbar-name{display:flex;gap:6px;align-items:center}
+.console-library-select{margin-left:8px;max-width:160px}
+.console-geq{margin:0 12px 12px;border:1px solid #929da1;background:#344247;border-radius:5px;padding:12px}.console-geq .console-subhead{display:flex;gap:10px;align-items:center}
+.console-geq-faders{display:grid;grid-template-columns:repeat(28,minmax(22px,1fr));gap:2px;margin-top:10px;overflow-x:auto}.console-geq-faders label{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px;color:#b8c2c6}.console-geq-faders input[type=range]{writing-mode:vertical-lr;direction:rtl;height:150px;width:20px;margin:0}.console-geq-faders output{font-size:9px;color:#d4dddf;font-variant-numeric:tabular-nums}
+.console-neq{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px;margin-top:10px}.console-neq-band{display:flex;gap:4px;align-items:center;font-size:11px;color:#d4dddf}
+.console-fx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;padding:12px}.console-fx-unit{border:1px solid #929da1;background:#344247;border-radius:5px;padding:10px;display:grid;gap:6px}.console-fx-unit.ufx{border-color:#08c7ff}.console-fx-unit span{color:#d4dddf;font-size:12px;min-height:1.2em}.console-fx-unit b{color:#fff}
+.console-sk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;padding:12px}.console-sk{border:1px solid #929da1;background:#344247;border-radius:5px;padding:8px;display:grid;gap:4px}.console-sk.unused{opacity:.6}.console-sk span{color:#d4dddf;font-size:12px;min-height:2.4em}.console-sk b{color:#fff;font-size:12px}
+.console-sk-editor{margin:0 12px 12px;border:1px solid #08c7ff;background:#344247;border-radius:5px;padding:12px;display:grid;gap:10px;max-width:420px}.console-sk-editor label{display:grid;gap:5px;font-size:12px;color:#d4dddf;font-weight:700}
+@media (max-width:760px){.console-geq-faders{grid-template-columns:repeat(14,minmax(22px,1fr))}}
