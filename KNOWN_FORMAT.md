@@ -172,6 +172,8 @@ V2's Structure inspector now discovers labelled framed records using this rule a
 
 ## 6. MixConfig.dat — DECODED, READ ONLY
 
+Converting a show to a different config (every config-dependent record) is covered in [docs/mix-config.md](docs/mix-config.md) and `tools/mixconfig_convert.py`.
+
 Every Director *MixRack › Mixer Config* setting was changed and one show saved per config: RevEngCfgA with all-distinct counts, RevEngM0–M5 for each Main type, and RevEngM6 for Individual strips.
 
 ```text

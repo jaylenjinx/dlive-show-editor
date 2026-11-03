@@ -82,6 +82,18 @@ class CheckerTests(unittest.TestCase):
         self.assertEqual((a['stereo_matrices'],a['mono_matrices'],a['pafl'],a['main_type'],a['main_strips']),(1,8,2,'LR','Combined'))
         self.assertEqual(dl.decode_mixconfig(bytes.fromhex('01 02 07 06 03 04 05 00 05 01 08 02 17'))['main_type'],'5.1 Surround')
 
+    def test_mix_mixer_layout_matches_corpus_sizes(self):
+        # Sizes of real scene Mix Mixer records (v2, v3, v4) from the USB show corpus.
+        for header,size in (('02 04 04 08 00 08 08 04 04 01 01',3555),('03 04 04 08 00 08 08 04 04 06 00',4315),
+                            ('04 04 04 08 00 08 08 04 04 01 01',3947),('04 0a 08 06 00 08 04 06 03 01 01',6008)):
+            self.assertEqual(dl.mix_mixer_layout(bytes.fromhex(header))['size'],size)
+        lay=dl.mix_mixer_layout(bytes.fromhex('04 04 04 08 00 08 08 04 04 01 01'))
+        self.assertEqual(lay['blocks'][0],('Group 1',11,217))
+        self.assertEqual(lay['blocks'][-1],('UFX sends',3627,320))
+        # Director 2.12 scene (0/8 groups, 8 FX, 6/4 aux, 2/2 mtx, 5.1 combined = 4 Main blocks)
+        lay=dl.mix_mixer_layout(bytes.fromhex('04 00 08 08 00 06 04 02 02 04 01'))
+        self.assertEqual((lay['size'],lay['group_block'],lay['blocks'][2][1]),(2811,167,345))
+
     def test_config_a_layout(self):
         # RevEngCfgA: every send offset measured on input 13 matches the rule
         entries,section,size=dl.input_mixer_layout(bytes.fromhex('03 02 07 06 03 04 05 08 01 01 01 02'))

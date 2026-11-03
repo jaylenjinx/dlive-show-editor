@@ -201,6 +201,32 @@ def input_mixer_layout(header: bytes) -> tuple[list[tuple[str, int, int]], int, 
             entries.append((f"UFX {i + 1}", o, 5)); o += 5
     return entries, section, o
 
+def mix_mixer_layout(header: bytes) -> dict[str, Any]:
+    """Block layout of the scene `Mix Mixer` record (corpus fit + Director 2.12, 2026-11-04).
+
+    header = [version, monoGrp, stGrp, monoFX, stFX, monoAux, stAux, monoMtx, stMtx, mainBlocks,
+              mainStrips] (11 bytes; no PAFL byte, unlike Input Mixer). Send entries are 5 bytes
+    [on, pre, level_i16, pan]. Blocks in order:
+    - one per group: sends in the Input Mixer order (mono FX, mono Aux, stereo FX, stereo Aux,
+      mono Mtx, stereo Mtx), then on version >= 4 one group-to-group assign byte per group plus the
+      Grp To Grp Send Point byte, then the 48-byte section;
+    - one per aux and per Main block: matrix sends, then the 48-byte section;
+    - one per matrix: the 48-byte section;
+    - version >= 3: 8 UFX sends per group, after all the blocks.
+    """
+    ver, mg, sg, mfx, sfx, ma, sa, mm, sm, main = header[:10]
+    G, A, M = mg + sg, ma + sa, mm + sm
+    group = 5 * (mfx + sfx + A + M) + (G + 1 if ver >= 4 else 0) + 48
+    bus = 5 * M + 48
+    blocks: list[tuple[str, int, int]] = []
+    o = 11
+    for kind, n, size in (("Group", G, group), ("Aux", A, bus), ("Main", main, bus), ("Mtx", M, 48)):
+        for i in range(n):
+            blocks.append((f"{kind} {i + 1}", o, size)); o += size
+    if ver >= 3:
+        blocks.append(("UFX sends", o, 40 * G)); o += 40 * G
+    return {"blocks": blocks, "size": o, "group_block": group, "bus_block": bus}
+
 def input_mixer_field(record: Record, rel_start: int, rel_end: int, data: bytes) -> dict[str, Any] | None:
     header = data[record.state_start:record.state_start + 12]
     if len(header) < 12 or header[0] not in (2, 3):
