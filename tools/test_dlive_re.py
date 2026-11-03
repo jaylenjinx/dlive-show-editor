@@ -88,8 +88,11 @@ class CheckerTests(unittest.TestCase):
                             ('04 04 04 08 00 08 08 04 04 01 01',3947),('04 0a 08 06 00 08 04 06 03 01 01',6008)):
             self.assertEqual(dl.mix_mixer_layout(bytes.fromhex(header))['size'],size)
         lay=dl.mix_mixer_layout(bytes.fromhex('04 04 04 08 00 08 08 04 04 01 01'))
-        self.assertEqual(lay['blocks'][0],('Group 1',11,257))
-        self.assertEqual(lay['blocks'][-1][0],'Mtx 8')
+        self.assertEqual(lay['blocks'][0],('Group 1',11,217))
+        self.assertEqual(lay['blocks'][-1],('UFX sends',3627,320))
+        # Director 2.12 scene (0/8 groups, 8 FX, 6/4 aux, 2/2 mtx, 5.1 combined = 4 Main blocks)
+        lay=dl.mix_mixer_layout(bytes.fromhex('04 00 08 08 00 06 04 02 02 04 01'))
+        self.assertEqual((lay['size'],lay['group_block'],lay['blocks'][2][1]),(2811,167,345))
 
     def test_config_a_layout(self):
         # RevEngCfgA: every send offset measured on input 13 matches the rule
